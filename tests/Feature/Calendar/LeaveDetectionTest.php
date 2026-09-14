@@ -205,8 +205,8 @@ test('sync now refreshes leave as well as busy times', function () {
         ->post(route('integrations.sync', ['calendarAccount' => $account->id]))
         ->assertRedirect();
 
-    Queue::assertPushed(SyncCalendarBusyBlocks::class);
-    Queue::assertPushed(SyncLeavePeriods::class);
+    Queue::assertPushedOn('calendars', SyncCalendarBusyBlocks::class);
+    Queue::assertPushedOn('calendars', SyncLeavePeriods::class);
 });
 
 test('a long graph failure is trimmed to fit the sync error column', function () {

@@ -167,9 +167,19 @@ services:
     # calendar -- the jobs simply pile up in the `jobs` table with no visible
     # error anywhere. Booking notifications queue through here too.
     #
+    # Queue order is priority: the worker drains `default` before it takes any
+    # `calendars` job. The hourly calendars:sync used to queue two Graph calls
+    # per account on `default`, each able to time out and retry, and booking
+    # mail sat behind them for minutes. Only those sweep jobs moved.
+    #
+    # SyncBookingToCalendars deliberately stays on `default`, queued ahead of
+    # the booking's notifications: it writes the Teams/Meet link the
+    # confirmation email reads, so on a lower-priority queue the email would
+    # go out before the link existed.
+    #
     # --max-time recycles the worker hourly so a slow leak cannot accumulate,
     # and picks up new code only on redeploy (the image is immutable).
-    command: php artisan queue:work --queue=default --sleep=3 --tries=3 --max-time=3600
+    command: php artisan queue:work --queue=default,calendars --sleep=3 --tries=3 --max-time=3600
     env_file: .env.docker
     extra_hosts:
       - host.docker.internal:host-gateway
@@ -203,8 +213,8 @@ services:
     image: ${APP_SLUG:-tx-bookings}/app:${APP_VERSION:-latest}
     restart: unless-stopped
     # Unlike texra-crm's, this scheduler has real work: routes/console.php
-    # registers bookings:send-reminders every five minutes, calendars:sync
-    # hourly, and a daily expired-invitation sweep. Exactly one replica --
+    # registers bookings:send-reminders and automations:run every minute,
+    # calendars:sync hourly, and a daily expired-invitation sweep. Exactly one replica --
     # two would double-fire every one of them, which for reminders means
     # invitees get the same email twice.
     command: php artisan schedule:work

@@ -27,7 +27,9 @@ class SyncLeavePeriods implements ShouldQueue
         public CalendarAccount $account,
         public int $daysAhead = 60,
     ) {
-        //
+        // The hourly sweep queues one of these per account. On the default
+        // queue that backlog held up every booking email behind it.
+        $this->onQueue('calendars');
     }
 
     /**

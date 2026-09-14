@@ -11,7 +11,7 @@
 # Rolled this way:   app       (user-facing)
 # Plainly recreated: web, queue, scheduler
 #   Two schedulers running at once would double-fire scheduled commands, and
-#   bookings:send-reminders runs every five minutes -- invitees would get the
+#   bookings:send-reminders runs every minute -- invitees would get the
 #   same reminder twice. A few seconds without a background worker is not
 #   user-visible.
 set -euo pipefail
