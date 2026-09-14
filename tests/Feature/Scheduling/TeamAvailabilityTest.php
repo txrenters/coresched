@@ -172,3 +172,47 @@ test('a group booking still blocks the host on other event types', function () {
 
     expect($starts->all())->toBe(['10:00:00']);
 });
+
+test('a group event does not offer a start that overlaps a session booked at another time', function () {
+    $owner = hostWorking('09:00:00', '13:00:00');
+
+    $eventType = EventType::factory()->ownedBy($owner)->group(seats: 5)->create([
+        'duration_minutes' => 60,
+        'slot_interval_minutes' => 30,
+    ]);
+
+    Booking::factory()->create([
+        'event_type_id' => $eventType->id,
+        'user_id' => $owner->id,
+        'team_id' => $eventType->team_id,
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-09-02 11:00:00', 'UTC'),
+    ]);
+
+    $starts = app(AvailabilityEngine::class)->slots($eventType->fresh(), day())
+        ->map(fn ($slot) => $slot->startsAt->toTimeString());
+
+    expect($starts->all())->toBe(['09:00:00', '10:00:00', '11:00:00', '11:30:00', '12:00:00']);
+});
+
+test('a group event keeps its buffers around a session booked at another time', function () {
+    $owner = hostWorking('09:00:00', '13:00:00');
+
+    $eventType = EventType::factory()->ownedBy($owner)->group(seats: 5)->create([
+        'duration_minutes' => 60,
+        'buffer_after_minutes' => 30,
+    ]);
+
+    Booking::factory()->create([
+        'event_type_id' => $eventType->id,
+        'user_id' => $owner->id,
+        'team_id' => $eventType->team_id,
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-09-02 11:00:00', 'UTC'),
+    ]);
+
+    $starts = app(AvailabilityEngine::class)->slots($eventType->fresh(), day())
+        ->map(fn ($slot) => $slot->startsAt->toTimeString());
+
+    expect($starts->all())->toBe(['09:00:00', '10:00:00', '12:00:00']);
+});

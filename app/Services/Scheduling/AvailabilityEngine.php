@@ -67,7 +67,11 @@ class AvailabilityEngine
 
         $slots = $this->applyHostLimits($eventType, $slots, $expanded, $ignoringBookingId);
 
-        return $this->applyBookingLimits($eventType, $slots);
+        if ($eventType->kind->allowsMultipleInvitees()) {
+            $slots = $this->withoutOverlappingSessions($eventType, $slots, $ignoringBookingId);
+        }
+
+        return $this->applyBookingLimits($eventType, $slots, $ignoringBookingId);
     }
 
     /**
@@ -346,12 +350,52 @@ class AvailabilityEngine
     }
 
     /**
+     * Drop group slots that would overlap a session already booked at another time.
+     *
+     * A group event's own bookings are left out of busy time so a session with
+     * seats left stays offered, but that must only hold for the session's own
+     * start. When the interval is shorter than the duration, or buffers are
+     * set, a start that overlaps an existing session would put the host in two
+     * at once.
+     *
+     * @param  Collection<int, AvailabilitySlot>  $slots
+     * @return Collection<int, AvailabilitySlot>
+     */
+    protected function withoutOverlappingSessions(EventType $eventType, Collection $slots, ?int $ignoringBookingId): Collection
+    {
+        if ($slots->isEmpty()) {
+            return $slots;
+        }
+
+        $sessions = Booking::query()
+            ->active()
+            ->where('event_type_id', $eventType->id)
+            ->where('starts_at', '<', $slots->last()->endsAt->addMinutes($eventType->buffer_before_minutes))
+            ->where('ends_at', '>', $slots->first()->startsAt->subMinutes($eventType->buffer_after_minutes))
+            ->when($ignoringBookingId !== null, fn ($query) => $query->whereKeyNot($ignoringBookingId))
+            ->get(['id', 'starts_at', 'ends_at']);
+
+        if ($sessions->isEmpty()) {
+            return $slots;
+        }
+
+        return $slots
+            ->reject(fn (AvailabilitySlot $slot) => $sessions->contains(
+                fn (Booking $session) => ! $slot->startsAt->equalTo($session->starts_at)
+                    && TimeRange::make($session->starts_at, $session->ends_at)
+                        ->pad($eventType->buffer_before_minutes, $eventType->buffer_after_minutes)
+                        ->overlaps(new TimeRange($slot->startsAt, $slot->endsAt)),
+            ))
+            ->values();
+    }
+
+    /**
      * Drop slots that would breach the daily limit or that have no seats left.
      *
      * @param  Collection<int, AvailabilitySlot>  $slots
      * @return Collection<int, AvailabilitySlot>
      */
-    protected function applyBookingLimits(EventType $eventType, Collection $slots): Collection
+    protected function applyBookingLimits(EventType $eventType, Collection $slots, ?int $ignoringBookingId = null): Collection
     {
         if ($slots->isEmpty()) {
             return $slots;
@@ -369,6 +413,7 @@ class AvailabilityEngine
             ->active()
             ->where('event_type_id', $eventType->id)
             ->whereBetween('starts_at', [$from, $to])
+            ->when($ignoringBookingId !== null, fn ($query) => $query->whereKeyNot($ignoringBookingId))
             ->get(['id', 'starts_at']);
 
         $perDay = $existing

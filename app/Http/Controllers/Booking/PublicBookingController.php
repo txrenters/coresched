@@ -69,7 +69,7 @@ class PublicBookingController extends Controller
      */
     public function editSchedule(Request $request, Booking $booking): RedirectResponse
     {
-        abort_unless($booking->isChangeable(), 410);
+        abort_unless($booking->isChangeable() && ! $booking->eventType->trashed(), 410);
 
         $eventType = $booking->eventType;
         $page = $eventType->kind->hasHostPool()
@@ -89,7 +89,7 @@ class PublicBookingController extends Controller
      */
     public function updateSchedule(Request $request, Booking $booking, RescheduleBooking $rescheduleBooking): RedirectResponse
     {
-        abort_unless($booking->isChangeable(), 410);
+        abort_unless($booking->isChangeable() && ! $booking->eventType->trashed(), 410);
 
         $validated = $request->validate([
             'starts_at' => ['required', 'date'],

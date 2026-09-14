@@ -309,3 +309,25 @@ test('slots align to the working window start even when it is not on the hour', 
 
     expect($starts->all())->toBe(['09:15:00', '10:15:00', '11:15:00']);
 });
+
+test('a booking on a deleted event type still blocks its host', function () {
+    $host = scheduledHost();
+    $eventType = EventType::factory()->ownedBy($host)->create(['duration_minutes' => 60]);
+    $deleted = EventType::factory()->ownedBy($host)->create(['duration_minutes' => 60]);
+
+    Booking::factory()->create([
+        'event_type_id' => $deleted->id,
+        'user_id' => $host->id,
+        'team_id' => $deleted->team_id,
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-09-02 11:00:00', 'UTC'),
+    ]);
+
+    $deleted->delete();
+
+    $starts = engine()->slots($eventType, wednesday())
+        ->map(fn ($slot) => $slot->startsAt->toTimeString());
+
+    expect($starts)->toHaveCount(7)
+        ->and($starts)->not->toContain('10:00:00');
+});
