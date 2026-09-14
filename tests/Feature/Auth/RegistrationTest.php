@@ -31,9 +31,10 @@ test('an expired invitation does not reopen registration', function () {
 });
 
 test('invited users can register', function () {
-    invitationFor('test@example.com');
+    $invitation = invitationFor('test@example.com');
 
     $response = $this->post(route('register.store'), [
+        'invitation' => $invitation->code,
         'name' => 'Test User',
         'email' => 'test@example.com',
         'password' => 'password',
@@ -42,7 +43,7 @@ test('invited users can register', function () {
 
     $this->assertAuthenticated();
 
-    expect(User::where('email', 'test@example.com')->exists())->toBeTrue();
+    expect(User::where('email', 'test@example.com')->value('email_verified_at'))->not->toBeNull();
     $response->assertRedirect(route('dashboard'));
 });
 
@@ -65,6 +66,7 @@ test('an accepted invitation cannot be reused to register', function () {
     $invitation->update(['accepted_at' => now()]);
 
     $this->post(route('register.store'), [
+        'invitation' => $invitation->code,
         'name' => 'Second Try',
         'email' => 'used@example.com',
         'password' => 'password',
@@ -93,9 +95,10 @@ test('registering an email that already has an account points at the password re
 });
 
 test('the invitation check ignores address casing', function () {
-    invitationFor('Mixed.Case@Example.com');
+    $invitation = invitationFor('Mixed.Case@Example.com');
 
     $this->post(route('register.store'), [
+        'invitation' => $invitation->code,
         'name' => 'Mixed Case',
         'email' => 'mixed.case@example.com',
         'password' => 'password',
@@ -103,4 +106,34 @@ test('the invitation check ignores address casing', function () {
     ]);
 
     $this->assertAuthenticated();
+});
+
+test('knowing an invited address is not enough to register without its invitation code', function () {
+    invitationFor('new-admin@example.com');
+
+    $this->post(route('register.store'), [
+        'name' => 'Not Them',
+        'email' => 'new-admin@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ])->assertSessionHasErrors([
+        'email' => 'Registration is by invitation only. Ask an administrator to invite you.',
+    ]);
+
+    $this->assertGuest();
+});
+
+test('another invitation\'s code does not unlock registration for a different address', function () {
+    invitationFor('new-admin@example.com');
+    $otherInvitation = invitationFor('someone-else@example.com');
+
+    $this->post(route('register.store'), [
+        'invitation' => $otherInvitation->code,
+        'name' => 'Not Them',
+        'email' => 'new-admin@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ])->assertSessionHasErrors('email');
+
+    $this->assertGuest();
 });

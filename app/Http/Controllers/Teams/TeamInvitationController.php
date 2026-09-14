@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class TeamInvitationController extends Controller
 {
@@ -77,31 +78,49 @@ class TeamInvitationController extends Controller
     }
 
     /**
-     * Join straight from the emailed link.
+     * Show the confirmation page behind the emailed "Join Now" link.
      *
-     * The one-click path: for an address with no account yet this creates one,
-     * signs the invitee in and accepts the invitation in a single request, so
-     * there is no form to fill in and no password to invent.
+     * Opening the link changes nothing. Mail security scanners (Microsoft Safe
+     * Links among them) fetch links in an email before the person does, and
+     * when this GET created the account it handed the scanner a signed in
+     * session and burned the invitation, leaving the real invitee with "expired
+     * or already used". The account is only created by the POST from this page.
      *
      * An address that ALREADY has an account is sent to sign in instead, and is
-     * deliberately not signed in automatically. That account may hold a
+     * deliberately never signed in automatically. That account may hold a
      * password and a second factor, and honouring a link from an inbox as proof
      * of identity would let anyone holding the email walk past both.
      */
-    public function join(Request $request, TeamInvitation $invitation, JoinTeamFromInvitation $joinTeam): RedirectResponse
+    public function showJoin(TeamInvitation $invitation): RedirectResponse|Response
     {
-        if (! $invitation->isPending()) {
-            return to_route('login')->withErrors([
-                'email' => __('This invitation has expired or has already been used.'),
-            ]);
+        if ($redirect = $this->redirectAwayFromJoin($invitation)) {
+            return $redirect;
         }
 
-        $existing = User::query()
-            ->whereRaw('lower(email) = ?', [mb_strtolower($invitation->email)])
-            ->first();
+        $invitation->loadMissing(['team', 'inviter']);
 
-        if ($existing !== null) {
-            return redirect()->route('login', ['invitation' => $invitation->code]);
+        return Inertia::render('auth/JoinInvitation', [
+            'invitation' => [
+                'code' => $invitation->code,
+                'email' => $invitation->email,
+                'teamName' => $invitation->team->name,
+                'roleLabel' => $invitation->role->label(),
+                'inviterName' => $invitation->inviter?->name,
+            ],
+        ]);
+    }
+
+    /**
+     * Join from the confirmation page.
+     *
+     * For an address with no account yet this creates one, signs the invitee
+     * in and accepts the invitation in a single request, so there is no form to
+     * fill in and no password to invent.
+     */
+    public function join(Request $request, TeamInvitation $invitation, JoinTeamFromInvitation $joinTeam): RedirectResponse
+    {
+        if ($redirect = $this->redirectAwayFromJoin($invitation)) {
+            return $redirect;
         }
 
         $user = $joinTeam->handle($invitation);
@@ -162,5 +181,25 @@ class TeamInvitationController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Invitation declined.')]);
 
         return to_route('dashboard');
+    }
+
+    /**
+     * Send the visitor somewhere else when this invitation cannot create an account.
+     */
+    protected function redirectAwayFromJoin(TeamInvitation $invitation): ?RedirectResponse
+    {
+        if (! $invitation->isPending()) {
+            return to_route('login')->withErrors([
+                'email' => __('This invitation has expired or has already been used.'),
+            ]);
+        }
+
+        $hasAccount = User::query()
+            ->whereRaw('lower(email) = ?', [mb_strtolower($invitation->email)])
+            ->exists();
+
+        return $hasAccount
+            ? redirect()->route('login', ['invitation' => $invitation->code])
+            : null;
     }
 }

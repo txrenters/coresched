@@ -7,7 +7,6 @@ use App\Http\Requests\Settings\ProfileDeleteRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
 use App\Models\User;
 use App\Support\PhoneNumber;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,7 +23,12 @@ class ProfileController extends Controller
     public function edit(Request $request): Response
     {
         return Inertia::render('settings/Profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            /*
+             * Always true: the User model does not implement MustVerifyEmail,
+             * so nothing is locked behind verification, but a changed address
+             * must be verified before it can accept an invitation.
+             */
+            'mustVerifyEmail' => true,
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -44,13 +48,21 @@ class ProfileController extends Controller
             $user->phone = PhoneNumber::toE164($user->phone);
         }
 
-        if ($user->isDirty('email')) {
+        $emailChanged = $user->isDirty('email');
+
+        if ($emailChanged) {
             $user->email_verified_at = null;
         }
 
         $user->save();
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Profile updated.')]);
+        if ($emailChanged) {
+            $user->sendEmailVerificationNotification();
+        }
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $emailChanged
+            ? __('Profile updated. Check your new email address for a verification link.')
+            : __('Profile updated.')]);
 
         return to_route('profile.edit');
     }

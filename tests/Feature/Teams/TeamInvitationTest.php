@@ -62,7 +62,7 @@ test('joining from the email creates the account, signs the invitee in and accep
         'invited_by' => $owner->id,
     ]);
 
-    $this->get(route('invitations.join', ['invitation' => $invitation->code]))
+    $this->post(route('invitations.join.store', ['invitation' => $invitation->code]))
         ->assertRedirect(route('dashboard', ['current_team' => $team->slug]));
 
     $user = User::where('email', 'newcomer@example.com')->first();
@@ -88,11 +88,41 @@ test('joining gives the invitee working hours rather than an empty calendar', fu
         'invited_by' => $owner->id,
     ]);
 
-    $this->get(route('invitations.join', ['invitation' => $invitation->code]));
+    $this->post(route('invitations.join.store', ['invitation' => $invitation->code]));
 
     $user = User::where('email', 'newcomer@example.com')->first();
 
     expect($user->availabilitySchedules()->exists())->toBeTrue();
+});
+
+/*
+ * Mail scanners open links in an email before the invitee does. Opening the
+ * link must leave the invitation usable and nobody signed in.
+ */
+test('opening the join link only shows the confirmation page', function () {
+    $owner = User::factory()->create(['name' => 'Dana Reed']);
+    $team = Team::factory()->create(['name' => 'Leasing']);
+
+    $team->members()->attach($owner, ['role' => TeamRole::Admin->value]);
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => 'newcomer@example.com',
+        'role' => TeamRole::Member->value,
+        'invited_by' => $owner->id,
+    ]);
+
+    $this->get(route('invitations.join', ['invitation' => $invitation->code]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('auth/JoinInvitation')
+            ->where('invitation.code', $invitation->code)
+            ->where('invitation.teamName', 'Leasing')
+            ->where('invitation.inviterName', 'Dana Reed'));
+
+    $this->assertGuest();
+    expect(User::where('email', 'newcomer@example.com')->exists())->toBeFalse()
+        ->and($invitation->fresh()->accepted_at)->toBeNull();
 });
 
 /*
@@ -111,11 +141,11 @@ test('a join link cannot be used twice', function () {
         'invited_by' => $owner->id,
     ]);
 
-    $this->get(route('invitations.join', ['invitation' => $invitation->code]));
+    $this->post(route('invitations.join.store', ['invitation' => $invitation->code]));
 
     $this->post(route('logout'));
 
-    $this->get(route('invitations.join', ['invitation' => $invitation->code]))
+    $this->post(route('invitations.join.store', ['invitation' => $invitation->code]))
         ->assertRedirect(route('login'));
 
     $this->assertGuest();
@@ -294,6 +324,35 @@ test('team invitations can be accepted', function () {
     expect($invitation->fresh()->accepted_at)->not->toBeNull();
 });
 
+test('switching your email to an invitee\'s address does not let you accept their invitation', function () {
+    Notification::fake();
+
+    $owner = User::factory()->create();
+    $team = Team::factory()->create();
+    $intruder = User::factory()->create(['email' => 'intruder@example.com']);
+
+    $team->members()->attach($owner, ['role' => TeamRole::Admin->value]);
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => 'new-admin@example.com',
+        'role' => TeamRole::Admin,
+        'invited_by' => $owner->id,
+    ]);
+
+    $this->actingAs($intruder)->patch(route('profile.update'), [
+        'name' => $intruder->name,
+        'email' => 'new-admin@example.com',
+    ]);
+
+    $this->actingAs($intruder->fresh())
+        ->post(route('invitations.accept', $invitation))
+        ->assertSessionHasErrors('invitation');
+
+    expect($intruder->fresh()->belongsToTeam($team))->toBeFalse()
+        ->and($invitation->fresh()->accepted_at)->toBeNull();
+});
+
 test('team invitations can be declined by the invited user', function () {
     $owner = User::factory()->create();
     $invitedUser = User::factory()->create(['email' => 'invited@example.com']);
@@ -408,4 +467,46 @@ test('expired invitations cannot be accepted', function () {
     $response->assertSessionHasErrors('invitation');
 
     expect($invitedUser->fresh()->belongsToTeam($team))->toBeFalse();
+});
+
+test('a plain member is not shown pending invitations or their join codes', function () {
+    $admin = User::factory()->create();
+    $member = User::factory()->create();
+    $team = Team::factory()->create();
+
+    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $team->members()->attach($member, ['role' => TeamRole::Member->value]);
+
+    TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => 'new-admin@example.com',
+        'role' => TeamRole::Admin,
+        'invited_by' => $admin->id,
+    ]);
+
+    $this->actingAs($member)
+        ->get(route('teams.edit', $team))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('invitations', 0));
+});
+
+test('an admin still sees pending invitations on the organization page', function () {
+    $admin = User::factory()->create();
+    $team = Team::factory()->create();
+
+    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => 'new-member@example.com',
+        'role' => TeamRole::Member,
+        'invited_by' => $admin->id,
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('teams.edit', $team))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('invitations', 1)
+            ->where('invitations.0.code', $invitation->code));
 });

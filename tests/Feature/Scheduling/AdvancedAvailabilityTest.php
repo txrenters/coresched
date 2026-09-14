@@ -234,9 +234,10 @@ test('two limits for the same period are rejected', function () {
 });
 
 test('a newly registered user is opted in to their holidays', function () {
-    invitationFor('casey@example.com');
+    $invitation = invitationFor('casey@example.com');
 
     $this->post(route('register.store'), [
+        'invitation' => $invitation->code,
         'name' => 'Casey Lane',
         'email' => 'casey@example.com',
         'password' => 'password-password',
@@ -251,9 +252,10 @@ test('a newly registered user is opted in to their holidays', function () {
 });
 
 test('a new user is unavailable on a holiday out of the box', function () {
-    invitationFor('casey@example.com');
+    $invitation = invitationFor('casey@example.com');
 
     $this->post(route('register.store'), [
+        'invitation' => $invitation->code,
         'name' => 'Casey Lane',
         'email' => 'casey@example.com',
         'password' => 'password-password',
@@ -276,9 +278,10 @@ test('a new user is unavailable on a holiday out of the box', function () {
 test('the default country can be turned off', function () {
     config(['scheduling.default_holiday_country' => null]);
 
-    invitationFor('casey@example.com');
+    $invitation = invitationFor('casey@example.com');
 
     $this->post(route('register.store'), [
+        'invitation' => $invitation->code,
         'name' => 'Casey Lane',
         'email' => 'casey@example.com',
         'password' => 'password-password',

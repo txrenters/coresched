@@ -40,6 +40,14 @@ defineOptions({
         v-slot="{ errors, processing }"
         class="flex flex-col gap-6"
     >
+        <!-- CreateNewUser only accepts an address together with its invitation code. -->
+        <input
+            v-if="teamInvitation"
+            type="hidden"
+            name="invitation"
+            :value="teamInvitation.code"
+        />
+
         <div class="grid gap-6">
             <div class="grid gap-2">
                 <Label for="name">Name</Label>
