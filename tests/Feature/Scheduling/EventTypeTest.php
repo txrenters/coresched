@@ -324,6 +324,27 @@ test('a plain member cannot hand an event type to someone else', function () {
     expect(EventType::first()->user_id)->toBe($member->id);
 });
 
+test('a plain member cannot put a colleague\'s personal schedule on their own event type', function () {
+    $team = Team::factory()->create();
+    $member = User::factory()->create();
+    $colleague = User::factory()->create();
+
+    $team->members()->attach($member, ['role' => TeamRole::Member->value]);
+    $team->members()->attach($colleague, ['role' => TeamRole::Member->value]);
+    $member->switchTeam($team);
+
+    $colleaguesSchedule = AvailabilitySchedule::factory()->for($colleague)->create();
+
+    $this->actingAs($member)
+        ->post(route('scheduling.store', ['current_team' => $team->slug]), eventTypePayload([
+            'user_id' => $colleague->id,
+            'availability_schedule_id' => $colleaguesSchedule->id,
+        ]))
+        ->assertSessionHasErrors('availability_schedule_id');
+
+    expect(EventType::count())->toBe(0);
+});
+
 test('an event type cannot be handed to someone outside the team', function () {
     $stranger = User::factory()->create();
 
