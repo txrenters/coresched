@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Bookings\RescheduleBooking;
 use App\Enums\BookingStatus;
 use App\Enums\EventTypeKind;
 use App\Enums\QuestionType;
@@ -19,6 +20,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function () {
     $this->travelTo(CarbonImmutable::parse('2026-08-31 08:00:00', 'UTC'));
@@ -652,4 +654,125 @@ test('a phone question accepts the ways people write numbers', function () {
 
     expect(Booking::latest('id')->first()->answers()->sole()->answer)
         ->toBe('+1 (346) 239-9213');
+});
+
+test('a booking on a deleted event type still shows its confirmation page', function () {
+    $booking = Booking::factory()->create([
+        'event_type_id' => $this->eventType->id,
+        'user_id' => $this->host->id,
+        'team_id' => $this->eventType->team_id,
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-09-02 11:00:00', 'UTC'),
+    ]);
+
+    $this->eventType->delete();
+
+    $this->get(route('booking.show', ['booking' => $booking->uid]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('booking.eventTypeName', 'Intro call'));
+});
+
+test('a booking on a deleted event type cannot be rescheduled', function () {
+    Notification::fake();
+
+    $booking = Booking::factory()->create([
+        'event_type_id' => $this->eventType->id,
+        'user_id' => $this->host->id,
+        'team_id' => $this->eventType->team_id,
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-09-02 11:00:00', 'UTC'),
+    ]);
+
+    $this->eventType->delete();
+
+    $this->get(route('booking.reschedule', ['booking' => $booking->uid]))->assertGone();
+
+    $this->post(route('booking.reschedule.store', ['booking' => $booking->uid]), [
+        'starts_at' => CarbonImmutable::parse('2026-09-03 14:00:00', 'UTC')->toIso8601String(),
+    ])->assertGone();
+
+    expect(Booking::where('rescheduled_from_id', $booking->id)->exists())->toBeFalse();
+});
+
+test('a booking canceled while a reschedule is under way is not moved', function () {
+    Notification::fake();
+
+    $booking = Booking::factory()->create([
+        'event_type_id' => $this->eventType->id,
+        'user_id' => $this->host->id,
+        'team_id' => $this->eventType->team_id,
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-09-02 11:00:00', 'UTC'),
+    ]);
+
+    // The copy in hand still reads as confirmed; the stored row has moved on.
+    Booking::whereKey($booking->id)->update(['status' => BookingStatus::Canceled]);
+
+    expect(fn () => app(RescheduleBooking::class)->handle(
+        $booking,
+        CarbonImmutable::parse('2026-09-03 14:00:00', 'UTC'),
+    ))->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(410));
+
+    expect(Booking::where('rescheduled_from_id', $booking->id)->exists())->toBeFalse()
+        ->and($booking->fresh()->status)->toBe(BookingStatus::Canceled);
+});
+
+test('a booking can move within a day that has reached its daily limit', function () {
+    Notification::fake();
+
+    $this->eventType->update(['daily_booking_limit' => 1]);
+
+    $booking = Booking::factory()->create([
+        'event_type_id' => $this->eventType->id,
+        'user_id' => $this->host->id,
+        'team_id' => $this->eventType->team_id,
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-09-02 11:00:00', 'UTC'),
+    ]);
+
+    $this->post(route('booking.reschedule.store', ['booking' => $booking->uid]), [
+        'starts_at' => CarbonImmutable::parse('2026-09-02 13:00:00', 'UTC')->toIso8601String(),
+    ])->assertSessionHasNoErrors();
+
+    expect(Booking::where('rescheduled_from_id', $booking->id)->sole()->starts_at->toTimeString())
+        ->toBe('13:00:00');
+});
+
+test('a phone question refuses a list of answers', function () {
+    $question = $this->eventType->questions()->create([
+        'type' => QuestionType::Phone,
+        'label' => 'Best number to reach you',
+        'is_required' => true,
+        'position' => 0,
+    ]);
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), [
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC')->toIso8601String(),
+        'timezone' => 'America/Chicago',
+        'name' => 'Sam Rivera',
+        'email' => 'sam@example.com',
+        'answers' => [$question->id => ['+1 (346) 239-9213']],
+    ])->assertSessionHasErrors(["answers.{$question->id}" => 'Enter a phone number.']);
+
+    expect(Booking::query()->where('email', 'sam@example.com')->exists())->toBeFalse();
+});
+
+test('an answer nested deeper than a list is refused', function () {
+    $question = $this->eventType->questions()->create([
+        'type' => QuestionType::MultiSelect,
+        'label' => 'Topics',
+        'options' => ['Pricing', 'Onboarding'],
+        'is_required' => false,
+        'position' => 0,
+    ]);
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), [
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC')->toIso8601String(),
+        'timezone' => 'America/Chicago',
+        'name' => 'Sam Rivera',
+        'email' => 'sam@example.com',
+        'answers' => [$question->id => [['Pricing']]],
+    ])->assertSessionHasErrors(["answers.{$question->id}.0" => 'The answers.'.$question->id.'.0 field must be a string.']);
+
+    expect(Booking::query()->where('email', 'sam@example.com')->exists())->toBeFalse();
 });

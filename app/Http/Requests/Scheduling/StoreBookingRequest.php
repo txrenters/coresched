@@ -33,6 +33,7 @@ class StoreBookingRequest extends FormRequest
             'guests' => ['array', 'max:10'],
             'guests.*' => ['email', 'max:255'],
             'answers' => ['array'],
+            'answers.*.*' => ['string', 'max:2000'],
         ];
     }
 
@@ -72,7 +73,8 @@ class StoreBookingRequest extends FormRequest
                     $validator->errors()->add('location_detail', 'Add the number we should call you on.');
                 }
 
-                $answers = $this->input('answers', []);
+                $answers = $this->input('answers');
+                $answers = is_array($answers) ? $answers : [];
 
                 foreach ($eventType->questions as $question) {
                     $answer = $answers[$question->id] ?? null;
@@ -83,7 +85,9 @@ class StoreBookingRequest extends FormRequest
                         continue;
                     }
 
-                    if (blank($answer)) {
+                    // A list holding anything but text is already refused by
+                    // the answers.*.* rule and cannot be checked any further.
+                    if (blank($answer) || (is_array($answer) && count(array_filter($answer, 'is_string')) !== count($answer))) {
                         continue;
                     }
 
@@ -95,6 +99,12 @@ class StoreBookingRequest extends FormRequest
                      * is a booking form, not a carrier.
                      */
                     if ($question->type === QuestionType::Phone) {
+                        if (is_array($answer)) {
+                            $validator->errors()->add("answers.{$question->id}", 'Enter a phone number.');
+
+                            continue;
+                        }
+
                         $digits = preg_replace('/\D/', '', (string) $answer);
 
                         if (mb_strlen((string) $digits) < 7 || preg_match('/[^0-9+()\s.\-]/', (string) $answer)) {

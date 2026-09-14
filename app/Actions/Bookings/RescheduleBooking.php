@@ -26,25 +26,38 @@ class RescheduleBooking
      * The original is kept, marked as rescheduled, so the history of the
      * meeting survives and the invitee's old links resolve to something.
      *
+     * The original is locked and checked again inside the transaction, so a
+     * double submit or a cancel landing at the same moment cannot leave two
+     * replacements, or bring a canceled meeting back.
+     *
      * @throws SlotUnavailableException
      */
     public function handle(Booking $booking, CarbonImmutable $startsAt, ?string $reason = null): Booking
     {
-        $replacement = $this->createBooking->handle(
-            $booking->eventType,
-            $startsAt,
-            [
-                'name' => $booking->name,
-                'email' => $booking->email,
-                'notes' => $booking->notes,
-                'timezone' => $booking->invitee_timezone,
-                'location_detail' => $booking->location_detail,
-                'guests' => $booking->guests->pluck('email')->all(),
-            ],
-            replacing: $booking,
-        );
+        /*
+         * Everything read from the original is loaded before the transaction:
+         * CreateBooking's host locks must be its first reads, see handle().
+         */
+        $eventType = $booking->eventType;
+        $eventType->schedulingHosts();
+        $booking->loadMissing(['guests', 'answers']);
 
-        DB::transaction(function () use ($booking, $replacement, $reason) {
+        $attributes = [
+            'name' => $booking->name,
+            'email' => $booking->email,
+            'notes' => $booking->notes,
+            'timezone' => $booking->invitee_timezone,
+            'location_detail' => $booking->location_detail,
+            'guests' => $booking->guests->pluck('email')->all(),
+        ];
+
+        $replacement = DB::transaction(function () use ($booking, $eventType, $startsAt, $reason, $attributes) {
+            $original = Booking::query()->whereKey($booking->id)->lockForUpdate()->first();
+
+            abort_unless($original !== null && $original->isChangeable(), 410);
+
+            $replacement = $this->createBooking->handle($eventType, $startsAt, $attributes, replacing: $booking);
+
             $booking->update([
                 'status' => BookingStatus::Rescheduled,
                 'cancellation_reason' => $reason,
@@ -62,6 +75,8 @@ class RescheduleBooking
                     'answer' => $answer->answer,
                 ]);
             }
+
+            return $replacement;
         });
 
         RemoveBookingFromCalendars::dispatch($booking);

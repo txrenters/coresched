@@ -8,6 +8,7 @@ use App\Jobs\SyncBookingToCalendars;
 use App\Models\Booking;
 use App\Models\EventType;
 use App\Models\EventTypeQuestion;
+use App\Models\User;
 use App\Services\Activity\ActivityLogger;
 use App\Services\Scheduling\AvailabilityEngine;
 use Carbon\CarbonImmutable;
@@ -31,11 +32,19 @@ class CreateBooking
      *
      * @param  array{name: string, email: string, notes?: string|null, timezone?: string|null, location_detail?: string|null, guests?: array<int, string>, answers?: array<int|string, mixed>}  $attributes
      *
+     * The host pool is resolved before the transaction opens, so that locking
+     * the hosts is the first read inside it. A caller that wraps this in its
+     * own transaction must resolve the pool first for the same reason.
+     *
      * @throws SlotUnavailableException
      */
     public function handle(EventType $eventType, CarbonImmutable $startsAt, array $attributes, ?Booking $replacing = null): Booking
     {
-        $booking = DB::transaction(function () use ($eventType, $startsAt, $attributes, $replacing) {
+        $candidateHostIds = $eventType->schedulingHosts()->modelKeys();
+
+        $booking = DB::transaction(function () use ($eventType, $startsAt, $attributes, $replacing, $candidateHostIds) {
+            $this->lockHosts($candidateHostIds);
+
             $slot = $this->availability->findSlot($eventType, $startsAt, $replacing?->id);
 
             if ($slot === null) {
@@ -82,7 +91,7 @@ class CreateBooking
 
         // A pending booking is written to calendars on approval, not before.
         if ($booking->status->isConfirmed()) {
-            SyncBookingToCalendars::dispatch($booking);
+            SyncBookingToCalendars::dispatch($booking)->afterCommit();
         }
 
         /*
@@ -115,6 +124,27 @@ class CreateBooking
         }
 
         return $booking;
+    }
+
+    /**
+     * Hold the hosts' rows until the booking commits.
+     *
+     * Two invitees picking the same slot at the same moment would otherwise
+     * both find it free and both be booked. Locking in id order keeps
+     * overlapping pools from deadlocking; under MySQL's repeatable read the
+     * lock must also come before any plain read in the transaction, or the
+     * availability check reads a snapshot taken before the other booking
+     * committed.
+     *
+     * @param  array<int, int>  $hostIds
+     */
+    protected function lockHosts(array $hostIds): void
+    {
+        User::query()
+            ->whereKey($hostIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->pluck('id');
     }
 
     /**

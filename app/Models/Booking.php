@@ -91,11 +91,15 @@ class Booking extends Model
     /**
      * Get the event type that was booked.
      *
+     * Includes a soft-deleted event type: deleting one leaves its bookings in
+     * place, and they still need its name and buffers to be shown, reminded
+     * about and counted as busy time.
+     *
      * @return BelongsTo<EventType, $this>
      */
     public function eventType(): BelongsTo
     {
-        return $this->belongsTo(EventType::class);
+        return $this->belongsTo(EventType::class)->withTrashed();
     }
 
     /**
