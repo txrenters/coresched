@@ -11,6 +11,8 @@ type Props = {
     selectedDate: string | null;
     loading?: boolean;
     minMonth?: string;
+    /** Today as YYYY-MM-DD in the calendar's timezone; defaults to the viewer's local date. */
+    today?: string;
     /** Grid aria-label prefix; the month name is appended. */
     gridLabel?: string;
     /** Announced after the date on days carrying the marker. */
@@ -22,6 +24,8 @@ type Props = {
 const props = withDefaults(defineProps<Props>(), {
     loading: false,
     minMonth: undefined,
+    // 'en-CA' renders the local date as YYYY-MM-DD.
+    today: () => new Date().toLocaleDateString('en-CA'),
     gridLabel: 'Available dates',
     markedDayLabel: 'times available',
     unmarkedDayLabel: 'no times available',
@@ -43,8 +47,6 @@ const weekdayLabels = [
 ];
 
 const available = computed(() => new Set(props.availableDates));
-
-const today = new Date().toISOString().slice(0, 10);
 
 const monthStart = computed(() => {
     const [y, m] = props.month.split('-').map((part) => Number(part));
@@ -94,6 +96,10 @@ const canGoBack = computed(
 );
 
 const shiftMonth = (delta: number) => {
+    if (delta < 0 && !canGoBack.value) {
+        return;
+    }
+
     const start = monthStart.value;
     const shifted = new Date(
         Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + delta, 1),
@@ -122,7 +128,11 @@ const monthDates = computed(() =>
 
 /** The day that owns the grid's tab stop: selection, else first open day, else the 1st. */
 const tabStopDate = computed(() => {
-    if (focusedDate.value && monthDates.value.includes(focusedDate.value)) {
+    if (
+        focusedDate.value &&
+        monthDates.value.includes(focusedDate.value) &&
+        available.value.has(focusedDate.value)
+    ) {
         return focusedDate.value;
     }
 
@@ -137,34 +147,68 @@ const tabStopDate = computed(() => {
     );
 });
 
+/** Set when the keyboard paged the month, so focus follows into the new grid. */
+const refocusAfterMonthChange = ref(false);
+
+const focusDate = async (date: string) => {
+    focusedDate.value = date;
+    await nextTick();
+    dayButtons.value[date]?.focus();
+};
+
 // A new month renders a new set of days, so the old focus target is gone.
 watch(
     () => props.month,
-    () => {
+    async () => {
         focusedDate.value = null;
         dayButtons.value = {};
+
+        if (!refocusAfterMonthChange.value) {
+            return;
+        }
+
+        refocusAfterMonthChange.value = false;
+        await nextTick();
+
+        if (tabStopDate.value) {
+            dayButtons.value[tabStopDate.value]?.focus();
+        }
     },
 );
 
+/*
+  Days without times are disabled buttons and cannot take focus, so the arrow
+  keys step over them to the next open day in that direction.
+*/
 const moveFocus = async (from: string, delta: number) => {
-    const index = monthDates.value.indexOf(from);
+    let index = monthDates.value.indexOf(from);
 
     if (index === -1) {
         return;
     }
 
-    const next = monthDates.value[index + delta];
+    for (;;) {
+        index += delta;
+        const next = monthDates.value[index];
 
-    if (!next) {
-        // Stepping past either edge advances the month rather than dead-ending.
-        shiftMonth(delta > 0 ? 1 : -1);
+        if (!next) {
+            // Stepping past either edge advances the month rather than dead-ending.
+            if (delta < 0 && !canGoBack.value) {
+                return;
+            }
 
-        return;
+            refocusAfterMonthChange.value = true;
+            shiftMonth(delta > 0 ? 1 : -1);
+
+            return;
+        }
+
+        if (available.value.has(next)) {
+            await focusDate(next);
+
+            return;
+        }
     }
-
-    focusedDate.value = next;
-    await nextTick();
-    dayButtons.value[next]?.focus();
 };
 
 const onKeydown = (event: KeyboardEvent, date: string) => {
@@ -184,13 +228,17 @@ const onKeydown = (event: KeyboardEvent, date: string) => {
 
     if (event.key === 'Home' || event.key === 'End') {
         event.preventDefault();
+        const openDates = monthDates.value.filter((day) =>
+            available.value.has(day),
+        );
         const target =
             event.key === 'Home'
-                ? monthDates.value[0]
-                : monthDates.value[monthDates.value.length - 1];
+                ? openDates[0]
+                : openDates[openDates.length - 1];
 
-        focusedDate.value = target;
-        void nextTick(() => dayButtons.value[target]?.focus());
+        if (target) {
+            void focusDate(target);
+        }
     }
 };
 </script>

@@ -10,6 +10,7 @@ import {
     Users,
 } from '@lucide/vue';
 import { computed } from 'vue';
+import { Button } from '@/components/ui/button';
 
 type Props = {
     booking: {
@@ -204,6 +205,24 @@ const subline = computed(() => {
                     </dd>
                 </div>
             </dl>
+
+            <div
+                v-if="booking.isChangeable"
+                class="flex flex-col gap-3 border-t border-border bg-muted/50 p-6 sm:flex-row"
+            >
+                <Button
+                    variant="outline"
+                    class="flex-1 cursor-pointer bg-card font-semibold"
+                    as-child
+                >
+                    <a :href="booking.rescheduleUrl">Reschedule</a>
+                </Button>
+                <Button variant="ghost" class="flex-1 cursor-pointer" as-child>
+                    <a :href="booking.cancelUrl" data-test="cancel-link">
+                        Cancel
+                    </a>
+                </Button>
+            </div>
         </div>
     </div>
 </template>

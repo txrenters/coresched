@@ -33,6 +33,7 @@ import { dashboard } from '@/routes';
 import { index as activityIndex } from '@/routes/activity';
 import { index as automationsIndex } from '@/routes/automations';
 import { index as availabilityIndex } from '@/routes/availability';
+import { page as bookingPage } from '@/routes/book';
 import { index as groupsIndex } from '@/routes/groups';
 import { index as logsIndex } from '@/routes/log-viewer';
 import { index as meetingsIndex } from '@/routes/meetings';
@@ -142,7 +143,7 @@ const footerNavItems = computed<NavItem[]>(() => {
         ? [
               {
                   title: 'View booking page',
-                  href: `/book/${slug}`,
+                  href: bookingPage(String(slug)),
                   icon: ExternalLink,
               },
           ]

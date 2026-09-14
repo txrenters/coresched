@@ -75,11 +75,22 @@ const selectedSlot = ref<Slot | null>(null);
 const guestInput = ref('');
 const guestError = ref<string | null>(null);
 const detailsHeading = ref<HTMLElement | null>(null);
+const timesHeading = ref<HTMLElement | null>(null);
+
+/** Matches the `guests` max rule in StoreBookingRequest. */
+const maxGuests = 10;
 
 const isRescheduling = computed(() => Boolean(props.reschedule));
 const slotsLoaded = computed(() => props.slots !== undefined);
 const availableDates = computed(() => Object.keys(props.slots ?? {}));
-const currentMonth = computed(() => new Date().toISOString().slice(0, 7));
+/*
+ * "Today" is the organizer's today, the same timezone the times are shown in,
+ * so the calendar does not roll over at midnight UTC.
+ */
+const today = computed(() =>
+    new Date().toLocaleDateString('en-CA', { timeZone: props.timezone }),
+);
+const currentMonth = computed(() => today.value.slice(0, 7));
 
 const slotsForSelectedDate = computed(() =>
     selectedDate.value ? (props.slots?.[selectedDate.value] ?? []) : [],
@@ -129,6 +140,16 @@ const errorFor = (key: string) => (form.errors as Record<string, string>)[key];
 
 const hasErrors = computed(() => Object.keys(form.errors).length > 0);
 
+/** The list-level rule reports on `guests`, a bad address on `guests.N`. */
+const guestsServerError = computed(() => {
+    const errors = form.errors as Record<string, string>;
+
+    return (
+        errors.guests ??
+        Object.entries(errors).find(([key]) => key.startsWith('guests.'))?.[1]
+    );
+});
+
 // Reloading with new query state re-runs the deferred slot lookup server side.
 const reload = (query: Record<string, string>) => {
     selectedDate.value = null;
@@ -151,6 +172,25 @@ watch(
 const selectDate = (date: string) => {
     selectedDate.value = date;
     pendingSlot.value = null;
+
+    /*
+     * On a phone the times stack under the calendar, below the fold, so bring
+     * them into view or picking a date looks like it did nothing.
+     */
+    if (!window.matchMedia('(max-width: 639px)').matches) {
+        return;
+    }
+
+    const reduceMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)',
+    ).matches;
+
+    void nextTick(() =>
+        timesHeading.value?.scrollIntoView({
+            behavior: reduceMotion ? 'auto' : 'smooth',
+            block: 'start',
+        }),
+    );
 };
 
 const selectSlot = (slot: Slot) => {
@@ -189,6 +229,12 @@ const addGuest = () => {
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         guestError.value = 'Enter a valid email address.';
+
+        return;
+    }
+
+    if (form.guests.length >= maxGuests) {
+        guestError.value = `You can add up to ${maxGuests} guests.`;
 
         return;
     }
@@ -349,6 +395,7 @@ const submit = () => {
                                     :selected-date="selectedDate"
                                     :loading="!slotsLoaded"
                                     :min-month="currentMonth"
+                                    :today="today"
                                     @update:month="
                                         (value) => reload({ month: value })
                                     "
@@ -374,7 +421,8 @@ const submit = () => {
 
                             <div class="min-w-0">
                                 <h3
-                                    class="mb-4 text-sm font-semibold"
+                                    ref="timesHeading"
+                                    class="mb-4 scroll-mt-4 text-sm font-semibold"
                                     aria-live="polite"
                                 >
                                     {{
@@ -544,6 +592,10 @@ const submit = () => {
                             class="mt-2"
                             :message="form.errors.starts_at"
                         />
+                        <InputError
+                            class="mt-2"
+                            :message="form.errors.timezone"
+                        />
 
                         <div v-if="!isRescheduling" class="mt-6 space-y-5">
                             <div class="grid gap-2">
@@ -592,9 +644,14 @@ const submit = () => {
                                 v-if="eventType.needsInviteePhone"
                                 class="grid gap-2"
                             >
-                                <Label for="location_detail"
-                                    >Phone number</Label
-                                >
+                                <Label for="location_detail">
+                                    Phone number
+                                    <span
+                                        class="text-destructive"
+                                        aria-hidden="true"
+                                        >*</span
+                                    >
+                                </Label>
                                 <Input
                                     id="location_detail"
                                     v-model="form.location_detail"
@@ -602,6 +659,11 @@ const submit = () => {
                                     inputmode="tel"
                                     autocomplete="tel"
                                     data-test="booking-phone"
+                                    required
+                                    aria-describedby="location_detail-help"
+                                    :aria-invalid="
+                                        Boolean(form.errors.location_detail)
+                                    "
                                 />
                                 <p
                                     id="location_detail-help"
@@ -620,9 +682,18 @@ const submit = () => {
                                 :key="question.id"
                                 class="grid gap-2"
                             >
+                                <!--
+                                  Radios and checkboxes have no single control
+                                  to point at; their group is labelled by id.
+                                -->
                                 <Label
                                     :id="`question-${question.id}-label`"
-                                    :for="`question-${question.id}`"
+                                    :for="
+                                        question.type === 'yes_no' ||
+                                        question.type === 'multi_select'
+                                            ? undefined
+                                            : `question-${question.id}`
+                                    "
                                 >
                                     {{ question.label }}
                                     <span
@@ -658,6 +729,11 @@ const submit = () => {
                                     class="flex gap-4"
                                     role="radiogroup"
                                     :aria-labelledby="`question-${question.id}-label`"
+                                    :aria-describedby="
+                                        question.helpText
+                                            ? `question-${question.id}-help`
+                                            : undefined
+                                    "
                                 >
                                     <label
                                         v-for="option in ['Yes', 'No']"
@@ -678,6 +754,13 @@ const submit = () => {
                                 <div
                                     v-else-if="question.type === 'multi_select'"
                                     class="grid gap-2"
+                                    role="group"
+                                    :aria-labelledby="`question-${question.id}-label`"
+                                    :aria-describedby="
+                                        question.helpText
+                                            ? `question-${question.id}-help`
+                                            : undefined
+                                    "
                                 >
                                     <label
                                         v-for="option in question.options"
@@ -791,7 +874,11 @@ const submit = () => {
                                         inputmode="email"
                                         placeholder="colleague@example.com"
                                         aria-describedby="guest-help"
-                                        :aria-invalid="Boolean(guestError)"
+                                        :aria-invalid="
+                                            Boolean(
+                                                guestError || guestsServerError,
+                                            )
+                                        "
                                         @keydown.enter.prevent="addGuest"
                                     />
                                     <Button
@@ -811,7 +898,7 @@ const submit = () => {
                                     updates.
                                 </p>
                                 <InputError
-                                    :message="guestError ?? undefined"
+                                    :message="guestError ?? guestsServerError"
                                 />
 
                                 <ul

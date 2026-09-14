@@ -15,7 +15,7 @@ import {
     UserMinus,
     UserRound,
 } from '@lucide/vue';
-import { ref, watch } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import InputError from '@/components/InputError.vue';
 import PageHeader from '@/components/PageHeader.vue';
@@ -124,6 +124,13 @@ const reload = (data: Record<string, string | number>) => {
 };
 
 let debounce: ReturnType<typeof setTimeout> | null = null;
+
+// A pending search would otherwise pull the reader back from the next page.
+onUnmounted(() => {
+    if (debounce) {
+        clearTimeout(debounce);
+    }
+});
 
 watch(searchTerm, () => {
     if (debounce) {

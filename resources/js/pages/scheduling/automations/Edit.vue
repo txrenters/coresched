@@ -140,6 +140,21 @@ const toggleEventType = (id: number, checked: boolean) => {
         : form.event_type_ids.filter((current) => current !== id);
 };
 
+/**
+ * A list's own rule reports on its key, one bad entry on `key.N`; show
+ * whichever the server sent, since only the list itself has a field.
+ */
+const listErrorFor = (key: string) => {
+    const errors = form.errors as Record<string, string>;
+
+    return (
+        errors[key] ??
+        Object.entries(errors).find(([field]) =>
+            field.startsWith(`${key}.`),
+        )?.[1]
+    );
+};
+
 const emailDraft = ref('');
 const emailError = ref<string | null>(null);
 
@@ -181,7 +196,7 @@ const addPhone = () => {
     }
 
     const dialable =
-        phone.startsWith('+') ||
+        (phone.startsWith('+') && digits.length > 0) ||
         digits.length === 10 ||
         (digits.length === 11 && digits.startsWith('1'));
 
@@ -558,7 +573,7 @@ setLayoutProps({
                                 <InputError
                                     :message="
                                         emailError ??
-                                        form.errors.recipient_emails
+                                        listErrorFor('recipient_emails')
                                     "
                                 />
 
@@ -747,7 +762,7 @@ setLayoutProps({
                                 <InputError
                                     :message="
                                         phoneError ??
-                                        form.errors.recipient_phones
+                                        listErrorFor('recipient_phones')
                                     "
                                 />
 
