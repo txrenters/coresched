@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Inertia\ExceptionResponse;
+use Inertia\Inertia;
 use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
@@ -32,11 +34,51 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->registerMicrosoftGraphMailer();
+        $this->renderErrorPages();
         $this->grantSuperAdminsEveryAbility();
         $this->restrictLogViewerToSuperAdmins();
         $this->restrictUserDirectoryToSuperAdmins();
         $this->restrictOrganizationDirectoryToSuperAdmins();
         $this->letAdminsViewTheirPeople();
+    }
+
+    /**
+     * Render HTTP errors as the themed Error page instead of Laravel's stock views.
+     *
+     * A 419 means the session lapsed under an open form, so the visitor is sent
+     * back to the page with a toast rather than shown a dead end. A server error
+     * drops the shared props, including any the middleware already attached:
+     * they query the database, which may be exactly what failed, and a throw
+     * while rendering the error page loses the page entirely.
+     * With debug on, server errors fall through to the framework's debug screen.
+     */
+    protected function renderErrorPages(): void
+    {
+        Inertia::handleExceptionsUsing(function (ExceptionResponse $response): mixed {
+            $status = $response->statusCode();
+
+            if ($response->request->expectsJson() || ! in_array($status, [403, 404, 410, 419, 429, 500, 503], true)) {
+                return null;
+            }
+
+            if ($status === 419) {
+                Inertia::flash('toast', ['type' => 'error', 'message' => __('Your session expired. Please try again.')]);
+
+                return redirect()->back(303);
+            }
+
+            if ($status >= 500 && config('app.debug')) {
+                return null;
+            }
+
+            if ($status >= 500) {
+                Inertia::flushShared();
+
+                return $response->render('Error', ['status' => $status, 'name' => config('app.name')]);
+            }
+
+            return $response->render('Error', ['status' => $status])->withSharedData();
+        });
     }
 
     /**
