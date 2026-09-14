@@ -219,9 +219,10 @@ test('the last remaining schedule cannot be deleted', function () {
 });
 
 test('a newly registered user starts with weekday working hours', function () {
-    invitationFor('dana@example.com');
+    $invitation = invitationFor('dana@example.com');
 
     $this->post(route('register.store'), [
+        'invitation' => $invitation->code,
         'name' => 'Dana Reed',
         'email' => 'dana@example.com',
         'password' => 'password-password',
@@ -238,9 +239,10 @@ test('a newly registered user starts with weekday working hours', function () {
 });
 
 test('a newly registered user gets a public booking slug', function () {
-    invitationFor('dana@example.com');
+    $invitation = invitationFor('dana@example.com');
 
     $this->post(route('register.store'), [
+        'invitation' => $invitation->code,
         'name' => 'Dana Reed',
         'email' => 'dana@example.com',
         'password' => 'password-password',
@@ -258,9 +260,10 @@ test('booking slugs stay unique across users with the same name', function () {
 });
 
 test('a new user and their default schedule start in the configured timezone', function () {
-    invitationFor('casey@example.com');
+    $invitation = invitationFor('casey@example.com');
 
     $this->post(route('register.store'), [
+        'invitation' => $invitation->code,
         'name' => 'Casey Lane',
         'email' => 'casey@example.com',
         'password' => 'password-password',

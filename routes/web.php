@@ -23,9 +23,15 @@ Route::prefix('{current_team}')
  * email, and the whole point is that the invitee has no account yet. The
  * 64-character invitation code is the credential, and it is single use -- the
  * controller accepts only a pending invitation and marks it accepted.
+ *
+ * The GET only shows a confirmation page; the POST joins. Mail scanners open
+ * links on their own, so a GET must never create an account or sign anyone in.
  */
-Route::get('invitations/{invitation}/join', [TeamInvitationController::class, 'join'])
+Route::get('invitations/{invitation}/join', [TeamInvitationController::class, 'showJoin'])
     ->name('invitations.join');
+Route::post('invitations/{invitation}/join', [TeamInvitationController::class, 'join'])
+    ->middleware('throttle:10,1')
+    ->name('invitations.join.store');
 
 Route::middleware(['auth'])->group(function () {
     Route::post('invitations/{invitation}/accept', [TeamInvitationController::class, 'accept'])->name('invitations.accept');

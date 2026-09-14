@@ -88,16 +88,24 @@ class TeamController extends Controller
                     'isLastAdmin' => $membership->role === TeamRole::Admin && $adminCount === 1,
                 ];
             }),
-            'invitations' => $team->invitations()
-                ->whereNull('accepted_at')
-                ->get()
-                ->map(fn ($invitation) => [
-                    'code' => $invitation->code,
-                    'email' => $invitation->email,
-                    'role' => $invitation->role->value,
-                    'role_label' => $invitation->role->label(),
-                    'created_at' => $invitation->created_at->toISOString(),
-                ]),
+            /*
+             * Only people who manage invitations see them. Each row carries its
+             * code, and the code alone is enough to join through the emailed
+             * link with the role the invitation grants, so a plain member
+             * shown this list could take an admin invitation meant for someone else.
+             */
+            'invitations' => $user->can('inviteMember', $team) || $user->can('cancelInvitation', $team)
+                ? $team->invitations()
+                    ->whereNull('accepted_at')
+                    ->get()
+                    ->map(fn ($invitation) => [
+                        'code' => $invitation->code,
+                        'email' => $invitation->email,
+                        'role' => $invitation->role->value,
+                        'role_label' => $invitation->role->label(),
+                        'created_at' => $invitation->created_at->toISOString(),
+                    ])
+                : [],
             'permissions' => $user->toTeamPermissions($team),
             'canCreateMember' => $user->can('createMember', $team),
             'availableRoles' => TeamRole::assignable(),

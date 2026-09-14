@@ -42,6 +42,18 @@ class ValidTeamInvitation implements ValidationRule
 
         if (strtolower($value->email) !== strtolower($this->user->email)) {
             $fail(__('This invitation was sent to a different email address.'));
+
+            return;
+        }
+
+        /*
+         * The address has to be proven, not just typed. Changing the profile
+         * email clears verification, and without this anyone could switch their
+         * address to a pending invitee's and accept that invitation, admin role
+         * included.
+         */
+        if (! $this->user->hasVerifiedEmail()) {
+            $fail(__('Verify your email address before accepting this invitation. We sent a link when you changed it; you can resend it from your profile.'));
         }
     }
 }
