@@ -12,6 +12,7 @@ createInertiaApp({
     layout: (name) => {
         switch (true) {
             case name === 'Welcome':
+            case name === 'Error':
             case name.startsWith('book/'):
                 return null;
             case name.startsWith('auth/'):
