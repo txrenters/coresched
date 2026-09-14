@@ -72,7 +72,7 @@ class RunAutomations extends Command
                     } catch (Throwable $exception) {
                         /*
                          * Marked sent even though it failed: the scheduler runs
-                         * every five minutes, and a bad address would otherwise
+                         * every minute, and a bad address would otherwise
                          * be retried forever. The reason is kept on the row.
                          */
                         $run->update(['sent_at' => now(), 'failure' => str($exception->getMessage())->limit(250)->toString()]);

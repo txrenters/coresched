@@ -12,6 +12,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Scheduling/GroupController.php | .ai/rules/controllers-scheduling.md |
 | resources/css/** | .ai/rules/css.md |
 | app/Actions/Fortify/** | .ai/rules/fortify.md |
+| docker-compose.yml | .ai/rules/general.md |
 | app/Jobs/SyncLeavePeriods.php | .ai/rules/jobs.md |
 | resources/js/** | .ai/rules/js.md |
 | resources/js/lib/** | .ai/rules/lib.md |
