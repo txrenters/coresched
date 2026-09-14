@@ -13,6 +13,7 @@ import {
     Users,
 } from '@lucide/vue';
 import { ref, watch } from 'vue';
+import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
     Sheet,
@@ -395,7 +396,9 @@ const approveMeeting = () => {
                     rows="10"
                     placeholder="Jot down anything worth remembering about this meeting."
                     data-test="host-notes"
+                    :aria-invalid="Boolean(notesForm.errors.host_notes)"
                 />
+                <InputError :message="notesForm.errors.host_notes" />
 
                 <Button
                     class="self-start"

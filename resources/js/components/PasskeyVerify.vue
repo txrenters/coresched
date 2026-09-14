@@ -7,6 +7,7 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
+import { home } from '@/routes';
 
 type Props = {
     routes?: {
@@ -30,7 +31,9 @@ const { verify, isLoading, error, isSupported } = usePasskeyVerify({
           }
         : {}),
     onSuccess: (response) => {
-        router.visit(response.redirect ?? '/dashboard');
+        // The server always names the destination; there is no bare /dashboard
+        // route (it lives under the team slug), so fall back to the home page.
+        router.visit(response.redirect ?? home().url);
     },
 });
 </script>

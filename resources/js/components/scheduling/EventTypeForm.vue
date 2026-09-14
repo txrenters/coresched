@@ -209,6 +209,7 @@ const removeOption = (question: Record<string, any>, index: number) => {
                         type="color"
                         class="h-9 p-1"
                     />
+                    <InputError :message="fields.errors.color" />
                 </div>
             </div>
         </section>
@@ -299,6 +300,7 @@ const removeOption = (question: Record<string, any>, index: number) => {
                         {{ selectedGroup.memberNames.join(', ') }}. Editing the
                         team updates every event type pointed at it.
                     </p>
+                    <InputError :message="fields.errors.group_id" />
                 </div>
 
                 <div v-if="!selectedGroup">
@@ -383,6 +385,9 @@ const removeOption = (question: Record<string, any>, index: number) => {
                             </SelectItem>
                         </SelectContent>
                     </Select>
+                    <InputError
+                        :message="fields.errors.availability_schedule_id"
+                    />
                 </div>
 
                 <div class="grid gap-2">
@@ -406,6 +411,9 @@ const removeOption = (question: Record<string, any>, index: number) => {
                         type="number"
                         min="0"
                     />
+                    <InputError
+                        :message="fields.errors.buffer_before_minutes"
+                    />
                 </div>
 
                 <div class="grid gap-2">
@@ -416,6 +424,7 @@ const removeOption = (question: Record<string, any>, index: number) => {
                         type="number"
                         min="0"
                     />
+                    <InputError :message="fields.errors.buffer_after_minutes" />
                 </div>
 
                 <div class="grid gap-2">
@@ -429,6 +438,9 @@ const removeOption = (question: Record<string, any>, index: number) => {
                         min="5"
                         placeholder="Same as duration"
                     />
+                    <InputError
+                        :message="fields.errors.slot_interval_minutes"
+                    />
                 </div>
 
                 <div class="grid gap-2">
@@ -440,6 +452,7 @@ const removeOption = (question: Record<string, any>, index: number) => {
                         min="1"
                         placeholder="No limit"
                     />
+                    <InputError :message="fields.errors.daily_booking_limit" />
                 </div>
 
                 <div v-if="fields.kind === 'group'" class="grid gap-2">
@@ -451,6 +464,7 @@ const removeOption = (question: Record<string, any>, index: number) => {
                         min="1"
                         data-test="event-type-seats"
                     />
+                    <InputError :message="fields.errors.seats_per_slot" />
                 </div>
 
                 <div class="grid gap-2">
@@ -469,6 +483,7 @@ const removeOption = (question: Record<string, any>, index: number) => {
                             </SelectItem>
                         </SelectContent>
                     </Select>
+                    <InputError :message="fields.errors.date_range_type" />
                 </div>
 
                 <div
@@ -482,6 +497,7 @@ const removeOption = (question: Record<string, any>, index: number) => {
                         type="number"
                         min="1"
                     />
+                    <InputError :message="fields.errors.rolling_days" />
                 </div>
 
                 <template v-if="fields.date_range_type === 'fixed_range'">
@@ -525,6 +541,7 @@ const removeOption = (question: Record<string, any>, index: number) => {
                     <Plus class="size-3.5" /> Add question
                 </Button>
             </div>
+            <InputError :message="fields.errors.questions" />
 
             <div
                 v-for="(question, index) in fields.questions ?? []"
@@ -562,6 +579,9 @@ const removeOption = (question: Record<string, any>, index: number) => {
                                 </SelectItem>
                             </SelectContent>
                         </Select>
+                        <InputError
+                            :message="fields.errors[`questions.${index}.type`]"
+                        />
                     </div>
                 </div>
 

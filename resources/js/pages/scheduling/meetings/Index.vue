@@ -116,6 +116,7 @@ const declineForm = useForm({ reason: '' });
  */
 const now = ref(Date.now());
 let clock: ReturnType<typeof setInterval> | null = null;
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
 onMounted(() => {
     clock = setInterval(() => (now.value = Date.now()), 30000);
@@ -125,6 +126,9 @@ onUnmounted(() => {
     if (clock) {
         clearInterval(clock);
     }
+
+    // A pending search would otherwise pull the reader back from the next page.
+    clearTimeout(searchTimer);
 });
 
 const isInProgress = (meeting: Meeting) =>
@@ -202,8 +206,6 @@ const reload = (data: Record<string, string | number | null>) => {
         { preserveState: true, preserveScroll: true, replace: true },
     );
 };
-
-let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
 watch(search, () => {
     clearTimeout(searchTimer);

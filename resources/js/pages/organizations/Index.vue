@@ -9,7 +9,7 @@ import {
     Trash2,
     UserPlus,
 } from '@lucide/vue';
-import { ref, watch } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 import CreateTeamModal from '@/components/CreateTeamModal.vue';
 import InputError from '@/components/InputError.vue';
 import PageHeader from '@/components/PageHeader.vue';
@@ -60,6 +60,13 @@ const props = defineProps<{
 const searchTerm = ref(props.search);
 
 let debounce: ReturnType<typeof setTimeout> | null = null;
+
+// A pending search would otherwise pull the reader back from the next page.
+onUnmounted(() => {
+    if (debounce) {
+        clearTimeout(debounce);
+    }
+});
 
 watch(searchTerm, () => {
     if (debounce) {

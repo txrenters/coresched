@@ -7,6 +7,7 @@ import {
     Check,
     Hourglass,
     RefreshCw,
+    TriangleAlert,
     X,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
@@ -20,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { index as meetingsIndex } from '@/routes/meetings';
 import {
     destroy as destroyNotification,
+    index as notificationsIndex,
     readAll,
     update as markRead,
 } from '@/routes/notifications';
@@ -41,6 +43,7 @@ const page = usePage();
 const open = ref(false);
 const loading = ref(false);
 const loaded = ref(false);
+const failed = ref(false);
 const notifications = ref<Notification[]>([]);
 
 /** The badge count comes from shared props so it is right on every page load. */
@@ -72,19 +75,28 @@ const iconFor = (type: string) => {
 
 const load = async () => {
     loading.value = true;
+    failed.value = false;
 
+    /*
+     * A dropped connection, a server error, or an expired session (which
+     * redirects to the HTML login page) must not read as "all caught up".
+     */
     try {
-        const response = await fetch('/notifications', {
+        const response = await fetch(notificationsIndex().url, {
             headers: { Accept: 'application/json' },
         });
 
         if (!response.ok) {
+            failed.value = true;
+
             return;
         }
 
         const payload = await response.json();
         notifications.value = payload.notifications ?? [];
         loaded.value = true;
+    } catch {
+        failed.value = true;
     } finally {
         loading.value = false;
     }
@@ -195,6 +207,30 @@ const openMeeting = (notification: Notification) => {
                     class="h-14 w-full animate-pulse rounded-lg"
                 />
                 <span class="sr-only">Loading notifications</span>
+            </div>
+
+            <div
+                v-else-if="failed && !loaded"
+                class="px-4 py-10 text-center"
+                role="alert"
+                data-test="notifications-error"
+            >
+                <TriangleAlert
+                    class="mx-auto size-5 text-destructive"
+                    aria-hidden="true"
+                />
+                <p class="mt-2 text-sm font-medium">
+                    Notifications could not be loaded
+                </p>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    class="mt-3 cursor-pointer"
+                    :disabled="loading"
+                    @click="load"
+                >
+                    Try again
+                </Button>
             </div>
 
             <ul

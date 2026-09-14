@@ -183,7 +183,11 @@ const copyToAllDays = (day: number) => {
 
 const addOverride = () => {
     form.value.overrides.push({
-        date: new Date().toISOString().slice(0, 10),
+        // Today in the schedule's own timezone, not UTC, which is already
+        // tomorrow on an American evening. 'en-CA' renders YYYY-MM-DD.
+        date: new Date().toLocaleDateString('en-CA', {
+            timeZone: form.value.timezone,
+        }),
         is_unavailable: true,
         starts_at: null,
         ends_at: null,
