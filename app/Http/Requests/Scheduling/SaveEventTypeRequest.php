@@ -6,7 +6,9 @@ use App\Enums\DateRangeType;
 use App\Enums\EventTypeKind;
 use App\Enums\LocationType;
 use App\Enums\QuestionType;
+use App\Enums\TeamPermission;
 use App\Models\EventType;
+use App\Models\Team;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -103,20 +105,28 @@ class SaveEventTypeRequest extends FormRequest
     /**
      * Get the id of the person the event type belongs to.
      *
-     * The submitted owner when one is given, the existing owner when editing,
-     * and otherwise whoever is creating it.
+     * The submitted owner when one is given and the person saving may hand
+     * event types to someone else, the existing owner when editing, and
+     * otherwise whoever is creating it. This mirrors
+     * EventTypeController::resolveOwner(): honouring a user_id the controller
+     * then ignores let a member attach a colleague's personal schedule to their
+     * own event type.
      */
     protected function ownerId(): int
     {
+        $eventType = $this->route('event_type');
+        $currentOwnerId = $eventType instanceof EventType ? $eventType->user_id : (int) $this->user()->id;
         $submitted = $this->input('user_id');
 
-        if (filled($submitted)) {
-            return (int) $submitted;
+        if (blank($submitted)) {
+            return $currentOwnerId;
         }
 
-        $eventType = $this->route('event_type');
+        $team = Team::find($eventType instanceof EventType ? $eventType->team_id : $this->user()->current_team_id);
 
-        return $eventType instanceof EventType ? $eventType->user_id : (int) $this->user()->id;
+        return $team !== null && $this->user()->hasTeamPermission($team, TeamPermission::ManageTeamBookings)
+            ? (int) $submitted
+            : $currentOwnerId;
     }
 
     /**
