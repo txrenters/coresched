@@ -32,8 +32,8 @@ type Automation = {
     recipient: string;
     recipientEmails: string[];
     recipientPhones: string[];
-    subject: string;
-    body: string;
+    subject: string | null;
+    body: string | null;
     smsBody: string | null;
     isActive: boolean;
     eventTypeIds: number[];

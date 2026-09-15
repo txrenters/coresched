@@ -52,7 +52,7 @@ class AutomationMessage
      */
     public function subject(): string
     {
-        return $this->render($this->automation->subject);
+        return $this->render((string) $this->automation->subject);
     }
 
     /**
@@ -63,7 +63,7 @@ class AutomationMessage
      */
     public function body(): string
     {
-        return trim($this->render($this->automation->body));
+        return trim($this->render((string) $this->automation->body));
     }
 
     /**

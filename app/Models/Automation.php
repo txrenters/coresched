@@ -30,8 +30,8 @@ use Illuminate\Support\Carbon;
  * @property array<int, string>|null $recipient_emails
  * @property array<int, string>|null $recipient_phones
  * @property \Illuminate\Support\Collection<int, AutomationChannel> $channels
- * @property string $subject
- * @property string $body
+ * @property string|null $subject
+ * @property string|null $body
  * @property string|null $sms_body
  * @property bool $is_active
  * @property Carbon|null $created_at

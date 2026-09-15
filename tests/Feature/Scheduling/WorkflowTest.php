@@ -195,6 +195,24 @@ test('a workflow can send an email and a text at once, with the numbers tidied u
         ->and($automation->describeAction())->toBe('Email and Text someone else');
 });
 
+test('a workflow can only send a text, leaving the email wording blank', function () {
+    $this->actingAs($this->host)
+        ->post(route('automations.store', ['current_team' => $this->team->slug]), [
+            'name' => 'Text leasing',
+            'trigger' => AutomationTrigger::Booked->value,
+            'channels' => ['sms'],
+            'recipient' => AutomationRecipient::Someone->value,
+            'recipient_phones' => ['(512) 555-0100'],
+            'subject' => '',
+            'body' => '',
+            'sms_body' => '{{ invitee_name }} booked {{ event_name }}.',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('automations.index', ['current_team' => $this->team->slug]));
+
+    expect(Automation::first()->describeAction())->toBe('Text +15125550100');
+});
+
 test('a workflow that texts has to say what the text says', function () {
     $this->actingAs($this->host)
         ->post(route('automations.store', ['current_team' => $this->team->slug]), [
