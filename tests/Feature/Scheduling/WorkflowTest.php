@@ -85,7 +85,7 @@ test('the editor offers the organizations event types and the message variables'
             ->has('eventTypes', 1)
             ->has('triggerOptions', 3)
             ->has('recipientOptions', 3)
-            ->has('variables', 12));
+            ->has('variables', 13));
 });
 
 test('a workflow can be edited, and switching it off leaves it in place', function () {
@@ -435,6 +435,7 @@ test('the message variables are filled in from the booking', function () {
         'email' => 'sam@example.com',
         'location_type' => LocationType::InPerson,
         'location_detail' => '12 Main St',
+        'notes' => 'Bringing my co-signer.',
     ]);
 
     $booking->hosts()->attach($this->host);
@@ -447,7 +448,7 @@ test('the message variables are filled in from the booking', function () {
     $automation = Automation::factory()->create([
         'team_id' => $this->team->id,
         'subject' => 'New booking: {{ event_name }}',
-        'body' => "{{ invitee_first_name }} ({{ invitee_email }}, {{ invitee_phone }}) booked {{ event_name }}.\n{{ event_date }} at {{ event_time }}, {{ location }}, hosted by {{ event_organizer }}.\n{{ questions_and_answers }}\n{{ not_a_variable }}",
+        'body' => "{{ invitee_first_name }} ({{ invitee_email }}, {{ invitee_phone }}) booked {{ event_name }}.\n{{ event_date }} at {{ event_time }}, {{ location }}, hosted by {{ event_organizer }}.\n{{ questions_and_answers }}\nNotes: {{ invitee_notes }}\n{{ not_a_variable }}",
     ]);
 
     $message = new AutomationMessage(
@@ -461,6 +462,7 @@ test('the message variables are filled in from the booking', function () {
             "Sam (sam@example.com, 512-555-0100) booked Leasing Team Meeting.\n"
             ."Wednesday, 2 September 2026 at 10:00am - 11:00am (America/Chicago), 12 Main St, hosted by Dana Reed.\n"
             ."Best number: 512-555-0100\n"
+            ."Notes: Bringing my co-signer.\n"
             .'{{ not_a_variable }}',
         );
 });

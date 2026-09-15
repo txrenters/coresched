@@ -202,6 +202,35 @@ test('a text to the invitee uses the number they gave when booking', function ()
     Http::assertSent(fn (Request $request) => $request['To'] === '+15125550199');
 });
 
+test('a text fills in the booking answers and the notes', function () {
+    Http::fake(['*/Messages.json' => Http::response(['sid' => 'SM1'])]);
+
+    $this->booking->update(['notes' => 'Bringing my co-signer.']);
+
+    $question = $this->eventType->questions()->create([
+        'type' => QuestionType::Text,
+        'label' => 'Property address',
+        'position' => 0,
+    ]);
+
+    $this->booking->answers()->create([
+        'event_type_question_id' => $question->id,
+        'label' => 'Property address',
+        'answer' => '12 Oak Lane',
+    ]);
+
+    $automation = Automation::factory()->byText()->create([
+        'team_id' => $this->team->id,
+        'sms_body' => "{{ invitee_name }} booked.\n{{ questions_and_answers }}\nNotes: {{ invitee_notes }}",
+    ]);
+
+    queueRunFor($automation, $this->booking);
+
+    $this->artisan('automations:run')->assertSuccessful();
+
+    Http::assertSent(fn (Request $request) => $request['Body'] === "Sam Rivera booked.\nProperty address: 12 Oak Lane\nNotes: Bringing my co-signer.");
+});
+
 test('an invitee who was never asked for a number is simply not texted', function () {
     Http::fake();
 

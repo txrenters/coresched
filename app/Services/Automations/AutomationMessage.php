@@ -43,6 +43,7 @@ class AutomationMessage
             ['name' => 'invitee_phone', 'description' => 'The phone number asked for when booking, if any'],
             ['name' => 'location', 'description' => 'The meeting link, address or phone number'],
             ['name' => 'event_description', 'description' => 'The event type\'s own description'],
+            ['name' => 'invitee_notes', 'description' => 'What the invitee wrote under "Anything we should know beforehand?"'],
             ['name' => 'questions_and_answers', 'description' => 'Every booking question and what was answered'],
         ];
     }
@@ -118,6 +119,7 @@ class AutomationMessage
             'invitee_phone' => $this->inviteePhone(),
             'location' => $this->location(),
             'event_description' => trim((string) ($booking->eventType->description ?? '')),
+            'invitee_notes' => trim((string) $booking->notes),
             'questions_and_answers' => $this->questionsAndAnswers(),
         ];
     }
