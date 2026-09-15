@@ -21,5 +21,6 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/EventType.php, app/Models/Availability*.php | .ai/rules/models.md |
 | app/Policies/** | .ai/rules/policies.md |
 | app/Services/Scheduling/** | .ai/rules/scheduling.md |
+| app/Http/Controllers/Settings/OrganizationDirectoryController.php | .ai/rules/settings.md |
 | app/Services/Sms/** | .ai/rules/sms.md |
 | app/Http/Controllers/Teams/** | .ai/rules/teams.md |

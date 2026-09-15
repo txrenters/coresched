@@ -38,7 +38,7 @@ class AppServiceProvider extends ServiceProvider
         $this->grantSuperAdminsEveryAbility();
         $this->restrictLogViewerToSuperAdmins();
         $this->restrictUserDirectoryToSuperAdmins();
-        $this->restrictOrganizationDirectoryToSuperAdmins();
+        $this->letAdminsOpenTheirOrganizations();
         $this->letAdminsViewTheirPeople();
     }
 
@@ -181,14 +181,17 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Keep the organization directory to super admins.
+     * Let an organization's admins open the organization directory.
      *
-     * Creating organizations and looking across all of them is the operator's
-     * job; an organization's own admins manage theirs from its settings.
+     * Opening only: the listing narrows to the organizations the viewer
+     * administers, and each member change is authorized against that
+     * organization through TeamPolicy, so an admin of one cannot touch another.
+     * Looking across every organization stays the super admin's.
      */
-    protected function restrictOrganizationDirectoryToSuperAdmins(): void
+    protected function letAdminsOpenTheirOrganizations(): void
     {
-        Gate::define('manageOrganizations', fn (User $user): bool => $user->isSuperAdmin());
+        Gate::define('viewOrganizations', fn (User $user): bool => $user->isSuperAdmin()
+            || $user->teams()->wherePivot('role', TeamRole::Admin->value)->exists());
     }
 
     /**

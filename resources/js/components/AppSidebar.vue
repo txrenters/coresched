@@ -107,12 +107,13 @@ const otherNavItems = computed<NavItem[]>(() => [
 ]);
 
 /**
- * The application log, for super admins only. It sits in the footer directly
- * above the booking page link rather than in Settings, because it is an
- * operator tool rather than a personal preference.
+ * Operator tools. They sit in the footer directly above the booking page link
+ * rather than in Settings, because they are not personal preferences. The log
+ * is for super admins only; organization admins also get Organizations, scoped
+ * to the ones they run.
  */
-const adminNavItems = computed<NavItem[]>(() =>
-    page.props.isSuperAdmin
+const adminNavItems = computed<NavItem[]>(() => [
+    ...(page.props.isSuperAdmin
         ? [
               {
                   title: 'Logs',
@@ -123,14 +124,18 @@ const adminNavItems = computed<NavItem[]>(() =>
                   // in a tab of its own so the app stays where it was.
                   external: true,
               },
+          ]
+        : []),
+    ...(page.props.canViewOrganizations
+        ? [
               {
                   title: 'Organizations',
                   href: organizationsIndex(),
                   icon: Building2,
               },
           ]
-        : [],
-);
+        : []),
+]);
 
 /**
  * The only external link worth a permanent slot is the user's own public

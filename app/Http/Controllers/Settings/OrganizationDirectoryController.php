@@ -18,8 +18,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Every organization in the installation, for the operator who looks after
- * all of them rather than one.
+ * Every organization in the installation for the operator who looks after all
+ * of them, and the ones they administer for everyone else.
  */
 class OrganizationDirectoryController extends Controller
 {
@@ -28,11 +28,16 @@ class OrganizationDirectoryController extends Controller
      */
     public function index(Request $request): Response
     {
-        Gate::authorize('manageOrganizations');
+        Gate::authorize('viewOrganizations');
 
+        $viewer = $request->user();
         $search = $request->string('search')->toString();
 
         $organizations = Team::query()
+            ->unless($viewer->isSuperAdmin(), fn ($query) => $query->whereIn(
+                'id',
+                $viewer->teams()->wherePivot('role', TeamRole::Admin->value)->pluck('teams.id'),
+            ))
             ->with(['members:id,name,email'])
             ->withCount(['eventTypes', 'bookings', 'groups'])
             ->when(filled($search), fn ($query) => $query->where('name', 'like', "%{$search}%"))
@@ -52,10 +57,14 @@ class OrganizationDirectoryController extends Controller
      * An address that already has an account joins the organization; a new one
      * gets an account created for it, which is CreateTeamUser's job and emails
      * a link to set a password.
+     *
+     * Only a super admin puts an existing account straight in. An organization
+     * admin invites that person instead, as on the organization's settings, so
+     * nobody lands in an organization they did not agree to join.
      */
     public function storeMember(AddOrganizationMemberRequest $request, Team $team, CreateTeamUser $createTeamUser): RedirectResponse
     {
-        Gate::authorize('manageOrganizations');
+        Gate::authorize('addMember', $team);
 
         $role = TeamRole::from($request->validated('role'));
         $email = mb_strtolower($request->validated('email'));
@@ -65,6 +74,10 @@ class OrganizationDirectoryController extends Controller
         if ($existing !== null) {
             if ($existing->belongsToTeam($team)) {
                 return back()->withErrors(['email' => __(':name is already in this organization.', ['name' => $existing->name])]);
+            }
+
+            if (! $request->user()->isSuperAdmin()) {
+                return back()->withErrors(['email' => __(':name already has an account. Invite them from the organization\'s settings instead.', ['name' => $existing->name])]);
             }
 
             $team->memberships()->create(['user_id' => $existing->id, 'role' => $role]);
@@ -84,6 +97,8 @@ class OrganizationDirectoryController extends Controller
 
             return back();
         }
+
+        Gate::authorize('createMember', $team);
 
         $user = $createTeamUser->handle($team, $request->validated('name'), $email, $role);
 
@@ -108,7 +123,7 @@ class OrganizationDirectoryController extends Controller
      */
     public function updateMember(Request $request, Team $team, User $user): RedirectResponse
     {
-        Gate::authorize('manageOrganizations');
+        Gate::authorize('updateMember', $team);
 
         $validated = $request->validate([
             'role' => ['required', Rule::enum(TeamRole::class)],
@@ -132,7 +147,7 @@ class OrganizationDirectoryController extends Controller
      */
     public function destroyMember(Team $team, User $user): RedirectResponse
     {
-        Gate::authorize('manageOrganizations');
+        Gate::authorize('removeMember', $team);
 
         if (app(TeamPolicy::class)->isLastAdmin($user, $team)) {
             return back()->withErrors(['member' => __('The last administrator cannot be removed.')]);

@@ -55,6 +55,8 @@ class HandleInertiaRequests extends Middleware
             'canCreateTeam' => (bool) $user?->can('create', Team::class),
             // Gates the Users nav entry; the controller enforces it as well.
             'canViewUsers' => (bool) $user?->can('viewUsers'),
+            // Gates the Organizations nav entry; the controller enforces it as well.
+            'canViewOrganizations' => (bool) $user?->can('viewOrganizations'),
         ];
     }
 }

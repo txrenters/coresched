@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Building2,
     ChevronDown,
@@ -9,7 +9,7 @@ import {
     Trash2,
     UserPlus,
 } from '@lucide/vue';
-import { onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import CreateTeamModal from '@/components/CreateTeamModal.vue';
 import InputError from '@/components/InputError.vue';
 import PageHeader from '@/components/PageHeader.vue';
@@ -56,6 +56,14 @@ const props = defineProps<{
     search: string;
     roles: Array<{ value: string; label: string }>;
 }>();
+
+const page = usePage();
+
+const description = computed(() =>
+    page.props.isSuperAdmin
+        ? 'Every organization in the installation, who runs it, and what it holds.'
+        : 'The organizations you administer, who is in them, and what they hold.',
+);
 
 const searchTerm = ref(props.search);
 
@@ -138,10 +146,7 @@ defineOptions({
     <Head title="Organizations" />
 
     <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
-        <PageHeader
-            title="Organizations"
-            description="Every organization in the installation, who runs it, and what it holds."
-        >
+        <PageHeader title="Organizations" :description="description">
             <template #actions>
                 <CreateTeamModal>
                     <Button data-test="new-organization">
