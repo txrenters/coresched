@@ -51,10 +51,20 @@ const update = (value: string | number) => {
 
 <template>
     <div class="relative">
+        <!--
+          An image rather than the flag emoji, which Windows shows as the
+          letters "US". The file holds the flag's own colours so no component
+          has to.
+        -->
         <span
-            class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-muted-foreground"
+            class="pointer-events-none absolute inset-y-0 left-0 flex items-center gap-1.5 pl-3 text-sm text-muted-foreground"
             aria-hidden="true"
         >
+            <img
+                src="/flag-us.svg"
+                alt=""
+                class="h-3 w-auto rounded-[2px] shadow-flat"
+            />
             +1
         </span>
         <Input
@@ -62,7 +72,7 @@ const update = (value: string | number) => {
             inputmode="tel"
             autocomplete="tel-national"
             placeholder="(555) 555-0100"
-            :class="cn('pl-9', props.class)"
+            :class="cn('pl-15', props.class)"
             :model-value="display"
             v-bind="$attrs"
             @update:model-value="update"
