@@ -8,7 +8,6 @@ import {
     Globe,
     MapPin,
     Users,
-    Video,
     X,
 } from '@lucide/vue';
 import { computed, nextTick, ref, watch } from 'vue';
@@ -27,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { locationIcon } from '@/lib/locationIcons';
 import { store as storeBooking } from '@/routes/book';
 import { store as storeReschedule } from '@/routes/booking/reschedule';
 
@@ -54,6 +54,7 @@ type Props = {
         color: string;
         durationMinutes: number;
         kind: string;
+        locationType: string;
         locationLabel: string;
         locationDetail: string | null;
         needsInviteePhone: boolean;
@@ -321,7 +322,8 @@ const submit = () => {
                         </div>
                         <div class="flex items-start gap-3">
                             <dt class="sr-only">Location</dt>
-                            <Video
+                            <component
+                                :is="locationIcon(eventType.locationType)"
                                 class="mt-0.5 size-4 shrink-0 text-muted-foreground"
                                 aria-hidden="true"
                             />

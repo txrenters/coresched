@@ -1,15 +1,6 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
-import {
-    Clock,
-    Link2,
-    MapPin,
-    Phone,
-    PhoneOutgoing,
-    Users,
-    Video,
-} from '@lucide/vue';
-import type { Component } from 'vue';
+import { Clock, Users } from '@lucide/vue';
 import { computed, watch } from 'vue';
 import InputError from '@/components/InputError.vue';
 import HostPriorityList from '@/components/scheduling/HostPriorityList.vue';
@@ -32,6 +23,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
+import { locationIcon } from '@/lib/locationIcons';
 import { store } from '@/routes/scheduling';
 
 type Kind = {
@@ -79,17 +71,6 @@ const emit = defineEmits<{ (e: 'close'): void }>();
 
 /** The handful of locations offered up front, before "All options". */
 const quickLocations = ['microsoft_teams', 'google_meet', 'phone', 'in_person'];
-
-const locationIcons: Record<string, Component> = {
-    microsoft_teams: Video,
-    google_meet: Video,
-    phone: Phone,
-    invitee_phone: PhoneOutgoing,
-    in_person: MapPin,
-    custom_link: Link2,
-};
-
-const iconFor = (value: string) => locationIcons[value] ?? Video;
 
 const durationPresets = [15, 30, 45, 60];
 
@@ -319,7 +300,7 @@ const submit = () => {
                             @click="form.location_type = location.value"
                         >
                             <component
-                                :is="iconFor(location.value)"
+                                :is="locationIcon(location.value)"
                                 class="size-3.5"
                             />
                             {{ location.shortLabel }}

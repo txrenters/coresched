@@ -51,6 +51,16 @@ test('the public page lists an owner bookable event types', function () {
             ->where('eventTypes.0.slug', 'intro'));
 });
 
+test('the booking pages say what kind of location the meeting is, so the right icon shows', function () {
+    $this->eventType->update(['location_type' => LocationType::Phone]);
+
+    $this->get(route('book.page', ['page' => 'dana']))
+        ->assertInertia(fn ($page) => $page->where('eventTypes.0.locationType', 'phone'));
+
+    $this->get(route('book.event-type', ['page' => 'dana', 'eventType' => 'intro']))
+        ->assertInertia(fn ($page) => $page->where('eventType.locationType', 'phone'));
+});
+
 test('hidden event types are left off the public page but still resolve directly', function () {
     $this->eventType->update(['is_hidden' => true]);
 

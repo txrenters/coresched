@@ -1,12 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import {
-    ArrowLeft,
-    ArrowRight,
-    CalendarClock,
-    Clock,
-    Video,
-} from '@lucide/vue';
+import { ArrowLeft, ArrowRight, CalendarClock, Clock } from '@lucide/vue';
+import { locationIcon } from '@/lib/locationIcons';
 
 type Props = {
     page: {
@@ -23,6 +18,7 @@ type Props = {
         description: string | null;
         color: string;
         durationMinutes: number;
+        locationType: string;
         locationLabel: string;
         url: string;
     }>;
@@ -124,7 +120,10 @@ withDefaults(defineProps<Props>(), {
                                     </span>
                                 </span>
                                 <span class="inline-flex items-center gap-1.5">
-                                    <Video
+                                    <component
+                                        :is="
+                                            locationIcon(eventType.locationType)
+                                        "
                                         class="size-3.5"
                                         aria-hidden="true"
                                     />
