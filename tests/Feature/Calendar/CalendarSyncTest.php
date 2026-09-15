@@ -176,6 +176,24 @@ test('a booking is written to the hosts calendar with a teams link', function ()
         && $request['onlineMeetingProvider'] === 'teamsForBusiness');
 });
 
+test('a microsoft event lists no attendees, so outlook sends no invite of its own', function () {
+    connectedAccount($this->host, CalendarProvider::Microsoft);
+
+    $booking = Booking::factory()->create([
+        'user_id' => $this->host->id,
+        'location_type' => LocationType::MicrosoftTeams,
+    ]);
+    $booking->hosts()->attach($this->host);
+    $booking->guests()->create(['email' => 'guest@example.com']);
+
+    Http::fake(['graph.microsoft.com/*' => Http::response(['id' => 'graph-event-3'])]);
+
+    (new SyncBookingToCalendars($booking))->handle(app(CalendarProviderManager::class));
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && ! isset($request['attendees']));
+});
+
 test('a phone booking does not ask the provider for a meeting link', function () {
     connectedAccount($this->host, CalendarProvider::Microsoft);
 

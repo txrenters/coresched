@@ -11,8 +11,9 @@ import {
     Smartphone,
     Trash2,
     Users,
+    Video,
 } from '@lucide/vue';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -71,6 +72,26 @@ const emit = defineEmits<{
 }>();
 
 const tab = ref<'details' | 'notes'>('details');
+
+/**
+ * The link to join by: the generated Teams or Meet link, or a custom link the
+ * host set on the event type. An address or phone number is not one.
+ */
+const joinUrl = computed(() => {
+    const meeting = props.meeting;
+
+    if (!meeting) {
+        return null;
+    }
+
+    if (meeting.meetingUrl) {
+        return meeting.meetingUrl;
+    }
+
+    return /^https?:\/\//i.test(meeting.locationDetail ?? '')
+        ? meeting.locationDetail
+        : null;
+});
 
 const notesForm = useForm({ host_notes: '' });
 
@@ -331,20 +352,36 @@ const approveMeeting = () => {
                 <section class="border-t pt-5">
                     <h3 class="mb-3 font-semibold">Location</h3>
 
-                    <div class="flex items-start gap-2.5 text-sm">
+                    <div
+                        v-if="joinUrl"
+                        class="flex items-center gap-2.5 text-sm"
+                    >
+                        <Video class="size-4 shrink-0 text-muted-foreground" />
+                        <span class="min-w-0 flex-1">
+                            {{ meeting.locationLabel }}
+                        </span>
+                        <Button
+                            size="sm"
+                            class="rounded-full"
+                            as-child
+                            data-test="panel-join"
+                        >
+                            <a
+                                :href="joinUrl"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                Join meeting
+                            </a>
+                        </Button>
+                    </div>
+
+                    <div v-else class="flex items-start gap-2.5 text-sm">
                         <MapPin
                             class="mt-0.5 size-4 shrink-0 text-muted-foreground"
                         />
                         <span class="min-w-0">
-                            <a
-                                v-if="meeting.meetingUrl"
-                                :href="meeting.meetingUrl"
-                                target="_blank"
-                                class="break-all text-primary underline"
-                            >
-                                {{ meeting.meetingUrl }}
-                            </a>
-                            <template v-else-if="meeting.locationDetail">
+                            <template v-if="meeting.locationDetail">
                                 {{ meeting.locationLabel }} &middot;
                                 {{ meeting.locationDetail }}
                             </template>

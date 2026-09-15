@@ -233,6 +233,11 @@ class MicrosoftCalendarProvider implements CalendarProviderContract, DetectsLeav
 
     /**
      * Write a booking to the account's calendar.
+     *
+     * The event carries no attendees. Graph has no equivalent of Google's
+     * sendUpdates=none: any attendee on an event is emailed an Outlook invite
+     * from the calendar owner, on top of the booking's own confirmation. The
+     * confirmation and its .ics are the one invite everyone gets.
      */
     public function createEvent(CalendarAccount $account, string $calendarId, Booking $booking, bool $withOnlineMeeting): ExternalEvent
     {
@@ -241,7 +246,6 @@ class MicrosoftCalendarProvider implements CalendarProviderContract, DetectsLeav
             'body' => ['contentType' => 'text', 'content' => $this->ics->description($booking)],
             'start' => ['dateTime' => $booking->starts_at->format('Y-m-d\TH:i:s'), 'timeZone' => 'UTC'],
             'end' => ['dateTime' => $booking->ends_at->format('Y-m-d\TH:i:s'), 'timeZone' => 'UTC'],
-            'attendees' => $this->attendees($booking),
         ];
 
         if ($withOnlineMeeting) {
@@ -282,35 +286,6 @@ class MicrosoftCalendarProvider implements CalendarProviderContract, DetectsLeav
     protected function request(CalendarAccount $account): PendingRequest
     {
         return Http::withToken($account->access_token)->acceptJson();
-    }
-
-    /**
-     * Build the attendee list for a calendar event.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    protected function attendees(Booking $booking): array
-    {
-        $attendees = [[
-            'emailAddress' => ['address' => $booking->email, 'name' => $booking->name],
-            'type' => 'required',
-        ]];
-
-        foreach ($booking->hosts as $host) {
-            $attendees[] = [
-                'emailAddress' => ['address' => $host->email, 'name' => $host->name],
-                'type' => 'required',
-            ];
-        }
-
-        foreach ($booking->guests as $guest) {
-            $attendees[] = [
-                'emailAddress' => ['address' => $guest->email],
-                'type' => 'optional',
-            ];
-        }
-
-        return $attendees;
     }
 
     /**

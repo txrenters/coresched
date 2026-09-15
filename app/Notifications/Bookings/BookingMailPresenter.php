@@ -6,6 +6,8 @@ use App\Models\Booking;
 use App\Models\BookingAnswer;
 use App\Models\User;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 
 /**
  * Formats booking details for whichever party is being emailed, so times
@@ -98,6 +100,36 @@ class BookingMailPresenter
     public function location(): ?string
     {
         return $this->booking->meeting_url ?: $this->booking->location_detail;
+    }
+
+    /**
+     * Get the lines describing where the meeting happens.
+     *
+     * A joining link becomes a button: a Teams URL runs to hundreds of
+     * characters and reads as noise. An address or phone number stays as text.
+     *
+     * @return array<int, string|HtmlString>
+     */
+    public function locationLines(): array
+    {
+        $location = $this->location();
+
+        if (blank($location)) {
+            return [];
+        }
+
+        if (! Str::startsWith($location, ['https://', 'http://'])) {
+            return ['**Where:** '.$location];
+        }
+
+        $place = $this->booking->location_type->isGenerated()
+            ? $this->booking->location_type->label()
+            : 'Online meeting';
+
+        return [
+            '**Where:** '.$place,
+            new HtmlString(view('mail.join-button', ['url' => $location, 'label' => 'Join meeting'])->render()),
+        ];
     }
 
     /**

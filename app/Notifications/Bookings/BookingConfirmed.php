@@ -34,8 +34,8 @@ class BookingConfirmed extends Notification implements ShouldQueue
             ->line('**When:** '.$presenter->when())
             ->line('**Who:** '.$presenter->participants());
 
-        if (filled($location = $presenter->location())) {
-            $message->line('**Where:** '.$location);
+        foreach ($presenter->locationLines() as $line) {
+            $message->line($line);
         }
 
         return $presenter

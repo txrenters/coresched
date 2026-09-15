@@ -35,8 +35,8 @@ class BookingRescheduled extends Notification implements ShouldQueue
             ->line('**Was:** '.$previous->when())
             ->line('**Now:** '.$presenter->when());
 
-        if (filled($location = $presenter->location())) {
-            $message->line('**Where:** '.$location);
+        foreach ($presenter->locationLines() as $line) {
+            $message->line($line);
         }
 
         return $presenter

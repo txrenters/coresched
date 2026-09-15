@@ -13,3 +13,6 @@ Resolve drivers via CalendarProviderManager::for($account), which refreshes an e
 OAuth redirect URIs must stay stable, so calendar routes live outside the {current_team} prefix at /settings/calendars/{provider}/callback. The callback verifies the session state token before exchanging the code.
 
 Only the provider that owns the meeting type generates a link (Teams from Microsoft, Meet from Google) — see LocationType::provider().
+
+## Microsoft events carry no attendees
+MicrosoftCalendarProvider::createEvent sends no `attendees`. Graph has no equivalent of Google's sendUpdates=none: any attendee on an event is emailed an Outlook meeting invite from the synced calendar account, duplicating the app's BookingConfirmed email (which carries its own .ics). The booking notifications are the single invite. Trade-off accepted: no RSVP tracking in the host's Outlook, and external invitees may wait in the Teams lobby depending on tenant policy.

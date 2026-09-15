@@ -3,6 +3,7 @@
 use App\Actions\Bookings\RescheduleBooking;
 use App\Enums\BookingStatus;
 use App\Enums\EventTypeKind;
+use App\Enums\LocationType;
 use App\Enums\QuestionType;
 use App\Enums\TeamRole;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -519,6 +520,34 @@ test('the invitee confirmation email offers no reschedule or cancel link', funct
 
     expect($body)->not->toContain('Reschedule')
         ->and($body)->not->toContain('Cancel this meeting');
+});
+
+test('the confirmation email shows a meeting link as a join button', function () {
+    $url = 'https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0?context=%7b%22Tid%22%7d';
+
+    $booking = Booking::factory()->create([
+        'location_type' => LocationType::MicrosoftTeams,
+        'meeting_url' => $url,
+    ]);
+
+    $html = (string) (new BookingConfirmed($booking))->toMail(new AnonymousNotifiable)->render();
+
+    expect($html)->toContain('Where:</strong> Microsoft Teams')
+        ->and($html)->toContain('href="'.e($url).'"')
+        ->and($html)->toContain('Join meeting')
+        ->and($html)->not->toContain('&lt;table');
+});
+
+test('the confirmation email keeps an address as text', function () {
+    $booking = Booking::factory()->create([
+        'location_type' => LocationType::InPerson,
+        'location_detail' => '12 Main St, Austin',
+    ]);
+
+    $html = (string) (new BookingConfirmed($booking))->toMail(new AnonymousNotifiable)->render();
+
+    expect($html)->toContain('Where:</strong> 12 Main St, Austin')
+        ->and($html)->not->toContain('Join meeting');
 });
 
 test('a yes or no question is answered from its two options', function () {
