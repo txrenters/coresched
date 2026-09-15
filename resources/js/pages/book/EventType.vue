@@ -14,6 +14,7 @@ import {
 import { computed, nextTick, ref, watch } from 'vue';
 import MonthCalendar from '@/components/booking/MonthCalendar.vue';
 import InputError from '@/components/InputError.vue';
+import PhoneInput from '@/components/PhoneInput.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -652,12 +653,9 @@ const submit = () => {
                                         >*</span
                                     >
                                 </Label>
-                                <Input
+                                <PhoneInput
                                     id="location_detail"
                                     v-model="form.location_detail"
-                                    type="tel"
-                                    inputmode="tel"
-                                    autocomplete="tel"
                                     data-test="booking-phone"
                                     required
                                     aria-describedby="location_detail-help"
@@ -806,24 +804,25 @@ const submit = () => {
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <PhoneInput
+                                    v-else-if="question.type === 'phone'"
+                                    :id="`question-${question.id}`"
+                                    :model-value="singleAnswer(question.id)"
+                                    @update:model-value="
+                                        (value) =>
+                                            (form.answers[question.id] = value)
+                                    "
+                                    :required="question.isRequired"
+                                    :aria-describedby="
+                                        question.helpText
+                                            ? `question-${question.id}-help`
+                                            : undefined
+                                    "
+                                />
                                 <Input
                                     v-else
                                     :id="`question-${question.id}`"
-                                    :type="
-                                        question.type === 'phone'
-                                            ? 'tel'
-                                            : 'text'
-                                    "
-                                    :inputmode="
-                                        question.type === 'phone'
-                                            ? 'tel'
-                                            : undefined
-                                    "
-                                    :autocomplete="
-                                        question.type === 'phone'
-                                            ? 'tel'
-                                            : undefined
-                                    "
+                                    type="text"
                                     :model-value="singleAnswer(question.id)"
                                     @update:model-value="
                                         (value) =>

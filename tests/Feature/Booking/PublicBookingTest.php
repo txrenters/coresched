@@ -678,11 +678,72 @@ test('a phone question accepts the ways people write numbers', function () {
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
-        'answers' => [$question->id => '+1 (346) 239-9213'],
+        'answers' => [$question->id => '(346) 239-9213'],
     ])->assertSessionHasNoErrors();
 
+    // Stored with the +1 in place, the form Twilio dials.
     expect(Booking::latest('id')->first()->answers()->sole()->answer)
-        ->toBe('+1 (346) 239-9213');
+        ->toBe('+13462399213');
+});
+
+test('a phone question refuses a number too short to be a us number', function () {
+    $question = $this->eventType->questions()->create([
+        'type' => QuestionType::Phone,
+        'label' => 'Best number to reach you',
+        'is_required' => true,
+        'position' => 0,
+    ]);
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), [
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC')->toIso8601String(),
+        'timezone' => 'America/Chicago',
+        'name' => 'Sam Rivera',
+        'email' => 'sam@example.com',
+        'answers' => [$question->id => '555-0100'],
+    ])->assertSessionHasErrors(["answers.{$question->id}" => 'Enter a 10 digit phone number.']);
+});
+
+test('the number an invitee gives to be called on is stored with its +1', function () {
+    Notification::fake();
+
+    $this->eventType->update(['location_type' => LocationType::Phone]);
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), [
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC')->toIso8601String(),
+        'timezone' => 'America/Chicago',
+        'name' => 'Sam Rivera',
+        'email' => 'sam@example.com',
+        'location_detail' => '346.239.9213',
+    ])->assertSessionHasNoErrors();
+
+    expect(Booking::latest('id')->first()->location_detail)->toBe('+13462399213');
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), [
+        'starts_at' => CarbonImmutable::parse('2026-09-02 12:00:00', 'UTC')->toIso8601String(),
+        'timezone' => 'America/Chicago',
+        'name' => 'Sam Rivera',
+        'email' => 'sam@example.com',
+        'location_detail' => '239-9213',
+    ])->assertSessionHasErrors(['location_detail' => 'Enter a 10 digit phone number.']);
+});
+
+test('an invitee cannot replace the hosts own location', function () {
+    Notification::fake();
+
+    $this->eventType->update([
+        'location_type' => LocationType::CustomLink,
+        'location_detail' => 'https://meet.example.com/dana',
+    ]);
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), [
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC')->toIso8601String(),
+        'timezone' => 'America/Chicago',
+        'name' => 'Sam Rivera',
+        'email' => 'sam@example.com',
+        'location_detail' => 'https://evil.example.com',
+    ])->assertSessionHasNoErrors();
+
+    expect(Booking::latest('id')->first()->location_detail)->toBe('https://meet.example.com/dana');
 });
 
 test('a booking on a deleted event type still shows its confirmation page', function () {

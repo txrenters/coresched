@@ -5,6 +5,7 @@ namespace App\Http\Requests\Scheduling;
 use App\Enums\QuestionType;
 use App\Models\EventType;
 use App\Services\Scheduling\BookingPageResolver;
+use App\Support\PhoneNumber;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -69,8 +70,12 @@ class StoreBookingRequest extends FormRequest
             function ($validator) {
                 $eventType = $this->eventType();
 
-                if ($eventType->location_type->requiresInviteeInput() && blank($this->input('location_detail'))) {
-                    $validator->errors()->add('location_detail', 'Add the number we should call you on.');
+                if ($eventType->location_type->requiresInviteeInput()) {
+                    if (blank($this->input('location_detail'))) {
+                        $validator->errors()->add('location_detail', 'Add the number we should call you on.');
+                    } elseif (! PhoneNumber::isValid((string) $this->input('location_detail'))) {
+                        $validator->errors()->add('location_detail', 'Enter a 10 digit phone number.');
+                    }
                 }
 
                 $answers = $this->input('answers');
@@ -92,11 +97,10 @@ class StoreBookingRequest extends FormRequest
                     }
 
                     /*
-                     * A phone question asks for a number, so a sentence is not
-                     * an answer to it. Deliberately loose about SHAPE -- digits,
-                     * spaces, + ( ) - and at least seven digits -- because
-                     * numbers are written differently around the world and this
-                     * is a booking form, not a carrier.
+                     * A phone question asks for a US number: the form puts the
+                     * +1 in place and the invitee types the ten digits, so the
+                     * answer has to be one PhoneNumber can dial. Punctuation is
+                     * still the writer's business; CreateBooking stores E.164.
                      */
                     if ($question->type === QuestionType::Phone) {
                         if (is_array($answer)) {
@@ -105,10 +109,8 @@ class StoreBookingRequest extends FormRequest
                             continue;
                         }
 
-                        $digits = preg_replace('/\D/', '', (string) $answer);
-
-                        if (mb_strlen((string) $digits) < 7 || preg_match('/[^0-9+()\s.\-]/', (string) $answer)) {
-                            $validator->errors()->add("answers.{$question->id}", 'Enter a phone number.');
+                        if (preg_match('/[^0-9+()\s.\-]/', (string) $answer) || ! PhoneNumber::isValid((string) $answer)) {
+                            $validator->errors()->add("answers.{$question->id}", 'Enter a 10 digit phone number.');
                         }
 
                         continue;

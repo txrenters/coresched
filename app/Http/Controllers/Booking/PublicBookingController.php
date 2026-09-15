@@ -40,7 +40,12 @@ class PublicBookingController extends Controller
                     'email' => (string) $validated['email'],
                     'notes' => $validated['notes'] ?? null,
                     'timezone' => $validated['timezone'] ?? null,
-                    'location_detail' => $validated['location_detail'] ?? null,
+                    // Only a number the invitee is asked for: every other
+                    // location is the host's, and a posted value must not
+                    // replace their address or meeting link.
+                    'location_detail' => $request->eventType()->location_type->requiresInviteeInput()
+                        ? ($validated['location_detail'] ?? null)
+                        : null,
                     'guests' => $validated['guests'] ?? [],
                     'answers' => $validated['answers'] ?? [],
                 ],

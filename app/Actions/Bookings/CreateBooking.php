@@ -3,6 +3,7 @@
 namespace App\Actions\Bookings;
 
 use App\Enums\BookingStatus;
+use App\Enums\QuestionType;
 use App\Exceptions\SlotUnavailableException;
 use App\Jobs\SyncBookingToCalendars;
 use App\Models\Booking;
@@ -11,6 +12,7 @@ use App\Models\EventTypeQuestion;
 use App\Models\User;
 use App\Services\Activity\ActivityLogger;
 use App\Services\Scheduling\AvailabilityEngine;
+use App\Support\PhoneNumber;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -65,7 +67,7 @@ class CreateBooking
                 'email' => $attributes['email'],
                 'notes' => $attributes['notes'] ?? null,
                 'location_type' => $eventType->location_type,
-                'location_detail' => $attributes['location_detail'] ?? $eventType->location_detail,
+                'location_detail' => $this->locationDetail($eventType, $attributes['location_detail'] ?? null),
                 'rescheduled_from_id' => $replacing?->id,
             ]);
 
@@ -180,11 +182,33 @@ class CreateBooking
                 continue;
             }
 
+            $text = is_array($answer) ? implode(', ', $answer) : (string) $answer;
+
             $booking->answers()->create([
                 'event_type_question_id' => $question->id,
                 'label' => $question->label,
-                'answer' => is_array($answer) ? implode(', ', $answer) : (string) $answer,
+                'answer' => $question->type === QuestionType::Phone
+                    ? (PhoneNumber::toE164($text) ?? $text)
+                    : $text,
             ]);
         }
+    }
+
+    /**
+     * Get the location detail to store on the booking.
+     *
+     * A number the invitee gave to be called on is stored in E.164, the form
+     * Twilio dials and every other number in the app is kept in. One that
+     * cannot be put in that form is kept as written rather than lost.
+     */
+    protected function locationDetail(EventType $eventType, ?string $given): ?string
+    {
+        if ($given === null) {
+            return $eventType->location_detail;
+        }
+
+        return $eventType->location_type->requiresInviteeInput()
+            ? (PhoneNumber::toE164($given) ?? $given)
+            : $given;
     }
 }
