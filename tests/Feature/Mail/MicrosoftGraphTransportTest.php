@@ -14,6 +14,7 @@ beforeEach(function () {
             'client_secret' => 'mail-secret',
             'mailbox' => 'bookings@texasrenters.com',
             'save_to_sent_items' => false,
+            'send_as' => ['no-reply@texasrenters.com'],
         ],
         'mail.from' => ['address' => 'bookings@texasrenters.com', 'name' => 'TR Bookings'],
     ]);
@@ -68,6 +69,28 @@ test('mail is sent from the shared mailbox through graph', function () {
             ['emailAddress' => ['address' => 'invitee@example.com', 'name' => 'Invitee']],
         ])
         ->and($body['saveToSentItems'])->toBeFalse();
+});
+
+test('mail from the no-reply address is sent through that mailbox', function () {
+    fakeGraph();
+    $body = sendThroughGraph(fn ($message) => $message
+        ->from('no-reply@texasrenters.com', 'TR Bookings')
+        ->to('someone@example.com')
+        ->subject('Reset Password Notification'));
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://graph.microsoft.com/v1.0/users/no-reply%40texasrenters.com/sendMail');
+
+    expect($body['message']['from']['emailAddress']['address'])->toBe('no-reply@texasrenters.com');
+});
+
+test('an unexpected from address still sends through the configured mailbox', function () {
+    fakeGraph();
+    sendThroughGraph(fn ($message) => $message
+        ->from('ceo@texasrenters.com')
+        ->to('someone@example.com')
+        ->subject('Hello'));
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://graph.microsoft.com/v1.0/users/bookings%40texasrenters.com/sendMail');
 });
 
 test('cc, bcc and reply-to are only sent when they carry addresses', function () {

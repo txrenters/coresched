@@ -69,6 +69,8 @@ return [
             'client_id' => env('MAIL_GRAPH_CLIENT_ID') ?: env('MICROSOFT_CLIENT_ID'),
             'client_secret' => env('MAIL_GRAPH_CLIENT_SECRET') ?: env('MICROSOFT_CLIENT_SECRET'),
             'mailbox' => env('MAIL_GRAPH_MAILBOX') ?: env('MAIL_FROM_ADDRESS'),
+            // Also sent through as themselves when a message is from them.
+            'send_as' => [env('MAIL_ACCOUNT_FROM_ADDRESS') ?: 'no-reply@texasrenters.com'],
             'save_to_sent_items' => env('MAIL_GRAPH_SAVE_TO_SENT_ITEMS', false),
         ],
 
@@ -136,6 +138,23 @@ return [
     'from' => [
         'address' => env('MAIL_FROM_ADDRESS', 'bookings@texasrenters.com'),
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Account Mail "From" Address
+    |--------------------------------------------------------------------------
+    |
+    | Mail about someone's account -- a password reset, an email verification,
+    | an invitation to an organization -- goes out from a no-reply address.
+    | Booking mail keeps the global address above, because a reply to it is
+    | meant to reach somebody. See SendAccountMailFromNoReply.
+    |
+    */
+
+    'account_from' => [
+        'address' => env('MAIL_ACCOUNT_FROM_ADDRESS') ?: 'no-reply@texasrenters.com',
+        'name' => env('MAIL_ACCOUNT_FROM_NAME') ?: env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
 ];

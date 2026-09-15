@@ -28,6 +28,9 @@ class MicrosoftGraphTransport extends AbstractTransport
 
     protected const TOKEN_CACHE_KEY = 'microsoft-graph.mail.token';
 
+    /**
+     * @param  array<int, string>  $sendAs
+     */
     public function __construct(
         protected Cache $cache,
         protected string $tenant,
@@ -35,6 +38,7 @@ class MicrosoftGraphTransport extends AbstractTransport
         protected string $clientSecret,
         protected string $mailbox,
         protected bool $saveToSentItems = false,
+        protected array $sendAs = [],
     ) {
         parent::__construct();
     }
@@ -66,11 +70,37 @@ class MicrosoftGraphTransport extends AbstractTransport
 
         Http::withToken($this->accessToken())
             ->acceptJson()
-            ->post(self::GRAPH_URL.'/users/'.urlencode($this->mailbox).'/sendMail', [
+            ->post(self::GRAPH_URL.'/users/'.urlencode($this->sendingMailbox($email)).'/sendMail', [
                 'message' => $this->message($email),
                 'saveToSentItems' => $this->saveToSentItems,
             ])
             ->throw();
+    }
+
+    /**
+     * Pick the mailbox to send through.
+     *
+     * Graph sends as the mailbox in the URL, and naming a different From
+     * needs Send As rights on top. So a message from one of the other
+     * mailboxes this app sends as -- the no-reply address account mail uses --
+     * goes through that mailbox. Anything else goes through the configured
+     * one, so an unexpected From cannot pick an arbitrary mailbox.
+     */
+    protected function sendingMailbox(Email $email): string
+    {
+        $from = $email->getFrom()[0] ?? null;
+
+        if ($from === null) {
+            return $this->mailbox;
+        }
+
+        foreach ($this->sendAs as $mailbox) {
+            if (strcasecmp($mailbox, $from->getAddress()) === 0) {
+                return $mailbox;
+            }
+        }
+
+        return $this->mailbox;
     }
 
     /**
