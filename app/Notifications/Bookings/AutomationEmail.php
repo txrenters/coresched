@@ -56,7 +56,7 @@ class AutomationEmail extends Notification implements ShouldQueue
             ->markdown('mail.automation', ['body' => $message->body()]);
 
         /*
-         * A reply has to reach a person: the bookings mailbox it sends as is
+         * A reply has to reach a person: the scheduling mailbox it sends as is
          * shared and unread. The same rule the booking emails follow -- a host
          * hears back from the invitee, everyone else from the hosts.
          */

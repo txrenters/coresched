@@ -97,7 +97,7 @@ ARG APP_URL=https://bookings.texasrenters.com
 # still read "... - Laravel".
 #
 # Confirm with `grep -o 'Laravel' public/build/assets/app-*.js`.
-ARG APP_NAME="TR Bookings"
+ARG APP_NAME="TR Scheduling"
 
 # `npm run build`, not `build:ssr`: vite.config.ts declares no SSR input and
 # SSR is left off, so building it would only add time.

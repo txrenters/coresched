@@ -50,7 +50,7 @@ return [
         ],
 
         /*
-         * The bookings address is a shared mailbox with no password, so it
+         * The scheduling address is a shared mailbox with no password, so it
          * cannot authenticate to SMTP. Graph sends on its behalf with an
          * app-only token instead -- see MicrosoftGraphTransport.
          *
@@ -70,7 +70,7 @@ return [
             'client_secret' => env('MAIL_GRAPH_CLIENT_SECRET') ?: env('MICROSOFT_CLIENT_SECRET'),
             'mailbox' => env('MAIL_GRAPH_MAILBOX') ?: env('MAIL_FROM_ADDRESS'),
             // Also sent through as themselves when a message is from them.
-            'send_as' => [env('MAIL_ACCOUNT_FROM_ADDRESS') ?: 'no-reply@texasrenters.com'],
+            'send_as' => array_values(array_filter([env('MAIL_ACCOUNT_FROM_ADDRESS')])),
             'save_to_sent_items' => env('MAIL_GRAPH_SAVE_TO_SENT_ITEMS', false),
         ],
 
@@ -136,7 +136,7 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'bookings@texasrenters.com'),
+        'address' => env('MAIL_FROM_ADDRESS') ?: 'scheduling@texasrenters.com',
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
@@ -146,14 +146,14 @@ return [
     |--------------------------------------------------------------------------
     |
     | Mail about someone's account -- a password reset, an email verification,
-    | an invitation to an organization -- goes out from a no-reply address.
-    | Booking mail keeps the global address above, because a reply to it is
-    | meant to reach somebody. See SendAccountMailFromNoReply.
+    | an invitation to an organization. It comes from the global address above
+    | unless MAIL_ACCOUNT_FROM_ADDRESS names a different one, such as a
+    | no-reply mailbox. See SendAccountMailFromNoReply.
     |
     */
 
     'account_from' => [
-        'address' => env('MAIL_ACCOUNT_FROM_ADDRESS') ?: 'no-reply@texasrenters.com',
+        'address' => env('MAIL_ACCOUNT_FROM_ADDRESS') ?: (env('MAIL_FROM_ADDRESS') ?: 'scheduling@texasrenters.com'),
         'name' => env('MAIL_ACCOUNT_FROM_NAME') ?: env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 

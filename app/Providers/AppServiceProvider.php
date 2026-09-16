@@ -87,7 +87,7 @@ class AppServiceProvider extends ServiceProvider
      * The Azure app registration is the same one the calendar integration
      * uses, but this token is app-only rather than a signed in user's, so the
      * registration needs the Mail.Send APPLICATION permission with admin
-     * consent -- ideally narrowed to the bookings mailbox with an Exchange
+     * consent -- ideally narrowed to the scheduling mailbox with an Exchange
      * application access policy.
      */
     protected function registerMicrosoftGraphMailer(): void

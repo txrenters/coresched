@@ -17,7 +17,7 @@ use Symfony\Component\Mime\Part\DataPart;
 /**
  * Sends mail through the Microsoft Graph sendMail endpoint.
  *
- * The bookings address is a shared mailbox, which has no password and cannot
+ * The scheduling address is a shared mailbox, which has no password and cannot
  * authenticate to SMTP at all. Graph application permissions are the way in:
  * we hold an app-only token for the tenant and post to that mailbox's
  * /sendMail, rather than signing in as it.
@@ -82,7 +82,7 @@ class MicrosoftGraphTransport extends AbstractTransport
      *
      * Graph sends as the mailbox in the URL, and naming a different From
      * needs Send As rights on top. So a message from one of the other
-     * mailboxes this app sends as -- the no-reply address account mail uses --
+     * mailboxes this app sends as -- a separate account mail address, if set --
      * goes through that mailbox. Anything else goes through the configured
      * one, so an unexpected From cannot pick an arbitrary mailbox.
      */

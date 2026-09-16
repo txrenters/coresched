@@ -11,7 +11,7 @@ use Symfony\Component\Mime\Address;
 /**
  * Sends mail about someone's account from the no-reply address.
  *
- * Booking mail comes from the bookings mailbox, where a reply reaches
+ * Booking mail comes from the scheduling mailbox, where a reply reaches
  * somebody. A password reset, an email verification or an invitation has
  * nothing to reply to, so it comes from mail.account_from instead.
  *

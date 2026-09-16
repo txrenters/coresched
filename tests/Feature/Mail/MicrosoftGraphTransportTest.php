@@ -12,11 +12,11 @@ beforeEach(function () {
             'tenant' => 'tenant-id',
             'client_id' => 'mail-id',
             'client_secret' => 'mail-secret',
-            'mailbox' => 'bookings@texasrenters.com',
+            'mailbox' => 'scheduling@texasrenters.com',
             'save_to_sent_items' => false,
             'send_as' => ['no-reply@texasrenters.com'],
         ],
-        'mail.from' => ['address' => 'bookings@texasrenters.com', 'name' => 'TR Bookings'],
+        'mail.from' => ['address' => 'scheduling@texasrenters.com', 'name' => 'TR Scheduling'],
     ]);
 });
 
@@ -60,11 +60,11 @@ test('mail is sent from the shared mailbox through graph', function () {
         && $request['grant_type'] === 'client_credentials'
         && $request['scope'] === 'https://graph.microsoft.com/.default');
 
-    Http::assertSent(fn ($request) => $request->url() === 'https://graph.microsoft.com/v1.0/users/bookings%40texasrenters.com/sendMail'
+    Http::assertSent(fn ($request) => $request->url() === 'https://graph.microsoft.com/v1.0/users/scheduling%40texasrenters.com/sendMail'
         && $request->hasHeader('Authorization', 'Bearer graph-token'));
 
     expect($body['message']['subject'])->toBe('Your booking is confirmed')
-        ->and($body['message']['from']['emailAddress']['address'])->toBe('bookings@texasrenters.com')
+        ->and($body['message']['from']['emailAddress']['address'])->toBe('scheduling@texasrenters.com')
         ->and($body['message']['toRecipients'])->toBe([
             ['emailAddress' => ['address' => 'invitee@example.com', 'name' => 'Invitee']],
         ])
@@ -74,7 +74,7 @@ test('mail is sent from the shared mailbox through graph', function () {
 test('mail from the no-reply address is sent through that mailbox', function () {
     fakeGraph();
     $body = sendThroughGraph(fn ($message) => $message
-        ->from('no-reply@texasrenters.com', 'TR Bookings')
+        ->from('no-reply@texasrenters.com', 'TR Scheduling')
         ->to('someone@example.com')
         ->subject('Reset Password Notification'));
 
@@ -90,7 +90,7 @@ test('an unexpected from address still sends through the configured mailbox', fu
         ->to('someone@example.com')
         ->subject('Hello'));
 
-    Http::assertSent(fn ($request) => $request->url() === 'https://graph.microsoft.com/v1.0/users/bookings%40texasrenters.com/sendMail');
+    Http::assertSent(fn ($request) => $request->url() === 'https://graph.microsoft.com/v1.0/users/scheduling%40texasrenters.com/sendMail');
 });
 
 test('cc, bcc and reply-to are only sent when they carry addresses', function () {

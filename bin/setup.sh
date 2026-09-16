@@ -58,7 +58,7 @@ else
     warn ".env missing. Create it with:
           APP_SLUG=${APP_SLUG}
           APP_HOST=bookings.texasrenters.com
-          APP_NAME=TX Bookings
+          APP_NAME=TR Scheduling
           HTTP_PORT=8084
           APP_VERSION=latest
           COMPOSE_FILE=docker-compose.yml"

@@ -33,7 +33,7 @@ services:
         # one place and can never drift.
         APP_URL: https://${APP_HOST:?APP_HOST is required}
         # Baked into the bundle as VITE_APP_NAME -- see the ARG in the Dockerfile.
-        APP_NAME: ${APP_NAME:-TR Bookings}
+        APP_NAME: ${APP_NAME:-TR Scheduling}
     image: ${APP_SLUG:-tx-bookings}/app:${APP_VERSION:-latest}
     restart: unless-stopped
     # Named .env.docker rather than .env so it cannot be confused with the
@@ -106,7 +106,7 @@ services:
       args:
         APP_URL: https://${APP_HOST:?APP_HOST is required}
         # Baked into the bundle as VITE_APP_NAME -- see the ARG in the Dockerfile.
-        APP_NAME: ${APP_NAME:-TR Bookings}
+        APP_NAME: ${APP_NAME:-TR Scheduling}
     image: ${APP_SLUG:-tx-bookings}/web:${APP_VERSION:-latest}
     restart: unless-stopped
     depends_on:
@@ -133,7 +133,7 @@ services:
       args:
         APP_URL: https://${APP_HOST:?APP_HOST is required}
         # Baked into the bundle as VITE_APP_NAME -- see the ARG in the Dockerfile.
-        APP_NAME: ${APP_NAME:-TR Bookings}
+        APP_NAME: ${APP_NAME:-TR Scheduling}
     image: ${APP_SLUG:-tx-bookings}/app:${APP_VERSION:-latest}
     # Under a profile so `up -d` never starts it; bin/deploy.sh runs it
     # explicitly with `run --rm`, once, before the new code serves traffic.
@@ -158,7 +158,7 @@ services:
       args:
         APP_URL: https://${APP_HOST:?APP_HOST is required}
         # Baked into the bundle as VITE_APP_NAME -- see the ARG in the Dockerfile.
-        APP_NAME: ${APP_NAME:-TR Bookings}
+        APP_NAME: ${APP_NAME:-TR Scheduling}
     image: ${APP_SLUG:-tx-bookings}/app:${APP_VERSION:-latest}
     restart: unless-stopped
     # Not optional. CreateBooking, CancelBooking and RescheduleBooking dispatch
@@ -209,7 +209,7 @@ services:
       args:
         APP_URL: https://${APP_HOST:?APP_HOST is required}
         # Baked into the bundle as VITE_APP_NAME -- see the ARG in the Dockerfile.
-        APP_NAME: ${APP_NAME:-TR Bookings}
+        APP_NAME: ${APP_NAME:-TR Scheduling}
     image: ${APP_SLUG:-tx-bookings}/app:${APP_VERSION:-latest}
     restart: unless-stopped
     # Unlike texra-crm's, this scheduler has real work: routes/console.php

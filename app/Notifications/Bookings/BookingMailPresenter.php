@@ -184,7 +184,7 @@ class BookingMailPresenter
     /**
      * Get the addresses a reply should go to.
      *
-     * Everything sends as the bookings mailbox, which is shared, has no
+     * Everything sends as the scheduling mailbox, which is shared, has no
      * password and nobody reads -- so a reply to the From address is lost.
      * Point it at the other party instead: a host hears back from the invitee,
      * and the invitee reaches whoever is hosting them.

@@ -13,8 +13,8 @@ use Illuminate\Support\Collection;
 beforeEach(function () {
     config([
         'mail.default' => 'array',
-        'mail.from' => ['address' => 'bookings@texasrenters.com', 'name' => 'TR Bookings'],
-        'mail.account_from' => ['address' => 'no-reply@texasrenters.com', 'name' => 'TR Bookings'],
+        'mail.from' => ['address' => 'scheduling@texasrenters.com', 'name' => 'TR Scheduling'],
+        'mail.account_from' => ['address' => 'no-reply@texasrenters.com', 'name' => 'TR Scheduling'],
     ]);
 });
 
@@ -49,10 +49,10 @@ test('an organization invitation comes from the no-reply address', function () {
     expect(sentFromAddresses()->all())->toBe(['no-reply@texasrenters.com']);
 });
 
-test('booking mail keeps the bookings address', function () {
+test('booking mail keeps the scheduling address', function () {
     (new AnonymousNotifiable)
         ->route('mail', 'invitee@example.com')
         ->notifyNow(new BookingConfirmed(Booking::factory()->create()));
 
-    expect(sentFromAddresses()->all())->toBe(['bookings@texasrenters.com']);
+    expect(sentFromAddresses()->all())->toBe(['scheduling@texasrenters.com']);
 });
