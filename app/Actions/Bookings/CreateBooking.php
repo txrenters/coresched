@@ -14,6 +14,7 @@ use App\Services\Activity\ActivityLogger;
 use App\Services\Scheduling\AvailabilityEngine;
 use App\Support\PhoneNumber;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class CreateBooking
@@ -38,22 +39,27 @@ class CreateBooking
      * the hosts is the first read inside it. A caller that wraps this in its
      * own transaction must resolve the pool first for the same reason.
      *
+     * A chosen host skips automatic assignment, and the slot must be free for
+     * that host in particular rather than for anyone in the pool.
+     *
      * @throws SlotUnavailableException
      */
-    public function handle(EventType $eventType, CarbonImmutable $startsAt, array $attributes, ?Booking $replacing = null): Booking
+    public function handle(EventType $eventType, CarbonImmutable $startsAt, array $attributes, ?Booking $replacing = null, ?User $host = null): Booking
     {
         $candidateHostIds = $eventType->schedulingHosts()->modelKeys();
 
-        $booking = DB::transaction(function () use ($eventType, $startsAt, $attributes, $replacing, $candidateHostIds) {
+        $booking = DB::transaction(function () use ($eventType, $startsAt, $attributes, $replacing, $host, $candidateHostIds) {
             $this->lockHosts($candidateHostIds);
 
             $slot = $this->availability->findSlot($eventType, $startsAt, $replacing?->id);
 
-            if ($slot === null) {
+            if ($slot === null || ($host !== null && ! in_array($host->id, $slot->hostIds, true))) {
                 throw SlotUnavailableException::taken();
             }
 
-            $hosts = $this->assignHosts->handle($eventType, $slot->hostIds);
+            $hosts = $host !== null
+                ? new Collection([$host])
+                : $this->assignHosts->handle($eventType, $slot->hostIds);
 
             $booking = Booking::create([
                 'event_type_id' => $eventType->id,

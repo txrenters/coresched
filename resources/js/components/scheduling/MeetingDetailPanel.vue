@@ -7,9 +7,11 @@ import {
     Globe,
     Mail,
     MapPin,
+    Plane,
     RotateCcw,
     Smartphone,
     Trash2,
+    UserX,
     Users,
     Video,
 } from '@lucide/vue';
@@ -23,7 +25,11 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
-import { approve } from '@/routes/meetings';
+import { approve, handOff } from '@/routes/meetings';
+import {
+    destroy as undoNoShow,
+    store as markNoShow,
+} from '@/routes/meetings/no-show';
 import { update as updateNotes } from '@/routes/meetings/notes';
 
 type Meeting = {
@@ -54,7 +60,11 @@ type Meeting = {
     }>;
     canCancel: boolean;
     canApprove: boolean;
+    noShow: boolean;
+    canMarkNoShow: boolean;
+    awayHostNames: string[];
     rescheduleUrl: string;
+    reassignableHosts: Array<{ id: number; name: string }>;
     cancellationReason: string | null;
 };
 
@@ -69,6 +79,7 @@ const emit = defineEmits<{
     (e: 'close'): void;
     (e: 'cancel'): void;
     (e: 'decline'): void;
+    (e: 'reschedule'): void;
 }>();
 
 const tab = ref<'details' | 'notes'>('details');
@@ -132,6 +143,45 @@ const approveMeeting = () => {
         { preserveScroll: true, onSuccess: () => emit('close') },
     );
 };
+
+const handOffMeeting = () => {
+    if (!props.meeting) {
+        return;
+    }
+
+    router.post(
+        handOff({ current_team: props.teamSlug, booking: props.meeting.uid })
+            .url,
+        {},
+        { preserveScroll: true, onSuccess: () => emit('close') },
+    );
+};
+
+const toggleNoShow = () => {
+    if (!props.meeting) {
+        return;
+    }
+
+    const route = {
+        current_team: props.teamSlug,
+        booking: props.meeting.uid,
+    };
+
+    if (props.meeting.noShow) {
+        router.delete(undoNoShow(route).url, {
+            preserveScroll: true,
+            onSuccess: () => emit('close'),
+        });
+
+        return;
+    }
+
+    router.post(
+        markNoShow(route).url,
+        {},
+        { preserveScroll: true, onSuccess: () => emit('close') },
+    );
+};
 </script>
 
 <template>
@@ -188,8 +238,66 @@ const approveMeeting = () => {
                     </Button>
                 </div>
 
+                <div
+                    v-if="meeting.awayHostNames.length"
+                    class="mt-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm"
+                    data-test="panel-host-away"
+                >
+                    <p class="flex items-center gap-1.5 font-medium">
+                        <Plane class="size-3.5 text-destructive" />
+                        {{ meeting.awayHostNames.join(', ') }}
+                        {{ meeting.awayHostNames.length === 1 ? 'is' : 'are' }}
+                        out of office at this time.
+                    </p>
+                    <Button
+                        v-if="meeting.reassignableHosts.length"
+                        size="sm"
+                        class="mt-2 rounded-full"
+                        data-test="panel-hand-off"
+                        @click="handOffMeeting"
+                    >
+                        Move to a free host
+                    </Button>
+                    <p v-else class="mt-1 text-muted-foreground">
+                        Only one person hosts this meeting, so reschedule or
+                        cancel it.
+                    </p>
+                </div>
+
+                <p
+                    v-if="meeting.noShow"
+                    class="mt-1 flex items-center gap-1.5 text-sm font-medium text-destructive"
+                    data-test="panel-no-show-label"
+                >
+                    <UserX class="size-3.5" /> Invitee did not show up
+                </p>
+
+                <div v-if="meeting.canMarkNoShow" class="mt-3 flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="rounded-full"
+                        data-test="panel-no-show"
+                        @click="toggleNoShow"
+                    >
+                        <UserX class="size-3.5" />
+                        {{ meeting.noShow ? 'Undo no-show' : 'Mark no-show' }}
+                    </Button>
+                </div>
+
                 <div v-if="meeting.canCancel" class="mt-3 flex gap-2">
                     <Button
+                        v-if="meeting.reassignableHosts.length"
+                        variant="outline"
+                        size="sm"
+                        class="rounded-full"
+                        data-test="panel-reschedule"
+                        @click="emit('reschedule')"
+                    >
+                        <RotateCcw class="size-3.5" /> Reschedule
+                    </Button>
+                    <Button
+                        v-else
                         variant="outline"
                         size="sm"
                         class="rounded-full"

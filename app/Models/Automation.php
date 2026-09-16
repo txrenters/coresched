@@ -123,6 +123,9 @@ class Automation extends Model
                 : 'When a meeting is booked',
             AutomationTrigger::BeforeStart => $this->describeOffset().' before it starts',
             AutomationTrigger::AfterEnd => $this->describeOffset().' after it ends',
+            AutomationTrigger::NoShow => $this->offset_minutes > 0
+                ? $this->describeOffset().' after the invitee is marked a no-show'
+                : 'When the invitee is marked a no-show',
         };
     }
 
@@ -218,16 +221,29 @@ class Automation extends Model
      */
     public function sendAtFor(Booking $booking): ?CarbonInterface
     {
+        /*
+         * A no-show only fires once a host records one, and a meeting the
+         * invitee missed gets no "thanks for meeting" follow-up.
+         */
+        if ($this->trigger === AutomationTrigger::NoShow && $booking->no_show_at === null) {
+            return null;
+        }
+
+        if ($this->trigger === AutomationTrigger::AfterEnd && $booking->no_show_at !== null) {
+            return null;
+        }
+
         $sendAt = match ($this->trigger) {
             // A delay after booking is allowed: "24 hours after it is booked".
             AutomationTrigger::Booked => now()->addMinutes($this->offset_minutes ?? 0),
             AutomationTrigger::BeforeStart => $booking->starts_at->copy()->subMinutes($this->offset_minutes ?? 0),
             AutomationTrigger::AfterEnd => $booking->ends_at->copy()->addMinutes($this->offset_minutes ?? 0),
+            AutomationTrigger::NoShow => $booking->no_show_at->copy()->addMinutes($this->offset_minutes ?? 0),
         };
 
         // A meeting booked for later today can already be past its "an hour
         // before" moment; there is nothing sensible to send then.
-        return $sendAt->isPast() && $this->trigger !== AutomationTrigger::Booked
+        return $sendAt->isPast() && ! in_array($this->trigger, [AutomationTrigger::Booked, AutomationTrigger::NoShow], true)
             ? null
             : $sendAt;
     }

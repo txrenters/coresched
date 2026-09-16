@@ -3,9 +3,12 @@ import { Head, router, setLayoutProps, useForm } from '@inertiajs/vue3';
 import {
     Check,
     Clock,
+    Plane,
+    Plus,
     RotateCcw,
     Search,
     SlidersHorizontal,
+    UserX,
 } from '@lucide/vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import PageHeader from '@/components/PageHeader.vue';
@@ -37,7 +40,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useCurrentTeam } from '@/composables/useCurrentTeam';
-import { decline, destroy, index } from '@/routes/meetings';
+import { decline, destroy, handOffAll, index } from '@/routes/meetings';
 
 type Meeting = {
     uid: string;
@@ -57,6 +60,8 @@ type Meeting = {
     inviteePhone: string | null;
     hostNotes: string | null;
     rescheduleUrl: string;
+    reassignableHosts: Array<{ id: number; name: string }>;
+    hostIds: number[];
     inviteeName: string;
     inviteeEmail: string;
     inviteeTimezone: string;
@@ -78,6 +83,9 @@ type Meeting = {
     }>;
     canCancel: boolean;
     canApprove: boolean;
+    noShow: boolean;
+    canMarkNoShow: boolean;
+    awayHostNames: string[];
 };
 
 type Option = { value: string; label: string; initial: string | null };
@@ -85,6 +93,7 @@ type Option = { value: string; label: string; initial: string | null };
 type Props = {
     meetings: Meeting[];
     total: number;
+    hostAwayCount: number;
     page: number;
     hasMore: boolean;
     filter: string;
@@ -96,6 +105,12 @@ type Props = {
     eventTypeId: number | null;
     eventTypeOptions: Array<{ value: number; label: string }>;
     viewerTimezone: string;
+    bookableEventTypes: Array<{
+        id: number;
+        name: string;
+        url: string;
+        hosts: Array<{ id: number; name: string }>;
+    }>;
 };
 
 const props = defineProps<Props>();
@@ -108,6 +123,8 @@ const canceling = ref<Meeting | null>(null);
 const cancelForm = useForm({ reason: '' });
 const declining = ref<Meeting | null>(null);
 const declineForm = useForm({ reason: '' });
+const rescheduling = ref<Meeting | null>(null);
+const rescheduleHostId = ref<string>('');
 
 /**
  * "In progress" is answered against the reader's own clock, which keeps
@@ -149,6 +166,34 @@ const askToCancel = () => {
 const askToDecline = () => {
     declining.value = selected.value;
     selected.value = null;
+};
+
+const askToReschedule = () => {
+    rescheduling.value = selected.value;
+    rescheduleHostId.value = String(selected.value?.hostIds[0] ?? '');
+    selected.value = null;
+};
+
+const dismissReschedule = () => {
+    selected.value = rescheduling.value;
+    rescheduling.value = null;
+};
+
+/**
+ * Picking a time happens on the booking page, like the invitee's own
+ * reschedule link, but with its times narrowed to the chosen host.
+ */
+const continueReschedule = () => {
+    if (!rescheduling.value) {
+        return;
+    }
+
+    const url = new URL(rescheduling.value.rescheduleUrl, window.location.href);
+    url.searchParams.set('host', rescheduleHostId.value);
+
+    window.open(url.toString(), '_blank');
+
+    rescheduling.value = null;
 };
 
 const dismissCancel = () => {
@@ -226,6 +271,58 @@ const loadMore = () => {
     });
 };
 
+const creating = ref(false);
+const newMeetingEventTypeId = ref('');
+const newMeetingHostId = ref('any');
+
+const newMeetingEventType = computed(() =>
+    props.bookableEventTypes.find(
+        (eventType) => String(eventType.id) === newMeetingEventTypeId.value,
+    ),
+);
+
+watch(newMeetingEventTypeId, () => (newMeetingHostId.value = 'any'));
+
+const openNewMeeting = () => {
+    newMeetingEventTypeId.value = String(props.bookableEventTypes[0]?.id ?? '');
+    newMeetingHostId.value = 'any';
+    creating.value = true;
+};
+
+/**
+ * Staff book on the same page invitees use, signed in, so the invitee still
+ * gets the confirmation and the history records who made the booking.
+ */
+const continueNewMeeting = () => {
+    if (!newMeetingEventType.value) {
+        return;
+    }
+
+    const url = new URL(newMeetingEventType.value.url, window.location.href);
+
+    if (newMeetingHostId.value !== 'any') {
+        url.searchParams.set('host', newMeetingHostId.value);
+    }
+
+    window.open(url.toString(), '_blank');
+
+    creating.value = false;
+};
+
+const movingAll = ref(false);
+
+const moveAllAwayMeetings = () => {
+    router.post(
+        handOffAll(teamSlug.value).url,
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => (movingAll.value = true),
+            onFinish: () => (movingAll.value = false),
+        },
+    );
+};
+
 const confirmCancel = () => {
     if (!canceling.value) {
         return;
@@ -276,7 +373,13 @@ setLayoutProps({
         <PageHeader
             title="Meetings"
             description="Everything booked with you and your organization."
-        />
+        >
+            <template v-if="bookableEventTypes.length" #actions>
+                <Button data-test="new-meeting" @click="openNewMeeting">
+                    <Plus class="size-4" /> New meeting
+                </Button>
+            </template>
+        </PageHeader>
 
         <div class="flex flex-wrap items-center gap-2">
             <ScopePicker
@@ -363,6 +466,9 @@ setLayoutProps({
                                 <SelectItem value="pending">
                                     Pending approval
                                 </SelectItem>
+                                <SelectItem value="host_away">
+                                    Host away
+                                </SelectItem>
                                 <SelectItem value="canceled">
                                     Cancelled &amp; rescheduled
                                 </SelectItem>
@@ -371,6 +477,36 @@ setLayoutProps({
                     </div>
                 </PopoverContent>
             </Popover>
+        </div>
+
+        <div
+            v-if="hostAwayCount > 0"
+            class="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm"
+            data-test="host-away-banner"
+        >
+            <Plane class="size-4 shrink-0 text-destructive" />
+            <p class="min-w-0 flex-1">
+                {{ hostAwayCount }} upcoming
+                {{ hostAwayCount === 1 ? 'meeting falls' : 'meetings fall' }}
+                while the host is out of office.
+            </p>
+            <Button
+                v-if="status !== 'host_away'"
+                variant="outline"
+                size="sm"
+                data-test="show-host-away"
+                @click="reload({ status: 'host_away', page: 1 })"
+            >
+                Show them
+            </Button>
+            <Button
+                size="sm"
+                :disabled="movingAll"
+                data-test="move-all-host-away"
+                @click="moveAllAwayMeetings"
+            >
+                Move to free hosts
+            </Button>
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -429,6 +565,20 @@ setLayoutProps({
                                     aria-hidden="true"
                                 />
                                 In progress
+                            </Badge>
+                            <Badge
+                                v-else-if="meeting.awayHostNames.length"
+                                variant="destructive"
+                                data-test="host-away-badge"
+                            >
+                                <Plane class="size-3" /> Host away
+                            </Badge>
+                            <Badge
+                                v-else-if="meeting.noShow"
+                                variant="destructive"
+                                data-test="no-show-badge"
+                            >
+                                <UserX class="size-3" /> No-show
                             </Badge>
                             <Badge
                                 v-else-if="meeting.status === 'pending'"
@@ -495,7 +645,132 @@ setLayoutProps({
         @close="selected = null"
         @cancel="askToCancel"
         @decline="askToDecline"
+        @reschedule="askToReschedule"
     />
+
+    <Dialog v-model:open="creating">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Book a meeting for someone</DialogTitle>
+                <DialogDescription>
+                    Pick what to book and who hosts it, then choose a time and
+                    enter the invitee's details.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div class="grid gap-4">
+                <div class="grid gap-2">
+                    <Label for="new-meeting-event-type">Event type</Label>
+                    <Select v-model="newMeetingEventTypeId">
+                        <SelectTrigger
+                            id="new-meeting-event-type"
+                            class="w-full"
+                            data-test="new-meeting-event-type"
+                        >
+                            <SelectValue placeholder="Choose an event type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="eventType in bookableEventTypes"
+                                :key="eventType.id"
+                                :value="String(eventType.id)"
+                            >
+                                {{ eventType.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div
+                    v-if="newMeetingEventType?.hosts.length"
+                    class="grid gap-2"
+                >
+                    <Label for="new-meeting-host">Host</Label>
+                    <Select v-model="newMeetingHostId">
+                        <SelectTrigger
+                            id="new-meeting-host"
+                            class="w-full"
+                            data-test="new-meeting-host"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="any">
+                                Whoever is free (automatic)
+                            </SelectItem>
+                            <SelectItem
+                                v-for="host in newMeetingEventType.hosts"
+                                :key="host.id"
+                                :value="String(host.id)"
+                            >
+                                {{ host.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="creating = false">
+                    Cancel
+                </Button>
+                <Button
+                    :disabled="!newMeetingEventType"
+                    data-test="continue-new-meeting"
+                    @click="continueNewMeeting"
+                >
+                    Pick a time
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog :open="rescheduling !== null" @update:open="dismissReschedule">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Reschedule this meeting</DialogTitle>
+                <DialogDescription>
+                    Choose who should host it, then pick a time they are free.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div class="grid gap-2">
+                <Label for="reschedule-host">Host</Label>
+                <Select v-model="rescheduleHostId">
+                    <SelectTrigger
+                        id="reschedule-host"
+                        class="w-full"
+                        data-test="reschedule-host"
+                    >
+                        <SelectValue placeholder="Choose a host" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem
+                            v-for="host in rescheduling?.reassignableHosts ??
+                            []"
+                            :key="host.id"
+                            :value="String(host.id)"
+                        >
+                            {{ host.name }}
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" @click="dismissReschedule">
+                    Back
+                </Button>
+                <Button
+                    :disabled="!rescheduleHostId"
+                    data-test="continue-reschedule"
+                    @click="continueReschedule"
+                >
+                    Pick a time
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 
     <Dialog :open="declining !== null" @update:open="dismissDecline">
         <DialogContent>

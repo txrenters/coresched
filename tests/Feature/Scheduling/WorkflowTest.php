@@ -83,7 +83,7 @@ test('the editor offers the organizations event types and the message variables'
             ->where('automation.name', $automation->name)
             ->where('automation.eventTypeIds', [$this->eventType->id])
             ->has('eventTypes', 1)
-            ->has('triggerOptions', 3)
+            ->has('triggerOptions', 4)
             ->has('recipientOptions', 3)
             ->has('variables', 13));
 });

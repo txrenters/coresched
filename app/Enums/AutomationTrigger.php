@@ -7,6 +7,7 @@ enum AutomationTrigger: string
     case Booked = 'booked';
     case BeforeStart = 'before_start';
     case AfterEnd = 'after_end';
+    case NoShow = 'no_show';
 
     /**
      * Get the display label for the trigger.
@@ -17,19 +18,20 @@ enum AutomationTrigger: string
             self::Booked => 'Immediately when a meeting is booked',
             self::BeforeStart => 'Before the meeting starts',
             self::AfterEnd => 'After the meeting ends',
+            self::NoShow => 'When the invitee is marked as a no-show',
         };
     }
 
     /**
      * Determine whether an offset has to be given.
      *
-     * Booking is a moment, so a delay after it is optional -- "immediately"
-     * is a perfectly good answer. The meeting's own times are only useful
+     * Booking and a no-show are moments, so a delay after them is optional --
+     * "immediately" is a perfectly good answer. The meeting's own times are only useful
      * with a distance from them.
      */
     public function requiresOffset(): bool
     {
-        return $this !== self::Booked;
+        return $this !== self::Booked && $this !== self::NoShow;
     }
 
     /**

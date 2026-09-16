@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Scheduling;
 use App\Actions\Bookings\ApproveBooking;
 use App\Actions\Bookings\CancelBooking;
 use App\Actions\Bookings\DeclineBooking;
+use App\Actions\Bookings\HandOffBooking;
+use App\Actions\Bookings\RecordNoShow;
 use App\Enums\BookingStatus;
 use App\Enums\TeamPermission;
+use App\Exceptions\SlotUnavailableException;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Booking;
@@ -67,7 +70,7 @@ class MeetingController extends Controller
 
         $status = $request->string('status', 'active')->toString();
 
-        if (! in_array($status, ['active', 'pending', 'canceled'], true)) {
+        if (! in_array($status, ['active', 'pending', 'canceled', 'host_away'], true)) {
             $status = 'active';
         }
 
@@ -86,8 +89,14 @@ class MeetingController extends Controller
 
         $total = (clone $query)->count();
 
+        $hostAwayCount = $this->baseQuery($current_team, $user, $scopes, $scope)
+            ->active()
+            ->where('ends_at', '>', now())
+            ->withHostAway()
+            ->count();
+
         $meetings = $query
-            ->with(['eventType:id,name,color', 'hosts:id,name', 'host:id,name', 'guests', 'answers', 'reminders'])
+            ->with(['eventType', 'eventType.owner:id,name', 'eventType.hosts:id,name', 'eventType.group.members:id,name', 'hosts:id,name', 'hosts.leavePeriods', 'host:id,name', 'host.leavePeriods', 'guests', 'answers', 'reminders'])
             ->forPage($page, $this->perPage)
             ->get();
 
@@ -111,6 +120,7 @@ class MeetingController extends Controller
                     ->all(),
             ),
             'total' => $total,
+            'hostAwayCount' => $hostAwayCount,
             'page' => $page,
             'hasMore' => $total > $page * $this->perPage,
             'filter' => $range,
@@ -123,7 +133,34 @@ class MeetingController extends Controller
             'eventTypeOptions' => $current_team->eventTypes()->orderBy('name')->get(['id', 'name'])
                 ->map(fn (EventType $eventType) => ['value' => $eventType->id, 'label' => $eventType->name]),
             'viewerTimezone' => $timezone,
+            'bookableEventTypes' => fn () => $this->bookableEventTypes($current_team, $user),
         ]);
+    }
+
+    /**
+     * Get the event types this viewer may book on an invitee's behalf.
+     *
+     * @return array<int, array{id: int, name: string, url: string, hosts: array<int, array{id: int, name: string}>}>
+     */
+    protected function bookableEventTypes(Team $team, User $user): array
+    {
+        return $team->eventTypes()
+            ->bookable()
+            ->with(['team', 'owner:id,name,booking_slug', 'hosts:id,name', 'group.members:id,name'])
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (EventType $eventType) => $eventType->canBeBookedOnBehalfBy($user))
+            ->map(fn (EventType $eventType) => [
+                'id' => $eventType->id,
+                'name' => $eventType->name,
+                'url' => $eventType->publicUrl(),
+                'hosts' => $eventType->assignableHosts()
+                    ->map(fn (User $host) => ['id' => $host->id, 'name' => $host->name])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -257,6 +294,7 @@ class MeetingController extends Controller
         match ($status) {
             'canceled' => $query->whereIn('status', [BookingStatus::Canceled, BookingStatus::Rescheduled]),
             'pending' => $query->where('status', BookingStatus::Pending),
+            'host_away' => $query->active()->withHostAway(),
             default => $query->active(),
         };
 
@@ -350,6 +388,7 @@ class MeetingController extends Controller
             'eventTypeName' => $booking->eventType->name,
             'color' => $booking->eventType->color,
             'hostNames' => $hosts->map(fn (User $host) => $host->name)->values(),
+            'hostIds' => $hosts->map(fn (User $host) => $host->id)->values(),
             'guests' => $booking->guests->map(fn ($guest) => $guest->email)->values(),
             'timeline' => $this->timeline($booking, $timezone, $history ?? new Collection),
             'answers' => $booking->answers->map(fn ($answer) => [
@@ -357,6 +396,16 @@ class MeetingController extends Controller
                 'answer' => $answer->answer,
             ])->values(),
             'canCancel' => $booking->isChangeable(),
+            'reassignableHosts' => $booking->isChangeable()
+                ? $booking->reassignableHosts()
+                    ->map(fn (User $host) => ['id' => $host->id, 'name' => $host->name])
+                    ->values()
+                : [],
+            'awayHostNames' => $booking->isChangeable()
+                ? $booking->awayHosts()->map(fn (User $host) => $host->name)->values()
+                : [],
+            'noShow' => $booking->no_show_at !== null,
+            'canMarkNoShow' => $booking->canBeMarkedNoShow() && Gate::allows('cancel', $booking),
             'canApprove' => $booking->status === BookingStatus::Pending
                 && $booking->starts_at->isFuture()
                 && Gate::allows('approve', $booking),
@@ -393,6 +442,104 @@ class MeetingController extends Controller
         $declineBooking->handle($booking, $request->user(), $validated['reason'] ?? null);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Request declined.')]);
+
+        return back();
+    }
+
+    /**
+     * Hand a meeting whose host is away to someone else free at the same time.
+     */
+    public function handOff(Team $current_team, Booking $booking, HandOffBooking $handOffBooking): RedirectResponse
+    {
+        Gate::authorize('cancel', $booking);
+
+        try {
+            $replacement = $handOffBooking->handle($booking);
+        } catch (SlotUnavailableException $exception) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => $exception->getMessage()]);
+
+            return back();
+        }
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Moved to :name.', ['name' => $replacement->host->name])]);
+
+        return back();
+    }
+
+    /**
+     * Hand every upcoming meeting whose host is away to someone free.
+     *
+     * Meetings nobody else can take are left where they are and counted, so
+     * the viewer knows how many still need rescheduling or cancelling.
+     */
+    public function handOffAll(Request $request, Team $current_team, ScopeFilter $scopes, HandOffBooking $handOffBooking): RedirectResponse
+    {
+        $user = $request->user();
+
+        $bookings = $this->baseQuery($current_team, $user, $scopes, $scopes->defaultScope($current_team, $user))
+            ->active()
+            ->where('starts_at', '>', now())
+            ->withHostAway()
+            ->orderBy('starts_at')
+            ->get();
+
+        $moved = 0;
+        $stuck = 0;
+
+        foreach ($bookings as $booking) {
+            if (Gate::denies('cancel', $booking)) {
+                continue;
+            }
+
+            try {
+                $handOffBooking->handle($booking);
+                $moved++;
+            } catch (SlotUnavailableException) {
+                $stuck++;
+            }
+        }
+
+        $message = trans_choice('{0} No meetings could be moved.|{1} Moved 1 meeting.|[2,*] Moved :count meetings.', $moved, ['count' => $moved]);
+
+        if ($stuck > 0) {
+            $message .= ' '.trans_choice('{1} 1 has nobody free to take it.|[2,*] :count have nobody free to take them.', $stuck, ['count' => $stuck]);
+        }
+
+        Inertia::flash('toast', ['type' => $stuck > 0 ? 'error' : 'success', 'message' => $message]);
+
+        return back();
+    }
+
+    /**
+     * Record that the invitee did not turn up.
+     */
+    public function markNoShow(Team $current_team, Booking $booking, RecordNoShow $recordNoShow): RedirectResponse
+    {
+        Gate::authorize('cancel', $booking);
+
+        if (! $booking->canBeMarkedNoShow()) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => __('Only a confirmed meeting that has started can be marked a no-show.')]);
+
+            return back();
+        }
+
+        $recordNoShow->handle($booking, noShow: true);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Marked as a no-show.')]);
+
+        return back();
+    }
+
+    /**
+     * Take back a no-show recorded by mistake.
+     */
+    public function undoNoShow(Team $current_team, Booking $booking, RecordNoShow $recordNoShow): RedirectResponse
+    {
+        Gate::authorize('cancel', $booking);
+
+        $recordNoShow->handle($booking, noShow: false);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('No-show removed.')]);
 
         return back();
     }

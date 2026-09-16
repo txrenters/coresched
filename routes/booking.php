@@ -8,6 +8,12 @@ use Illuminate\Support\Facades\Route;
  * The public, unauthenticated booking flow. These live under /book and
  * /booking so they can never collide with the team prefixed app routes.
  */
+// Before book/{page}/{eventType}, which would otherwise read "once" as a page.
+Route::get('book/once/{singleUseLink}', [BookingPageController::class, 'singleUseLink'])->name('book.once');
+Route::post('book/once/{singleUseLink}', [PublicBookingController::class, 'storeFromLink'])
+    ->middleware('throttle:20,1')
+    ->name('book.once.store');
+
 Route::get('book/{page}', [BookingPageController::class, 'show'])->name('book.page');
 Route::get('book/{page}/{eventType}', [BookingPageController::class, 'eventType'])->name('book.event-type');
 Route::post('book/{page}/{eventType}', [PublicBookingController::class, 'store'])

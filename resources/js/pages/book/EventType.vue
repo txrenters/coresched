@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { locationIcon } from '@/lib/locationIcons';
 import { store as storeBooking } from '@/routes/book';
+import { store as storeFromLink } from '@/routes/book/once';
 import { store as storeReschedule } from '@/routes/booking/reschedule';
 
 type Slot = {
@@ -66,6 +67,9 @@ type Props = {
     month: string;
     slots?: Record<string, Slot[]>;
     reschedule?: string | null;
+    chosenHost?: { id: number; name: string } | null;
+    bookingOnBehalf?: boolean;
+    singleUseLink?: string | null;
 };
 
 const props = defineProps<Props>();
@@ -119,6 +123,7 @@ const form = useForm({
     location_detail: '',
     guests: [] as string[],
     answers: {} as Record<number, string | string[]>,
+    reason: '',
 });
 
 /*
@@ -254,14 +259,25 @@ const addGuest = () => {
 
 const submit = () => {
     if (isRescheduling.value) {
-        form.transform((data) => ({ starts_at: data.starts_at })).post(
-            storeReschedule(props.reschedule as string).url,
-        );
+        form.transform((data) => ({
+            starts_at: data.starts_at,
+            reason: data.reason,
+            host_id: props.chosenHost?.id ?? null,
+        })).post(storeReschedule(props.reschedule as string).url);
 
         return;
     }
 
-    form.post(
+    if (props.singleUseLink) {
+        form.post(storeFromLink(props.singleUseLink).url);
+
+        return;
+    }
+
+    form.transform((data) => ({
+        ...data,
+        host_id: props.chosenHost?.id ?? null,
+    })).post(
         storeBooking({ page: props.page.slug, eventType: props.eventType.slug })
             .url,
     );
@@ -368,6 +384,25 @@ const submit = () => {
                     </p>
 
                     <div
+                        v-if="bookingOnBehalf"
+                        class="mt-6 flex gap-3 rounded-lg border border-primary/25 bg-accent p-3.5 text-sm text-accent-foreground"
+                        data-test="booking-on-behalf"
+                    >
+                        <Users
+                            class="mt-0.5 size-4 shrink-0"
+                            aria-hidden="true"
+                        />
+                        <p>
+                            You are booking for someone else<template
+                                v-if="chosenHost"
+                                >, hosted by
+                                <strong>{{ chosenHost.name }}</strong></template
+                            >. Enter their details; they get the confirmation
+                            email.
+                        </p>
+                    </div>
+
+                    <div
                         v-if="isRescheduling"
                         class="mt-6 flex gap-3 rounded-lg border border-primary/25 bg-accent p-3.5 text-sm text-accent-foreground"
                     >
@@ -376,7 +411,13 @@ const submit = () => {
                             aria-hidden="true"
                         />
                         <p>
-                            You are picking a new time for an existing booking.
+                            You are picking a new time for an existing
+                            booking<template v-if="chosenHost"
+                                >, hosted by
+                                <strong data-test="reschedule-host-name">{{
+                                    chosenHost.name
+                                }}</strong></template
+                            >.
                         </p>
                     </div>
                 </aside>
@@ -599,6 +640,17 @@ const submit = () => {
                             class="mt-2"
                             :message="form.errors.timezone"
                         />
+
+                        <div v-if="isRescheduling" class="mt-6 grid gap-2">
+                            <Label for="reason">Reason for rescheduling</Label>
+                            <Textarea
+                                id="reason"
+                                v-model="form.reason"
+                                maxlength="500"
+                                data-test="reschedule-reason"
+                            />
+                            <InputError :message="form.errors.reason" />
+                        </div>
 
                         <div v-if="!isRescheduling" class="mt-6 space-y-5">
                             <div class="grid gap-2">

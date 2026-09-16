@@ -20,6 +20,7 @@ use App\Services\Activity\ActivityLogger;
 use App\Services\Scheduling\EventTypeAvailabilitySummary;
 use App\Services\Scheduling\ScopeFilter;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -75,6 +76,21 @@ class EventTypeController extends Controller
             // behind the calendar's skeleton, like the dashboard widgets.
             'calendarBookings' => Inertia::defer(fn () => $this->calendarBookings($user, $current_team, $calendarMonth, $timezone)),
         ]);
+    }
+
+    /**
+     * Make a private link to the event type that works for one booking.
+     */
+    public function createSingleUseLink(Request $request, Team $current_team, EventType $event_type): JsonResponse
+    {
+        abort_unless($event_type->canBeBookedOnBehalfBy($request->user()), 403);
+
+        $link = $event_type->singleUseLinks()->create([
+            'team_id' => $event_type->team_id,
+            'created_by' => $request->user()->id,
+        ]);
+
+        return response()->json(['url' => $link->url()], 201);
     }
 
     /**
@@ -372,6 +388,7 @@ class EventTypeController extends Controller
             'locationLabel' => $this->locationLabel($eventType),
             'locationDetail' => $eventType->location_detail,
             'isActive' => $eventType->is_active,
+            'canMakeSingleUseLink' => $eventType->canBeBookedOnBehalfBy($user),
             'isHidden' => $eventType->is_hidden,
             'upcomingBookings' => $eventType->bookings_count,
             'ownerName' => $this->ownerName($eventType),
@@ -516,10 +533,6 @@ class EventTypeController extends Controller
      */
     protected function publicUrl(EventType $eventType): string
     {
-        $page = $eventType->kind->hasHostPool()
-            ? $eventType->team->slug
-            : ($eventType->owner->booking_slug ?? $eventType->team->slug);
-
-        return route('book.event-type', ['page' => $page, 'eventType' => $eventType->slug]);
+        return $eventType->publicUrl();
     }
 }

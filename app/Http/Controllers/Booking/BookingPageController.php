@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Booking;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\EventType;
 use App\Models\Group;
+use App\Models\SingleUseLink;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Scheduling\AvailabilityEngine;
@@ -122,6 +124,11 @@ class BookingPageController extends Controller
 
         $timezone = $this->resolveTimezone($owner);
         $month = $this->resolveMonth($request, $timezone);
+        $isRescheduling = $request->string('reschedule')->toString() !== '';
+        $bookingOnBehalf = ! $isRescheduling && $type->canBeBookedOnBehalfBy($request->user());
+        $chosenHost = $isRescheduling
+            ? $this->rescheduleHost($request, $type)
+            : ($bookingOnBehalf ? $type->assignableHosts()->firstWhere('id', $request->integer('host')) : null);
 
         return Inertia::render('book/EventType', [
             'page' => [
@@ -134,6 +141,55 @@ class BookingPageController extends Controller
             'timezone' => $timezone,
             'month' => $month->format('Y-m'),
             'reschedule' => $request->string('reschedule')->toString() ?: null,
+            'chosenHost' => $chosenHost === null ? null : [
+                'id' => $chosenHost->id,
+                'name' => $chosenHost->name,
+            ],
+            'bookingOnBehalf' => $bookingOnBehalf,
+            'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone, $chosenHost)),
+        ]);
+    }
+
+    /**
+     * Display the slot picker behind a single-use link.
+     *
+     * The link works even for an event type that is switched off or hidden,
+     * which is the point: it books something that has no public link.
+     */
+    public function singleUseLink(Request $request, SingleUseLink $singleUseLink): Response
+    {
+        $type = $singleUseLink->eventType;
+
+        abort_if($type === null, 404);
+
+        $owner = $type->kind->hasHostPool() || blank($type->owner->booking_slug) ? $type->team : $type->owner;
+        $pageSlug = $owner instanceof Team ? $owner->slug : $owner->booking_slug;
+
+        if ($singleUseLink->used_at !== null) {
+            return Inertia::render('book/LinkUsed', [
+                'eventTypeName' => $type->name,
+                'pageName' => $this->pages->name($owner),
+                'pageUrl' => route('book.page', ['page' => $pageSlug]),
+            ]);
+        }
+
+        $timezone = $this->resolveTimezone($owner);
+        $month = $this->resolveMonth($request, $timezone);
+
+        return Inertia::render('book/EventType', [
+            'page' => [
+                'slug' => $pageSlug,
+                'name' => $this->pages->name($owner),
+                'url' => route('book.page', ['page' => $pageSlug]),
+                'logoUrl' => $this->pages->logoUrl($owner),
+            ],
+            'eventType' => $this->toPayload($type),
+            'timezone' => $timezone,
+            'month' => $month->format('Y-m'),
+            'reschedule' => null,
+            'chosenHost' => null,
+            'bookingOnBehalf' => false,
+            'singleUseLink' => $singleUseLink->uid,
             'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone)),
         ]);
     }
@@ -143,7 +199,7 @@ class BookingPageController extends Controller
      *
      * @return array<string, array<int, array<string, mixed>>>
      */
-    protected function slotsForMonth(EventType $eventType, CarbonImmutable $month, string $timezone): array
+    protected function slotsForMonth(EventType $eventType, CarbonImmutable $month, string $timezone, ?User $host = null): array
     {
         $window = new TimeRange(
             $month->startOfMonth()->startOfDay()->utc(),
@@ -152,6 +208,7 @@ class BookingPageController extends Controller
 
         return $this->availability
             ->slots($eventType, $window)
+            ->when($host !== null, fn ($slots) => $slots->filter(fn ($slot) => in_array($host->id, $slot->hostIds, true)))
             ->groupBy(fn ($slot) => $slot->startsAt->setTimezone($timezone)->toDateString())
             ->map(fn ($slots) => $slots->map(fn ($slot) => [
                 'startsAt' => $slot->startsAt->toIso8601String(),
@@ -159,6 +216,25 @@ class BookingPageController extends Controller
                 'seatsRemaining' => $slot->seatsRemaining,
             ])->values()->all())
             ->all();
+    }
+
+    /**
+     * Get the host a signed-in organizer chose to hand a rescheduled meeting to.
+     */
+    protected function rescheduleHost(Request $request, EventType $eventType): ?User
+    {
+        $uid = $request->string('reschedule')->toString();
+
+        if ($uid === '' || $request->integer('host') === 0) {
+            return null;
+        }
+
+        $booking = Booking::query()
+            ->where('uid', $uid)
+            ->where('event_type_id', $eventType->id)
+            ->first();
+
+        return $booking?->chosenHostFor($request->user(), $request->integer('host'));
     }
 
     /**

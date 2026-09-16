@@ -59,6 +59,17 @@ class AutomationFactory extends Factory
     }
 
     /**
+     * Send when the invitee is marked as a no-show.
+     */
+    public function onNoShow(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'trigger' => AutomationTrigger::NoShow,
+            'offset_minutes' => null,
+        ]);
+    }
+
+    /**
      * Send to the meeting's hosts rather than an address typed in.
      */
     public function toHosts(): static

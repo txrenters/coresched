@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, setLayoutProps } from '@inertiajs/vue3';
+import { Head, Link, router, setLayoutProps, useHttp } from '@inertiajs/vue3';
 import {
     CalendarPlus,
     Check,
@@ -8,6 +8,7 @@ import {
     CopyPlus,
     Crown,
     ExternalLink,
+    Link2,
     EyeOff,
     MoreVertical,
     Pencil,
@@ -68,6 +69,7 @@ import {
     index,
 } from '@/routes/scheduling';
 import { update as updateActive } from '@/routes/scheduling/active';
+import { store as storeSingleUseLink } from '@/routes/scheduling/single-use-links';
 
 type EventTypeRow = {
     id: number;
@@ -83,6 +85,7 @@ type EventTypeRow = {
     locationLabel: string;
     locationDetail: string | null;
     isActive: boolean;
+    canMakeSingleUseLink: boolean;
     isHidden: boolean;
     upcomingBookings: number;
     ownerName: string;
@@ -312,6 +315,43 @@ const copyLink = async (eventType: EventTypeRow) => {
         copyTimer = window.setTimeout(() => (copiedSlug.value = null), 2000);
     } catch {
         toast.error('Could not copy the link');
+    }
+};
+
+const http = useHttp();
+
+/**
+ * The link is made on the server, so the clipboard write waits on the
+ * request. Handing the clipboard a promise keeps Safari treating it as part
+ * of the click; elsewhere the plain write after the response is fine.
+ */
+const copySingleUseLink = async (eventType: EventTypeRow) => {
+    const request = http.submit(
+        storeSingleUseLink({
+            current_team: teamSlug.value,
+            event_type: eventType.slug,
+        }),
+    ) as Promise<{ url: string }>;
+
+    try {
+        if (typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'text/plain': request.then(
+                        ({ url }) => new Blob([url], { type: 'text/plain' }),
+                    ),
+                }),
+            ]);
+        } else {
+            const { url } = await request;
+            await navigator.clipboard.writeText(url);
+        }
+
+        toast.success(
+            'Single-use link copied. It stops working after one booking.',
+        );
+    } catch {
+        toast.error('Could not make a single-use link');
     }
 };
 
@@ -742,6 +782,20 @@ setLayoutProps({
                                                         />
                                                         Edit
                                                     </Link>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    v-if="
+                                                        eventType.canMakeSingleUseLink
+                                                    "
+                                                    :data-test="`single-use-link-${eventType.slug}`"
+                                                    @select="
+                                                        copySingleUseLink(
+                                                            eventType,
+                                                        )
+                                                    "
+                                                >
+                                                    <Link2 class="size-4" />
+                                                    Single-use link
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     v-if="canCreate"

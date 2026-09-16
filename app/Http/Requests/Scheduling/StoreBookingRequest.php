@@ -4,6 +4,7 @@ namespace App\Http\Requests\Scheduling;
 
 use App\Enums\QuestionType;
 use App\Models\EventType;
+use App\Models\SingleUseLink;
 use App\Services\Scheduling\BookingPageResolver;
 use App\Support\PhoneNumber;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -35,6 +36,7 @@ class StoreBookingRequest extends FormRequest
             'guests.*' => ['email', 'max:255'],
             'answers' => ['array'],
             'answers.*.*' => ['string', 'max:2000'],
+            'host_id' => ['nullable', 'integer'],
         ];
     }
 
@@ -45,6 +47,14 @@ class StoreBookingRequest extends FormRequest
     {
         if ($this->resolvedEventType !== null) {
             return $this->resolvedEventType;
+        }
+
+        $link = $this->route('singleUseLink');
+
+        if ($link instanceof SingleUseLink) {
+            abort_if($link->eventType === null, 404);
+
+            return $this->resolvedEventType = $link->eventType;
         }
 
         $resolver = app(BookingPageResolver::class);

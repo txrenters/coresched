@@ -6,9 +6,12 @@ use App\Enums\BookingStatus;
 use App\Exceptions\SlotUnavailableException;
 use App\Jobs\RemoveBookingFromCalendars;
 use App\Models\Booking;
+use App\Models\User;
+use App\Notifications\Bookings\BookingCanceled;
 use App\Services\Activity\ActivityLogger;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 class RescheduleBooking
 {
@@ -30,9 +33,13 @@ class RescheduleBooking
      * double submit or a cancel landing at the same moment cannot leave two
      * replacements, or bring a canceled meeting back.
      *
+     * A host moving the meeting may also hand it to someone else in the pool.
+     * The host who is dropped is told it was canceled for them, since the
+     * move announcement only reaches the hosts of the replacement.
+     *
      * @throws SlotUnavailableException
      */
-    public function handle(Booking $booking, CarbonImmutable $startsAt, ?string $reason = null): Booking
+    public function handle(Booking $booking, CarbonImmutable $startsAt, ?string $reason = null, ?User $host = null, string $rescheduledBy = 'invitee'): Booking
     {
         /*
          * Everything read from the original is loaded before the transaction:
@@ -40,7 +47,8 @@ class RescheduleBooking
          */
         $eventType = $booking->eventType;
         $eventType->schedulingHosts();
-        $booking->loadMissing(['guests', 'answers']);
+        $booking->loadMissing(['guests', 'answers', 'host', 'hosts']);
+        $previousHosts = $booking->attendingHosts();
 
         $attributes = [
             'name' => $booking->name,
@@ -51,17 +59,17 @@ class RescheduleBooking
             'guests' => $booking->guests->pluck('email')->all(),
         ];
 
-        $replacement = DB::transaction(function () use ($booking, $eventType, $startsAt, $reason, $attributes) {
+        $replacement = DB::transaction(function () use ($booking, $eventType, $startsAt, $reason, $attributes, $host, $rescheduledBy) {
             $original = Booking::query()->whereKey($booking->id)->lockForUpdate()->first();
 
             abort_unless($original !== null && $original->isChangeable(), 410);
 
-            $replacement = $this->createBooking->handle($eventType, $startsAt, $attributes, replacing: $booking);
+            $replacement = $this->createBooking->handle($eventType, $startsAt, $attributes, replacing: $booking, host: $host);
 
             $booking->update([
                 'status' => BookingStatus::Rescheduled,
                 'cancellation_reason' => $reason,
-                'canceled_by' => 'invitee',
+                'canceled_by' => $rescheduledBy,
                 'canceled_at' => now(),
             ]);
 
@@ -92,6 +100,12 @@ class RescheduleBooking
         $replacement->status->isConfirmed()
             ? $this->notify->rescheduled($replacement, $booking)
             : $this->notify->pending($replacement);
+
+        $droppedHosts = $previousHosts->diff($replacement->attendingHosts());
+
+        if ($droppedHosts->isNotEmpty()) {
+            Notification::send($droppedHosts, new BookingCanceled($booking->fresh(['eventType', 'host', 'guests'])));
+        }
 
         $this->activity->record(
             $replacement->team,

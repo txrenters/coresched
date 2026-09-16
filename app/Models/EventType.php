@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\DateRangeType;
 use App\Enums\EventTypeKind;
 use App\Enums\LocationType;
+use App\Enums\TeamPermission;
 use Database\Factories\EventTypeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -232,6 +233,60 @@ class EventType extends Model
         $hosts = $this->hosts;
 
         return $hosts->isEmpty() ? new Collection([$this->owner]) : $hosts;
+    }
+
+    /**
+     * Get the single-use links made for this event type.
+     *
+     * @return HasMany<SingleUseLink, $this>
+     */
+    public function singleUseLinks(): HasMany
+    {
+        return $this->hasMany(SingleUseLink::class);
+    }
+
+    /**
+     * Get the hosts someone booking on an invitee's behalf may pick between.
+     *
+     * Only a pooled event type that one host takes offers a choice; a
+     * one-on-one belongs to its owner and a collective event needs everyone.
+     *
+     * @return Collection<int, User>
+     */
+    public function assignableHosts(): Collection
+    {
+        if (! $this->kind->hasHostPool() || $this->kind->requiresEveryHost()) {
+            return new Collection;
+        }
+
+        return $this->hostPool()->values();
+    }
+
+    /**
+     * Determine if a signed-in user may book this event type for someone else.
+     *
+     * Anyone who could host it, or who manages the organization's bookings.
+     */
+    public function canBeBookedOnBehalfBy(?User $user): bool
+    {
+        if ($user === null || ! $user->belongsToTeam($this->team)) {
+            return false;
+        }
+
+        return $user->hasTeamPermission($this->team, TeamPermission::ManageTeamBookings)
+            || $this->hostPool()->contains('id', $user->id);
+    }
+
+    /**
+     * Get the public page this event type is booked on.
+     */
+    public function publicUrl(): string
+    {
+        $page = $this->kind->hasHostPool()
+            ? $this->team->slug
+            : ($this->owner->booking_slug ?? $this->team->slug);
+
+        return route('book.event-type', ['page' => $page, 'eventType' => $this->slug]);
     }
 
     /**

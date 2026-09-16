@@ -2,6 +2,7 @@
 paths:
   - app/Actions/Bookings/AssignHosts.php
   - app/Actions/Bookings/ScheduleAutomations.php
+  - 'app/Actions/Bookings/**'
 ---
 
 # Bookings
@@ -19,3 +20,8 @@ An Automation (a "workflow" in the UI) queues one automation_run per booking. Re
 No rows in automation_event_type means "every event type in the organization", including ones added later. Do not introduce a magic all-event-types value.
 
 CreateBooking and ApproveBooking only queue runs for a CONFIRMED booking, like reminders; CancelBooking, DeclineBooking and RescheduleBooking delete the pending ones.
+
+## Choosing a host and no-shows ride on the existing booking flow
+A chosen host is passed to CreateBooking/RescheduleBooking as `host:`; the slot must list that host in its hostIds, otherwise SlotUnavailableException. Who may choose is decided in one place: EventType::canBeBookedOnBehalfBy (new bookings) and Booking::chosenHostFor (reschedules, needs the cancel ability). Only EventType::assignableHosts() may be chosen: pooled and not collective.
+RescheduleBooking sends BookingCanceled to hosts dropped from the replacement, because BookingRescheduled only reaches the new booking's hosts.
+A no-show keeps the booking Confirmed and sets no_show_at. Automation::sendAtFor queues NoShow runs only once no_show_at is set, and skips AfterEnd runs while it is set. RecordNoShow re-runs ScheduleAutomations both when marking and when undoing.

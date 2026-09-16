@@ -22,6 +22,7 @@ Route::prefix('{current_team}')
             Route::patch('scheduling/{event_type}', [EventTypeController::class, 'update'])->name('scheduling.update');
             Route::patch('scheduling/{event_type}/active', [EventTypeController::class, 'updateActive'])->name('scheduling.active.update');
             Route::post('scheduling/{event_type}/duplicate', [EventTypeController::class, 'duplicate'])->name('scheduling.duplicate');
+            Route::post('scheduling/{event_type}/single-use-links', [EventTypeController::class, 'createSingleUseLink'])->name('scheduling.single-use-links.store');
             Route::delete('scheduling/{event_type}', [EventTypeController::class, 'destroy'])->name('scheduling.destroy');
         });
 
@@ -54,10 +55,14 @@ Route::prefix('{current_team}')
         Route::delete('availability/{availability}', [AvailabilityScheduleController::class, 'destroy'])->name('availability.destroy');
 
         Route::get('meetings', [MeetingController::class, 'index'])->name('meetings.index');
+        Route::post('meetings/hand-off', [MeetingController::class, 'handOffAll'])->name('meetings.hand-off-all');
         Route::scopeBindings()->group(function () {
             Route::patch('meetings/{booking}/notes', [MeetingController::class, 'updateNotes'])->name('meetings.notes.update');
             Route::post('meetings/{booking}/approve', [MeetingController::class, 'approve'])->name('meetings.approve');
             Route::post('meetings/{booking}/decline', [MeetingController::class, 'decline'])->name('meetings.decline');
+            Route::post('meetings/{booking}/hand-off', [MeetingController::class, 'handOff'])->name('meetings.hand-off');
+            Route::post('meetings/{booking}/no-show', [MeetingController::class, 'markNoShow'])->name('meetings.no-show.store');
+            Route::delete('meetings/{booking}/no-show', [MeetingController::class, 'undoNoShow'])->name('meetings.no-show.destroy');
             Route::delete('meetings/{booking}', [MeetingController::class, 'destroy'])->name('meetings.destroy');
         });
     });

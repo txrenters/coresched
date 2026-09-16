@@ -39,6 +39,7 @@ use Illuminate\Support\Str;
  * @property string|null $cancellation_reason
  * @property string|null $canceled_by
  * @property Carbon|null $canceled_at
+ * @property Carbon|null $no_show_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read EventType $eventType
@@ -54,7 +55,7 @@ use Illuminate\Support\Str;
 #[Fillable([
     'uid', 'event_type_id', 'team_id', 'user_id', 'status', 'starts_at', 'ends_at', 'invitee_timezone',
     'name', 'email', 'notes', 'host_notes', 'location_type', 'location_detail', 'meeting_url', 'rescheduled_from_id',
-    'cancellation_reason', 'canceled_by', 'canceled_at',
+    'cancellation_reason', 'canceled_by', 'canceled_at', 'no_show_at',
 ])]
 class Booking extends Model
 {
@@ -283,11 +284,85 @@ class Booking extends Model
     }
 
     /**
+     * Scope the query to bookings with a host who is on leave when they fall.
+     *
+     * Leave only stops new bookings (it is merged into busy time), so a
+     * meeting booked before the host set their auto-reply still sits with
+     * them. This finds those.
+     *
+     * @param  Builder<Booking>  $query
+     */
+    public function scopeWithHostAway(Builder $query): void
+    {
+        $overlapping = fn (Builder $leave) => $leave
+            ->whereColumn('leave_periods.starts_at', '<', 'bookings.ends_at')
+            ->whereColumn('leave_periods.ends_at', '>', 'bookings.starts_at');
+
+        $query->where(fn (Builder $inner) => $inner
+            ->whereHas('hosts.leavePeriods', $overlapping)
+            ->orWhere(fn (Builder $single) => $single
+                ->whereDoesntHave('hosts')
+                ->whereHas('host.leavePeriods', $overlapping)));
+    }
+
+    /**
+     * Get the hosts who are on leave when this meeting takes place.
+     *
+     * Reads each host's loaded leavePeriods, so eager load them for a list.
+     *
+     * @return Collection<int, User>
+     */
+    public function awayHosts(): Collection
+    {
+        return $this->attendingHosts()
+            ->filter(fn (User $host) => $host->leavePeriods->contains(
+                fn (LeavePeriod $leave) => $leave->starts_at < $this->ends_at && $leave->ends_at > $this->starts_at,
+            ))
+            ->values();
+    }
+
+    /**
      * Determine if the booking can still be changed by the invitee.
      */
     public function isChangeable(): bool
     {
         return $this->status->isActive() && $this->starts_at->isFuture();
+    }
+
+    /**
+     * Determine if the invitee can be recorded as not turning up.
+     *
+     * Only a confirmed meeting that has already started: before then nobody
+     * can know, and a cancelled one was never going to happen.
+     */
+    public function canBeMarkedNoShow(): bool
+    {
+        return $this->status->isConfirmed() && $this->starts_at->isPast();
+    }
+
+    /**
+     * Get the hosts this meeting could be handed to when it is rescheduled.
+     *
+     * @return Collection<int, User>
+     */
+    public function reassignableHosts(): Collection
+    {
+        return $this->eventType->assignableHosts();
+    }
+
+    /**
+     * Get the host a viewer has chosen to hand this meeting to.
+     *
+     * Null when nobody was chosen, the viewer may not change the meeting, or
+     * the chosen person is not in the pool.
+     */
+    public function chosenHostFor(?User $viewer, int $hostId): ?User
+    {
+        if ($hostId === 0 || $viewer === null || $viewer->cannot('cancel', $this)) {
+            return null;
+        }
+
+        return $this->reassignableHosts()->firstWhere('id', $hostId);
     }
 
     /**
@@ -303,6 +378,7 @@ class Booking extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'canceled_at' => 'datetime',
+            'no_show_at' => 'datetime',
         ];
     }
 

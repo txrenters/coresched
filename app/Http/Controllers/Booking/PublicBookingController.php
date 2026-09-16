@@ -9,6 +9,7 @@ use App\Exceptions\SlotUnavailableException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Scheduling\StoreBookingRequest;
 use App\Models\Booking;
+use App\Models\SingleUseLink;
 use App\Services\Scheduling\BookingPageResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -30,6 +31,14 @@ class PublicBookingController extends Controller
     public function store(StoreBookingRequest $request, CreateBooking $createBooking): RedirectResponse
     {
         $validated = $request->validated();
+        $eventType = $request->eventType();
+
+        $hostId = (int) ($validated['host_id'] ?? 0);
+        $host = $eventType->canBeBookedOnBehalfBy($request->user())
+            ? $eventType->assignableHosts()->firstWhere('id', $hostId)
+            : null;
+
+        abort_if($hostId !== 0 && $host === null, 403);
 
         try {
             $booking = $createBooking->handle(
@@ -49,12 +58,61 @@ class PublicBookingController extends Controller
                     'guests' => $validated['guests'] ?? [],
                     'answers' => $validated['answers'] ?? [],
                 ],
+                host: $host,
             );
         } catch (SlotUnavailableException $exception) {
             throw ValidationException::withMessages([
                 'starts_at' => $exception->getMessage(),
             ]);
         }
+
+        return to_route('booking.show', ['booking' => $booking->uid]);
+    }
+
+    /**
+     * Book a slot through a single-use link, which then stops working.
+     *
+     * The link is claimed before booking with a conditional update, so two
+     * people submitting at once cannot both use it; a failed booking gives
+     * it back.
+     */
+    public function storeFromLink(StoreBookingRequest $request, SingleUseLink $singleUseLink, CreateBooking $createBooking): RedirectResponse
+    {
+        $claimed = SingleUseLink::query()
+            ->whereKey($singleUseLink->id)
+            ->whereNull('used_at')
+            ->update(['used_at' => now()]);
+
+        abort_if($claimed === 0, 410);
+
+        $validated = $request->validated();
+        $eventType = $request->eventType();
+
+        try {
+            $booking = $createBooking->handle(
+                $eventType,
+                CarbonImmutable::parse($validated['starts_at'])->utc(),
+                [
+                    'name' => (string) $validated['name'],
+                    'email' => (string) $validated['email'],
+                    'notes' => $validated['notes'] ?? null,
+                    'timezone' => $validated['timezone'] ?? null,
+                    'location_detail' => $eventType->location_type->requiresInviteeInput()
+                        ? ($validated['location_detail'] ?? null)
+                        : null,
+                    'guests' => $validated['guests'] ?? [],
+                    'answers' => $validated['answers'] ?? [],
+                ],
+            );
+        } catch (SlotUnavailableException $exception) {
+            SingleUseLink::query()->whereKey($singleUseLink->id)->update(['used_at' => null]);
+
+            throw ValidationException::withMessages([
+                'starts_at' => $exception->getMessage(),
+            ]);
+        }
+
+        $singleUseLink->update(['booking_id' => $booking->id]);
 
         return to_route('booking.show', ['booking' => $booking->uid]);
     }
@@ -76,17 +134,13 @@ class PublicBookingController extends Controller
     {
         abort_unless($booking->isChangeable() && ! $booking->eventType->trashed(), 410);
 
-        $eventType = $booking->eventType;
-        $page = $eventType->kind->hasHostPool()
-            ? $eventType->team->slug
-            : ($eventType->owner->booking_slug ?? $eventType->team->slug);
-
-        return redirect()->to(route('book.event-type', [
-            'page' => $page,
-            'eventType' => $eventType->slug,
+        $query = http_build_query(array_filter([
             'reschedule' => $booking->uid,
             'timezone' => $booking->invitee_timezone,
+            'host' => $request->integer('host') ?: null,
         ]));
+
+        return redirect()->to($booking->eventType->publicUrl().'?'.$query);
     }
 
     /**
@@ -99,13 +153,23 @@ class PublicBookingController extends Controller
         $validated = $request->validate([
             'starts_at' => ['required', 'date'],
             'reason' => ['nullable', 'string', 'max:500'],
+            'host_id' => ['nullable', 'integer'],
         ]);
+
+        $hostId = (int) ($validated['host_id'] ?? 0);
+        $host = $booking->chosenHostFor($request->user(), $hostId);
+
+        abort_if($hostId !== 0 && $host === null, 403);
+
+        $byHost = $request->user()?->can('cancel', $booking) ?? false;
 
         try {
             $replacement = $rescheduleBooking->handle(
                 $booking,
                 CarbonImmutable::parse($validated['starts_at'])->utc(),
                 $validated['reason'] ?? null,
+                $host,
+                $byHost ? 'host' : 'invitee',
             );
         } catch (SlotUnavailableException $exception) {
             throw ValidationException::withMessages([
