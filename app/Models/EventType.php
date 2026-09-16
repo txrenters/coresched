@@ -269,12 +269,20 @@ class EventType extends Model
      */
     public function canBeBookedOnBehalfBy(?User $user): bool
     {
-        if ($user === null || ! $user->belongsToTeam($this->team)) {
+        if ($user === null) {
             return false;
         }
 
-        return $user->hasTeamPermission($this->team, TeamPermission::ManageTeamBookings)
-            || $this->hostPool()->contains('id', $user->id);
+        /*
+         * Permission first: a super admin belongs to no organization but has
+         * every permission, and a membership check ahead of it shut them out.
+         */
+        if ($user->hasTeamPermission($this->team, TeamPermission::ManageTeamBookings)) {
+            return true;
+        }
+
+        return $user->belongsToTeam($this->team)
+            && $this->hostPool()->contains('id', $user->id);
     }
 
     /**

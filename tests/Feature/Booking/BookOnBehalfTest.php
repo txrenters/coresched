@@ -91,3 +91,11 @@ test('the meetings page offers the event types the viewer can book for others', 
             ->where('bookableEventTypes.0.name', 'Leasing Team Meeting')
             ->where('bookableEventTypes.0.hosts.1.name', 'Riley Park'));
 });
+
+test('a super admin, who belongs to no organization, can still book for others', function () {
+    $superAdmin = User::factory()->create(['is_super_admin' => true]);
+
+    $this->actingAs($superAdmin)
+        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->assertInertia(fn ($page) => $page->has('bookableEventTypes', 1));
+});
