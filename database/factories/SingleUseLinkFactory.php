@@ -20,7 +20,7 @@ class SingleUseLinkFactory extends Factory
     {
         return [
             'event_type_id' => EventType::factory(),
-            'team_id' => fn (array $attributes) => EventType::find($attributes['event_type_id'])->team_id,
+            'team_id' => fn (array $attributes) => EventType::query()->whereKey($attributes['event_type_id'])->value('team_id'),
             'created_by' => null,
             'booking_id' => null,
             'used_at' => null,

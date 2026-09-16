@@ -40,7 +40,7 @@ class HandOffBooking
 
         $slot = $this->availability->findSlot($eventType, $startsAt, $booking->id);
 
-        $freeHostIds = array_values(array_diff($slot?->hostIds ?? [], $currentHostIds));
+        $freeHostIds = array_values(array_diff($slot->hostIds ?? [], $currentHostIds));
 
         if ($freeHostIds === []) {
             throw new SlotUnavailableException('Nobody else who hosts this meeting is free at that time.');
