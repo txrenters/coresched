@@ -4,7 +4,7 @@ use App\Enums\TeamRole;
 use App\Models\AvailabilitySchedule;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Notifications\Teams\AccountCreated;
 use Illuminate\Support\Facades\Notification;
 
 test('a super admin creates a user directly inside an organization', function () {
@@ -61,7 +61,7 @@ test('the created user is emailed a link to set their own password', function ()
 
     $user = User::where('email', 'new.hire@example.com')->firstOrFail();
 
-    Notification::assertSentTo($user, ResetPassword::class);
+    Notification::assertSentTo($user, AccountCreated::class);
 });
 
 /**

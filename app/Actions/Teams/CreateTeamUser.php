@@ -8,7 +8,6 @@ use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 
 class CreateTeamUser
@@ -16,6 +15,7 @@ class CreateTeamUser
     public function __construct(
         private CreateDefaultAvailability $createDefaultAvailability,
         private ApplyDefaultHolidays $applyDefaultHolidays,
+        private SendAccountWelcome $sendAccountWelcome,
     ) {
         //
     }
@@ -26,7 +26,7 @@ class CreateTeamUser
      * This is the super admin's alternative to an invitation: the account
      * exists immediately, already a member, with no self-service signup. No
      * password is ever chosen for the user — the account is created with a
-     * throwaway secret and they set their own via the reset link, so a usable
+     * throwaway secret and they set their own from the welcome email, so a usable
      * password never passes through the creator's hands or the logs.
      *
      * Unlike CreateNewUser this does NOT create a personal organization. The
@@ -55,7 +55,7 @@ class CreateTeamUser
             return $user;
         });
 
-        Password::sendResetLink(['email' => $user->email]);
+        $this->sendAccountWelcome->handle($user, $team);
 
         return $user;
     }

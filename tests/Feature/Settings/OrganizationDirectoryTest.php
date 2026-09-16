@@ -3,7 +3,7 @@
 use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Notifications\Teams\AccountCreated;
 use Illuminate\Support\Facades\Notification;
 
 /**
@@ -181,7 +181,7 @@ test('an unknown address gets an account and a link to set a password', function
 
     expect($created->teamRole($team))->toBe(TeamRole::Member);
 
-    Notification::assertSentTo($created, ResetPassword::class);
+    Notification::assertSentTo($created, AccountCreated::class);
 });
 
 test('a new account needs a name', function () {

@@ -21,7 +21,7 @@ Deliberately narrower than inviteMember: creating an account skips the invitee's
 
 App\Actions\Teams\CreateTeamUser does the work and differs from CreateNewUser in two ways worth knowing:
 - It does NOT create a personal organization. The user is being placed into an existing one, and a second personal org would only clutter their switcher. There is a test pinning this.
-- No password is ever chosen for the user. The account is created with Str::password(32) and Password::sendResetLink() emails them to set their own, so a usable password never passes through the creator's hands or the logs. Do not add an "initial password" field.
+- No password is ever chosen for the user. The account is created with Str::password(32) and SendAccountWelcome emails an AccountCreated "Set your password" link, so a usable password never passes through the creator's hands or the logs. Do not add an "initial password" field. Do not go back to Password::sendResetLink(): that email tells a brand-new person they asked for a reset and to ignore it otherwise, and its link dies after 60 minutes. The welcome token comes from the separate `welcome` broker in config/auth.php (7 days, same token table) and is redeemed only by AccountSetupController, because Fortify's reset route checks the 60-minute `users` broker. The directory's explicit "Send password reset" button still sends the real reset email.
 
 It still calls CreateDefaultAvailability and ApplyDefaultHolidays, so a created user lands with working hours rather than an empty calendar — same as a self-registered one.
 

@@ -3,6 +3,7 @@
 use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Teams\AccountCreated;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Notification;
 
@@ -219,7 +220,7 @@ test('a super admin creates another super admin', function () {
         ->and($created->availabilitySchedules()->count())->toBe(1)
         ->and($created->email_verified_at)->not->toBeNull();
 
-    Notification::assertSentTo($created, ResetPassword::class);
+    Notification::assertSentTo($created, AccountCreated::class);
 });
 
 test('a super admin creates an admin inside an organization', function () {
@@ -241,7 +242,7 @@ test('a super admin creates an admin inside an organization', function () {
     expect($created->isSuperAdmin())->toBeFalse()
         ->and($created->teamRole($team))->toBe(TeamRole::Admin);
 
-    Notification::assertSentTo($created, ResetPassword::class);
+    Notification::assertSentTo($created, AccountCreated::class);
 });
 
 test('an account that is not a super admin needs an organization and a role', function () {
@@ -296,7 +297,7 @@ test('an organization admin creates an account in their own organization', funct
 
     expect($created->teamRole($team))->toBe(TeamRole::Member);
 
-    Notification::assertSentTo($created, ResetPassword::class);
+    Notification::assertSentTo($created, AccountCreated::class);
 });
 
 test('an admin cannot create a super admin', function () {

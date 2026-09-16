@@ -99,6 +99,18 @@ return [
             'expire' => 60,
             'throttle' => 60,
         ],
+
+        /*
+         * Links in the welcome email sent when an account is created for
+         * someone. Same token table, but a week rather than an hour: the
+         * person was not expecting the email and may not open it right away.
+         */
+        'welcome' => [
+            'provider' => 'users',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 60 * 24 * 7,
+            'throttle' => 0,
+        ],
     ],
 
     /*

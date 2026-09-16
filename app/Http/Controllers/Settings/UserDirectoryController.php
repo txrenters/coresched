@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Actions\Scheduling\ApplyDefaultHolidays;
 use App\Actions\Scheduling\CreateDefaultAvailability;
 use App\Actions\Teams\CreateTeamUser;
+use App\Actions\Teams\SendAccountWelcome;
 use App\Enums\TeamRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\CreateDirectoryUserRequest;
@@ -101,7 +102,7 @@ class UserDirectoryController extends Controller
      * account gets a throwaway secret and a link to set its own, the way
      * CreateTeamUser and the user:super-admin command both work.
      */
-    public function store(CreateDirectoryUserRequest $request, CreateTeamUser $createTeamUser): RedirectResponse
+    public function store(CreateDirectoryUserRequest $request, CreateTeamUser $createTeamUser, SendAccountWelcome $sendAccountWelcome): RedirectResponse
     {
         // A super admin is created by a super admin; anyone else is created by
         // whoever administers the organization they are going into.
@@ -133,7 +134,7 @@ class UserDirectoryController extends Controller
                 return $user;
             });
 
-            Password::sendResetLink(['email' => $user->email]);
+            $sendAccountWelcome->handle($user);
         } else {
             $user = $createTeamUser->handle(
                 $team,

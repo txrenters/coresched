@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountSetupController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotificationController;
@@ -32,6 +33,17 @@ Route::get('invitations/{invitation}/join', [TeamInvitationController::class, 's
 Route::post('invitations/{invitation}/join', [TeamInvitationController::class, 'join'])
     ->middleware('throttle:10,1')
     ->name('invitations.join.store');
+
+/*
+ * The "Set your password" link from the welcome email sent when an account is
+ * created for someone. The token is the credential; see AccountSetupController.
+ */
+Route::middleware('guest')->group(function () {
+    Route::get('account/setup/{token}', [AccountSetupController::class, 'show'])->name('account-setup.show');
+    Route::post('account/setup', [AccountSetupController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('account-setup.store');
+});
 
 Route::middleware(['auth'])->group(function () {
     Route::post('invitations/{invitation}/accept', [TeamInvitationController::class, 'accept'])->name('invitations.accept');

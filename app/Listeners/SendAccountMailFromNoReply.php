@@ -2,6 +2,7 @@
 
 namespace App\Listeners;
 
+use App\Notifications\Teams\AccountCreated;
 use App\Notifications\Teams\TeamInvitation;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
@@ -29,6 +30,7 @@ class SendAccountMailFromNoReply
     public const ACCOUNT_NOTIFICATIONS = [
         ResetPassword::class,
         VerifyEmail::class,
+        AccountCreated::class,
         TeamInvitation::class,
     ];
 
