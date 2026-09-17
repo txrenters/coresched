@@ -9,6 +9,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Resolves a public booking page slug to the user or team behind it, and
@@ -40,14 +41,17 @@ class BookingPageResolver
         return $this->query($page)
             ->where('is_hidden', false)
             /*
-             * An organization page advertises only the shared kinds. A person's
-             * own one-on-ones belong on their personal link, not on the front
-             * door of the organization -- but they still RESOLVE here, so any
+             * The split is by kind, and it cuts both ways. An organization page
+             * advertises only the shared kinds; a person's page advertises only
+             * the kinds they host alone. A shared event is hosted by a pool that
+             * its creator may not even be in, so it belongs on the organization
+             * page and never on theirs -- but it still RESOLVES on both, so any
              * link already handed out keeps working.
              */
             ->when(
                 $page instanceof Team,
                 fn (Builder $query) => $query->whereIn('kind', EventTypeKind::shared()),
+                fn (Builder $query) => $query->whereNotIn('kind', EventTypeKind::shared()),
             )
             ->orderBy('name')
             ->get();
@@ -74,13 +78,20 @@ class BookingPageResolver
     /**
      * Get the event types listed on a team's own landing page.
      *
+     * That is every event type hosting from the team, plus any picked to show
+     * on its page -- a personal one-on-one, or a shared event hosted elsewhere.
+     *
      * @return Collection<int, EventType>
      */
     public function eventTypesForGroup(Group $group): Collection
     {
         return $this->query($group->team)
             ->where('is_hidden', false)
-            ->where('group_id', $group->id)
+            ->where(fn (Builder $query) => $query
+                ->where('group_id', $group->id)
+                ->orWhereIn('id', DB::table('group_page_event_types')
+                    ->where('group_id', $group->id)
+                    ->select('event_type_id')))
             ->orderBy('name')
             ->get();
     }

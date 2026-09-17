@@ -209,3 +209,53 @@ test('deleting a group leaves its event types falling back to their own hosts', 
     expect($eventType->group_id)->toBeNull()
         ->and($eventType->hostPool()->pluck('id')->all())->toBe([$this->owner->id]);
 });
+
+test('an admin can pick event types to show on a team page', function () {
+    $group = Group::factory()->create(['team_id' => $this->team->id]);
+    $eventType = EventType::factory()->ownedBy($this->owner)->create();
+
+    $this->actingAs($this->owner)
+        ->patch(route('groups.update', ['current_team' => $this->team->slug, 'group' => $group->slug]), [
+            'name' => 'Sales',
+            'member_ids' => [$this->owner->id],
+            'page_event_type_ids' => [$eventType->id],
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($group->fresh()->pageEventTypes->pluck('id')->all())->toBe([$eventType->id]);
+
+    $this->get(route('groups.index', ['current_team' => $this->team->slug]))
+        ->assertInertia(fn ($page) => $page
+            ->where('groups.0.pageEventTypeIds', [$eventType->id])
+            ->where('eventTypes.0.id', $eventType->id));
+});
+
+test('saving a group without page event types keeps the ones already picked', function () {
+    $group = Group::factory()->create(['team_id' => $this->team->id]);
+    $eventType = EventType::factory()->ownedBy($this->owner)->create();
+    $group->pageEventTypes()->attach($eventType);
+
+    $this->actingAs($this->owner)
+        ->patch(route('groups.update', ['current_team' => $this->team->slug, 'group' => $group->slug]), [
+            'name' => 'Sales',
+            'member_ids' => [$this->owner->id],
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($group->fresh()->pageEventTypes)->toHaveCount(1);
+});
+
+test('an event type from another organization cannot be shown on a team page', function () {
+    $group = Group::factory()->create(['team_id' => $this->team->id]);
+    $foreign = EventType::factory()->ownedBy(User::factory()->create())->create();
+
+    $this->actingAs($this->owner)
+        ->patch(route('groups.update', ['current_team' => $this->team->slug, 'group' => $group->slug]), [
+            'name' => 'Sales',
+            'member_ids' => [$this->owner->id],
+            'page_event_type_ids' => [$foreign->id],
+        ])
+        ->assertSessionHasErrors('page_event_type_ids.0');
+
+    expect($group->fresh()->pageEventTypes)->toBeEmpty();
+});

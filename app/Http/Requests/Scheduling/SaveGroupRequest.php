@@ -33,6 +33,11 @@ class SaveGroupRequest extends FormRequest
                 'integer',
                 Rule::exists('team_members', 'user_id')->where('team_id', $teamId),
             ],
+            'page_event_type_ids' => ['nullable', 'array'],
+            'page_event_type_ids.*' => [
+                'integer',
+                Rule::exists('event_types', 'id')->where('team_id', $teamId)->whereNull('deleted_at'),
+            ],
         ];
     }
 

@@ -14,3 +14,8 @@ Slot generation is layered and each layer has one job:
 Kind matters: round robin/one-on-one take the UNION of hosts' free time (slot keeps the list of hosts free for it); collective takes the INTERSECTION. Seats only gate group events — for every other kind a booked host is already removed from the slot's host list, so do not also filter on per-start booking counts (that bug hid round-robin slots another host could still take).
 
 Always store timestamps in UTC; convert at the edges only.
+
+## Public page listings split by event type kind, both ways
+BookingPageResolver::eventTypes() filters by kind on BOTH page types: an organization page lists only EventTypeKind::shared() (round robin, collective), a person's page lists only the other kinds. user_id is the creator, not the host pool, so without the whereNotIn a round robin its creator handed to another host kept showing on the creator's own /book/{slug} page.
+
+Listing is not resolution: eventType() applies no kind filter, so every link already handed out still opens on either page.

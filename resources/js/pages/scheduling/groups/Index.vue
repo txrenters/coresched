@@ -8,6 +8,7 @@ import PageHeader from '@/components/PageHeader.vue';
 import HostPriorityList from '@/components/scheduling/HostPriorityList.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -42,6 +43,15 @@ type Group = {
     bookingUrl: string;
     members: Member[];
     memberIds: number[];
+    pageEventTypeIds: number[];
+};
+
+type EventTypeOption = {
+    id: number;
+    name: string;
+    kindLabel: string;
+    ownerName: string | null;
+    isActive: boolean;
 };
 
 type Props = {
@@ -50,6 +60,8 @@ type Props = {
     canManage: boolean;
     /** Hours the organization shares, selectable as this team's own. */
     sharedSchedules: Array<{ value: number; label: string }>;
+    /** Every event type in the organization, pickable for a team's page. */
+    eventTypes: EventTypeOption[];
 };
 
 defineProps<Props>();
@@ -70,7 +82,18 @@ const form = useForm({
     description: '',
     availability_schedule_id: null as number | null,
     member_ids: [] as number[],
+    page_event_type_ids: [] as number[],
 });
+
+const togglePageEventType = (
+    id: number,
+    checked: boolean | 'indeterminate',
+) => {
+    form.page_event_type_ids =
+        checked === true
+            ? [...form.page_event_type_ids, id]
+            : form.page_event_type_ids.filter((selected) => selected !== id);
+};
 
 const openCreate = () => {
     editing.value = null;
@@ -86,6 +109,7 @@ const openEdit = (group: Group) => {
     form.description = group.description ?? '';
     form.availability_schedule_id = group.availabilityScheduleId;
     form.member_ids = [...group.memberIds];
+    form.page_event_type_ids = [...group.pageEventTypeIds];
     panelOpen.value = true;
 };
 
@@ -308,6 +332,59 @@ setLayoutProps({
                         @update:model-value="(ids) => (form.member_ids = ids)"
                     />
                     <InputError :message="form.errors.member_ids" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label>Show on team page</Label>
+                    <p class="text-xs text-muted-foreground">
+                        Event types hosting from this team are always listed.
+                        Pick any others to show on its booking page too — this
+                        does not change who hosts them.
+                    </p>
+                    <div
+                        v-if="eventTypes.length"
+                        class="grid max-h-64 gap-1 overflow-y-auto rounded-md border border-border p-2"
+                    >
+                        <label
+                            v-for="eventType in eventTypes"
+                            :key="eventType.id"
+                            class="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted"
+                            :data-test="`page-event-type-${eventType.id}`"
+                        >
+                            <Checkbox
+                                :model-value="
+                                    form.page_event_type_ids.includes(
+                                        eventType.id,
+                                    )
+                                "
+                                @update:model-value="
+                                    (checked) =>
+                                        togglePageEventType(
+                                            eventType.id,
+                                            checked,
+                                        )
+                                "
+                            />
+                            <span class="min-w-0 flex-1 truncate">
+                                {{ eventType.name }}
+                            </span>
+                            <span
+                                class="shrink-0 text-xs text-muted-foreground"
+                            >
+                                {{ eventType.kindLabel }}
+                                <template v-if="eventType.ownerName">
+                                    · {{ eventType.ownerName }}
+                                </template>
+                                <template v-if="!eventType.isActive">
+                                    · Off
+                                </template>
+                            </span>
+                        </label>
+                    </div>
+                    <p v-else class="text-xs text-muted-foreground">
+                        No event types in this organization yet.
+                    </p>
+                    <InputError :message="form.errors.page_event_type_ids" />
                 </div>
 
                 <SheetFooter class="flex-row justify-end gap-2 px-0">

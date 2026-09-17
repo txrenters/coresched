@@ -27,6 +27,7 @@ use Illuminate\Support\Str;
  * @property-read Team $team
  * @property-read Collection<int, User> $members
  * @property-read Collection<int, EventType> $eventTypes
+ * @property-read Collection<int, EventType> $pageEventTypes
  */
 #[Fillable(['team_id', 'name', 'slug', 'description', 'availability_schedule_id'])]
 class Group extends Model
@@ -89,6 +90,19 @@ class Group extends Model
     public function eventTypes(): HasMany
     {
         return $this->hasMany(EventType::class);
+    }
+
+    /**
+     * Get the event types picked to show on the team's public page.
+     *
+     * Listing only: unlike eventTypes(), this never changes who hosts them.
+     *
+     * @return BelongsToMany<EventType, $this>
+     */
+    public function pageEventTypes(): BelongsToMany
+    {
+        return $this->belongsToMany(EventType::class, 'group_page_event_types')
+            ->withTimestamps();
     }
 
     /**

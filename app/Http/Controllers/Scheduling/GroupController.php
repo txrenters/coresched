@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Scheduling;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Scheduling\SaveGroupRequest;
 use App\Models\AvailabilitySchedule;
+use App\Models\EventType;
 use App\Models\Group;
 use App\Models\Team;
 use App\Models\User;
@@ -25,7 +26,7 @@ class GroupController extends Controller
         Gate::authorize('viewAny', Group::class);
 
         $groups = $current_team->groups()
-            ->with(['members:id,name,email', 'team:id,slug', 'availabilitySchedule:id,name'])
+            ->with(['members:id,name,email', 'team:id,slug', 'availabilitySchedule:id,name', 'pageEventTypes:id'])
             ->withCount('eventTypes')
             ->orderBy('name')
             ->get();
@@ -46,6 +47,17 @@ class GroupController extends Controller
                     'value' => $schedule->id,
                     'label' => $schedule->name,
                 ]),
+            'eventTypes' => $current_team->eventTypes()
+                ->with('owner:id,name')
+                ->orderBy('name')
+                ->get(['id', 'user_id', 'name', 'kind', 'is_active'])
+                ->map(fn (EventType $eventType) => [
+                    'id' => $eventType->id,
+                    'name' => $eventType->name,
+                    'kindLabel' => $eventType->kind->label(),
+                    'ownerName' => $eventType->owner?->name,
+                    'isActive' => $eventType->is_active,
+                ]),
         ]);
     }
 
@@ -62,6 +74,7 @@ class GroupController extends Controller
             );
 
             $this->syncMembers($group, $request->validated('member_ids'));
+            $this->syncPageEventTypes($group, $request);
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Group created.')]);
@@ -80,6 +93,7 @@ class GroupController extends Controller
             $group->update($request->safe()->only(['name', 'description', 'availability_schedule_id']));
 
             $this->syncMembers($group, $request->validated('member_ids'));
+            $this->syncPageEventTypes($group, $request);
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Group updated.')]);
@@ -120,6 +134,18 @@ class GroupController extends Controller
     }
 
     /**
+     * Sync the event types shown on the team's page, when the form sent them.
+     */
+    protected function syncPageEventTypes(Group $group, SaveGroupRequest $request): void
+    {
+        if (! $request->has('page_event_type_ids')) {
+            return;
+        }
+
+        $group->pageEventTypes()->sync($request->validated('page_event_type_ids') ?? []);
+    }
+
+    /**
      * Present a group for the listing.
      *
      * @return array<string, mixed>
@@ -149,6 +175,7 @@ class GroupController extends Controller
                 'email' => $member->email,
             ])->values(),
             'memberIds' => $group->members->pluck('id')->values(),
+            'pageEventTypeIds' => $group->pageEventTypes->pluck('id')->values(),
         ];
     }
 }
