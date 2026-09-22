@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Bookings\CancelBooking;
 use App\Enums\EventTypeKind;
 use App\Enums\TeamRole;
 use App\Models\ApiKey;
@@ -134,6 +135,26 @@ test('a past meeting is not upcoming', function () {
         'starts_at' => now()->subDay(),
         'ends_at' => now()->subDay()->addMinutes(30),
     ]);
+
+    $this->getJson(route('api.v1.bookings.index', ['email' => 'owner@example.com']), withToken())
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
+});
+
+test('a canceled meeting drops off the list', function () {
+    // The client portal shows this list as "what you have booked", so a
+    // meeting called off here has to stop appearing there too.
+    $booking = Booking::factory()->create([
+        'event_type_id' => $this->eventType->id,
+        'email' => 'owner@example.com',
+        'starts_at' => now()->addDays(2),
+        'ends_at' => now()->addDays(2)->addMinutes(30),
+    ]);
+
+    $this->getJson(route('api.v1.bookings.index', ['email' => 'owner@example.com']), withToken())
+        ->assertJsonCount(1, 'data');
+
+    app(CancelBooking::class)->handle($booking, canceledBy: 'host');
 
     $this->getJson(route('api.v1.bookings.index', ['email' => 'owner@example.com']), withToken())
         ->assertOk()
