@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\EventTypeController;
+use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\SlotController;
 use App\Http\Middleware\AuthenticateApiToken;
 use Illuminate\Support\Facades\Route;
@@ -12,6 +13,9 @@ use Illuminate\Support\Facades\Route;
  * booking pages; the token is here so the endpoints cannot be scraped.
  */
 Route::middleware(AuthenticateApiToken::class)->prefix('v1')->name('api.v1.')->group(function () {
+    Route::get('organizations', [OrganizationController::class, 'index'])->name('organizations.index');
+
+    // {page} is a booking slug or an organization id; the id survives a rename.
     Route::get('pages/{page}/event-types', [EventTypeController::class, 'index'])->name('event-types.index');
     Route::get('pages/{page}/event-types/{eventType}/slots', [SlotController::class, 'index'])->name('slots.index');
 

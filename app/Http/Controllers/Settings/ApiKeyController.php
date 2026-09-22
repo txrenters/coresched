@@ -22,14 +22,20 @@ class ApiKeyController extends Controller
             // The only moment the secret is readable. It is flashed by store()
             // and handed over here, then gone.
             'issued' => $request->session()->get('issued_api_key'),
+            'canIssueSystemWide' => (bool) $request->user()?->isSuperAdmin(),
             /** @var Collection<int, array<string, mixed>> */
             'keys' => ApiKey::query()
-                ->with('creator:id,name')
+                ->with(['creator:id,name', 'team:id,name'])
+                // An admin sees their own organization's keys; a super admin
+                // sees every one, including the system-wide keys.
+                ->unless($request->user()?->isSuperAdmin(), fn ($query) => $query
+                    ->where('team_id', $request->user()?->current_team_id))
                 ->latest()
                 ->get()
                 ->map(fn (ApiKey $key): array => [
                     'id' => $key->id,
                     'name' => $key->name,
+                    'organization' => $key->team?->name,
                     'prefix' => $key->prefix,
                     'createdBy' => $key->creator?->name,
                     'createdAt' => $key->created_at?->toIso8601String(),
@@ -49,9 +55,20 @@ class ApiKeyController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'system_wide' => ['nullable', 'boolean'],
         ]);
 
-        ['key' => $key, 'token' => $token] = ApiKey::issue($validated['name'], $request->user());
+        $user = $request->user();
+
+        // Scoped to the admin's own organization. Only a super admin may make
+        // a key that speaks for all of them, and only by asking for one.
+        $team = $user?->isSuperAdmin() && $request->boolean('system_wide')
+            ? null
+            : $user?->currentTeam;
+
+        abort_if($team === null && ! $user?->isSuperAdmin(), 403);
+
+        ['key' => $key, 'token' => $token] = ApiKey::issue($validated['name'], $user, $team);
 
         Log::info('An API key was issued.', [
             'api_key_id' => $key->id,
@@ -70,6 +87,12 @@ class ApiKeyController extends Controller
      */
     public function destroy(Request $request, ApiKey $apiKey): RedirectResponse
     {
+        // An admin may only revoke their own organization's keys.
+        abort_unless(
+            $request->user()?->isSuperAdmin() || $apiKey->team_id === $request->user()?->current_team_id,
+            403,
+        );
+
         $apiKey->forceFill(['revoked_at' => now()])->save();
 
         Log::info('An API key was revoked.', [

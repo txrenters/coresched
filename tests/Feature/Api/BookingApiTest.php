@@ -1,9 +1,11 @@
 <?php
 
+use App\Enums\TeamRole;
 use App\Models\ApiKey;
 use App\Models\AvailabilitySchedule;
 use App\Models\Booking;
 use App\Models\EventType;
+use App\Models\Team;
 use App\Models\User;
 
 beforeEach(function () {
@@ -181,4 +183,45 @@ test('booking requires a name and a valid email', function () {
         'starts_at' => now()->addDay()->toIso8601String(),
         'email' => 'not-an-email',
     ], withToken())->assertJsonValidationErrors(['name', 'email']);
+});
+
+test('an organization key cannot read another organization pages', function () {
+    $theirTeam = Team::factory()->create(['slug' => 'someone-else']);
+    ['token' => $theirToken] = ApiKey::issue('Theirs', null, $theirTeam);
+
+    // Reported as not found, not forbidden: whether our page exists is not
+    // their business.
+    $this->getJson(
+        route('api.v1.event-types.index', ['page' => $this->owner->booking_slug]),
+        withToken($theirToken),
+    )->assertNotFound();
+});
+
+test('an organization key reads its own page', function () {
+    $team = Team::factory()->create(['slug' => 'ours']);
+    $team->members()->attach($this->owner, ['role' => TeamRole::Admin->value]);
+    ['token' => $token] = ApiKey::issue('Ours', null, $team);
+
+    // Its own organization page, and the pages of people who belong to it.
+    $this->getJson(route('api.v1.event-types.index', ['page' => 'ours']), withToken($token))->assertOk();
+    $this->getJson(
+        route('api.v1.event-types.index', ['page' => $this->owner->booking_slug]),
+        withToken($token),
+    )->assertOk();
+});
+
+test('a page can be reached by organization id, which survives a rename', function () {
+    $team = Team::factory()->create(['slug' => 'ours']);
+
+    $this->getJson(route('api.v1.event-types.index', ['page' => (string) $team->id]), withToken())
+        ->assertOk()
+        ->assertJsonPath('meta.page', (string) $team->id);
+});
+
+test('it lists the organizations that have a booking page', function () {
+    Team::factory()->create(['name' => 'Texas Renters', 'slug' => 'texas-renters']);
+
+    $this->getJson(route('api.v1.organizations.index'), withToken())
+        ->assertOk()
+        ->assertJsonFragment(['name' => 'Texas Renters', 'slug' => 'texas-renters']);
 });

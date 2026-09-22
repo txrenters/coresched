@@ -17,4 +17,6 @@ enum TeamPermission: string
     case ManageGroups = 'group:manage';
     case ManageEventTypes = 'event_type:manage';
     case ManageTeamBookings = 'booking:manage';
+
+    case ManageApiKeys = 'api_key:manage';
 }

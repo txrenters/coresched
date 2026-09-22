@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Bookings\CreateBooking;
 use App\Exceptions\SlotUnavailableException;
+use App\Http\Controllers\Api\Concerns\ResolvesBookingPage;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Services\Scheduling\BookingPageResolver;
@@ -13,6 +14,8 @@ use Illuminate\Http\Request;
 
 class BookingController extends Controller
 {
+    use ResolvesBookingPage;
+
     public function __construct(private BookingPageResolver $pages) {}
 
     /**
@@ -34,9 +37,7 @@ class BookingController extends Controller
             'timezone' => ['nullable', 'string', 'max:64'],
         ]);
 
-        $owner = $this->pages->resolve($validated['page']);
-
-        abort_if($owner === null, 404);
+        $owner = $this->pageForKey($request, $this->pages, $validated['page']);
 
         $eventType = $this->pages->eventType($owner, $validated['event_type']);
 

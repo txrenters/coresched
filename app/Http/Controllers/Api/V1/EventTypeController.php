@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\Concerns\ResolvesBookingPage;
 use App\Http\Controllers\Controller;
 use App\Models\EventType;
 use App\Services\Scheduling\BookingPageResolver;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class EventTypeController extends Controller
 {
+    use ResolvesBookingPage;
+
     public function __construct(private BookingPageResolver $pages) {}
 
     /**
@@ -18,11 +22,9 @@ class EventTypeController extends Controller
      * API adds no exposure: it exists so another application can show the
      * same list in its own interface.
      */
-    public function index(string $page): JsonResponse
+    public function index(Request $request, string $page): JsonResponse
     {
-        $owner = $this->pages->resolve($page);
-
-        abort_if($owner === null, 404);
+        $owner = $this->pageForKey($request, $this->pages, $page);
 
         return response()->json([
             'data' => $this->pages->eventTypes($owner)

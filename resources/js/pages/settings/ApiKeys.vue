@@ -29,9 +29,11 @@ function when(value: string | null): string {
 defineProps<{
     /** Present only on the request that issued a key. */
     issued?: { name: string; token: string } | null;
+    canIssueSystemWide?: boolean;
     keys: {
         id: number;
         name: string;
+        organization: string | null;
         prefix: string;
         createdBy: string | null;
         createdAt: string | null;
@@ -100,6 +102,13 @@ defineOptions({ layout: SettingsLayout });
                     {{ errors.name }}
                 </p>
             </div>
+            <label
+                v-if="canIssueSystemWide"
+                class="flex w-fit items-center gap-2 text-sm"
+            >
+                <input type="checkbox" name="system_wide" value="1" />
+                Let this key read every organization
+            </label>
             <Button type="submit" class="w-fit" :disabled="processing">
                 <KeyRound class="size-4" />
                 Issue a key
@@ -129,6 +138,10 @@ defineOptions({ layout: SettingsLayout });
                         </p>
                         <p class="text-xs text-muted-foreground">
                             <code class="font-mono">{{ key.prefix }}…</code>
+                            <span v-if="key.organization">
+                                · {{ key.organization }}</span
+                            >
+                            <span v-else> · every organization</span>
                             · last used {{ when(key.lastUsedAt) }}
                             <span v-if="key.createdBy">
                                 · issued by {{ key.createdBy }}</span

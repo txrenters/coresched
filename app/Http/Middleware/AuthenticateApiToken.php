@@ -27,6 +27,9 @@ class AuthenticateApiToken
         // change to the key itself.
         $key->forceFill(['last_used_at' => now()])->saveQuietly();
 
+        // The controllers need it to decide which pages this key may read.
+        $request->attributes->set('api_key', $key);
+
         return $next($request);
     }
 }

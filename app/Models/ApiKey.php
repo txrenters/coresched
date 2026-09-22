@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
  *
  * @property int $id
  * @property string $name
+ * @property ?int $team_id
  * @property string $prefix
  * @property string $token_hash
  * @property ?int $created_by
@@ -28,7 +29,7 @@ use Illuminate\Support\Str;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
-#[Fillable(['name', 'prefix', 'token_hash', 'created_by'])]
+#[Fillable(['name', 'team_id', 'prefix', 'token_hash', 'created_by'])]
 #[Hidden(['token_hash'])]
 class ApiKey extends Model
 {
@@ -44,6 +45,16 @@ class ApiKey extends Model
     }
 
     /**
+     * The organization this key speaks for, or null for a system-wide key.
+     *
+     * @return BelongsTo<Team, $this>
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function creator(): BelongsTo
@@ -54,15 +65,19 @@ class ApiKey extends Model
     /**
      * Make a key, returning the model and the one and only copy of the secret.
      *
+     * A key with no organization speaks for all of them, which is why only a
+     * super admin can issue one.
+     *
      * @return array{key: self, token: string}
      */
-    public static function issue(string $name, ?User $creator = null): array
+    public static function issue(string $name, ?User $creator = null, ?Team $team = null): array
     {
         $prefix = Str::lower(Str::random(self::PREFIX_LENGTH));
         $secret = Str::random(48);
 
         $key = self::create([
             'name' => $name,
+            'team_id' => $team?->id,
             'prefix' => $prefix,
             'token_hash' => Hash::make($secret),
             'created_by' => $creator?->id,
@@ -98,6 +113,24 @@ class ApiKey extends Model
     public function scopeActive(Builder $query): void
     {
         $query->whereNull('revoked_at');
+    }
+
+    /**
+     * Whether this key may read a booking page.
+     *
+     * A system-wide key may read any. An organization's key may read that
+     * organization's page, and the pages of people who belong to it —
+     * nothing else, or one organization's admin could read another's.
+     */
+    public function canRead(User|Team $page): bool
+    {
+        if ($this->team_id === null) {
+            return true;
+        }
+
+        return $page instanceof Team
+            ? $page->id === $this->team_id
+            : $page->teams()->whereKey($this->team_id)->exists();
     }
 
     public function isRevoked(): bool

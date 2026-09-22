@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Data\AvailabilitySlot;
+use App\Http\Controllers\Api\Concerns\ResolvesBookingPage;
 use App\Http\Controllers\Controller;
 use App\Services\Scheduling\AvailabilityEngine;
 use App\Services\Scheduling\BookingPageResolver;
@@ -13,6 +14,8 @@ use Illuminate\Http\Request;
 
 class SlotController extends Controller
 {
+    use ResolvesBookingPage;
+
     /** The longest window one request may ask for. */
     private const MAX_DAYS = 62;
 
@@ -35,9 +38,7 @@ class SlotController extends Controller
             'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
 
-        $owner = $this->pages->resolve($page);
-
-        abort_if($owner === null, 404);
+        $owner = $this->pageForKey($request, $this->pages, $page);
 
         $type = $this->pages->eventType($owner, $eventType);
 

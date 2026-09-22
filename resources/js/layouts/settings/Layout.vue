@@ -28,8 +28,8 @@ const sidebarNavItems = computed<NavItem[]>(() => [
         title: 'Appearance',
         href: editAppearance(),
     },
-    // Issuing a key reaches every booking page, so only a super admin sees it.
-    ...(page.props.isSuperAdmin
+    // Organization admins issue keys for their own organization.
+    ...(page.props.canManageApiKeys
         ? [{ title: 'API keys', href: apiKeys() }]
         : []),
 ]);

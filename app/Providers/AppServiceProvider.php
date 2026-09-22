@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Enums\TeamPermission;
 use App\Enums\TeamRole;
 use App\Models\User;
 use App\Services\Mail\MicrosoftGraphTransport;
@@ -167,9 +168,12 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::define('manageUsers', fn (User $user): bool => $user->isSuperAdmin());
 
-        // API keys reach every booking page in the system, so issuing one is
-        // not something a team owner can do for their own team.
-        Gate::define('manageApiKeys', fn (User $user): bool => $user->isSuperAdmin());
+        // An organization's admins issue keys for their own organization; the
+        // key is scoped to it, so one cannot read another's booking pages. A
+        // super admin can additionally issue a system-wide key.
+        Gate::define('manageApiKeys', fn (User $user): bool => $user->isSuperAdmin()
+            || ($user->currentTeam !== null
+                && $user->hasTeamPermission($user->currentTeam, TeamPermission::ManageApiKeys)));
     }
 
     /**
