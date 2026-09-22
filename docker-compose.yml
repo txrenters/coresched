@@ -118,7 +118,7 @@ services:
       - storage-app:/var/www/html/storage/app:ro
     ports:
       # Bound to loopback only. The VPS's nginx proxies
-      # bookings.texasrenters.com here and is the sole public entry point;
+      # scheduling.texasrenters.com here and is the sole public entry point;
       # publishing on 0.0.0.0 would expose the app on http://45.132.241.14:8084
       # with no TLS. 8084 because texra-crm already holds 8083.
       - '127.0.0.1:${HTTP_PORT:-8084}:80'

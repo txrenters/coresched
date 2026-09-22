@@ -88,7 +88,7 @@ RUN mkdir -p storage/framework/views storage/framework/cache/data \
 #
 # Must match APP_URL in .env.docker. docker-compose.yml passes it through from
 # the compose .env so the value lives in exactly one place.
-ARG APP_URL=https://bookings.texasrenters.com
+ARG APP_URL=https://scheduling.texasrenters.com
 
 # The name in the browser tab, and the same build-time trap as APP_URL above.
 # resources/js/app.ts reads import.meta.env.VITE_APP_NAME when the bundle is
