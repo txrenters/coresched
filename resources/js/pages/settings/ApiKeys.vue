@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
-import { Check, Copy, KeyRound, TriangleAlert } from '@lucide/vue';
+import { Check, Copy, KeyRound, Trash2, TriangleAlert } from '@lucide/vue';
 import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { destroy, index, store } from '@/routes/api-keys';
+import { destroy, forget, index, store } from '@/routes/api-keys';
 
 /**
  * Keys our other applications use to reach the booking API.
@@ -39,9 +39,6 @@ defineOptions({
 defineProps<{
     /** Present only on the request that issued a key. */
     issued?: { name: string; token: string } | null;
-    canIssueSystemWide?: boolean;
-    /** Only a super admin chooses; everyone else is scoped to their own. */
-    organizations?: { id: number; name: string }[];
     keys: {
         id: number;
         name: string;
@@ -112,33 +109,6 @@ defineProps<{
                     {{ errors.name }}
                 </p>
             </div>
-            <div
-                v-if="canIssueSystemWide && (organizations?.length ?? 0) > 0"
-                class="grid gap-2"
-            >
-                <Label for="team_id">Organization</Label>
-                <select
-                    id="team_id"
-                    name="team_id"
-                    class="h-9 max-w-sm rounded-md border border-input bg-background px-3 text-sm"
-                >
-                    <option
-                        v-for="organization in organizations"
-                        :key="organization.id"
-                        :value="organization.id"
-                    >
-                        {{ organization.name }}
-                    </option>
-                </select>
-            </div>
-
-            <label
-                v-if="canIssueSystemWide"
-                class="flex w-fit items-center gap-2 text-sm"
-            >
-                <input type="checkbox" name="system_wide" value="1" />
-                Let this key read every organization
-            </label>
             <Button type="submit" class="w-fit" :disabled="processing">
                 <KeyRound class="size-4" />
                 Issue a key
@@ -190,6 +160,24 @@ defineProps<{
                             :disabled="processing"
                         >
                             Revoke
+                        </Button>
+                    </Form>
+
+                    <!-- Revoking is what stops it working; this clears the row. -->
+                    <Form
+                        v-else
+                        v-bind="forget.form(key.id)"
+                        #default="{ processing }"
+                    >
+                        <Button
+                            type="submit"
+                            variant="ghost"
+                            size="sm"
+                            class="text-destructive hover:text-destructive"
+                            :disabled="processing"
+                        >
+                            <Trash2 class="size-4" />
+                            Delete
                         </Button>
                     </Form>
                 </li>

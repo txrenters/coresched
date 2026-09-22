@@ -68,19 +68,6 @@ test('an admin cannot revoke another organization key', function () {
     expect($theirs->fresh()->isRevoked())->toBeFalse();
 });
 
-test('only a super admin can issue a key that speaks for every organization', function () {
-    $this->actingAs($this->admin)
-        ->post(route('api-keys.store'), ['name' => 'Sneaky', 'system_wide' => true]);
-
-    // Asking for one as an ordinary admin still scopes it to their own.
-    expect(ApiKey::query()->firstOrFail()->team_id)->toBe($this->org->id);
-
-    $this->actingAs($this->superAdmin)
-        ->post(route('api-keys.store'), ['name' => 'Everything', 'system_wide' => true]);
-
-    expect(ApiKey::query()->where('name', 'Everything')->firstOrFail()->team_id)->toBeNull();
-});
-
 test('issuing a key shows the secret exactly once', function () {
     $this->actingAs($this->admin)->post(route('api-keys.store'), ['name' => 'Client portal']);
 
@@ -133,35 +120,47 @@ test('a token with the right prefix but the wrong secret is refused', function (
         ->and(ApiKey::findByToken($token))->not->toBeNull();
 });
 
-test('a super admin can issue a key for an organization they are not in', function () {
+test('a super admin issues for whichever organization they are looking after', function () {
     $other = Team::factory()->create(['name' => 'Texas Renters']);
+    $other->members()->attach($this->superAdmin, ['role' => TeamRole::Admin->value]);
+    $this->superAdmin->switchTeam($other);
 
-    $this->actingAs($this->superAdmin)
-        ->post(route('api-keys.store'), ['name' => 'Client portal', 'team_id' => $other->id])
-        ->assertRedirect(route('api-keys.index'));
+    // Switching organization is how you act on another one here, the same as
+    // everything else about it.
+    $this->actingAs($this->superAdmin)->post(route('api-keys.store'), ['name' => 'Client portal']);
 
-    expect(ApiKey::query()->where('name', 'Client portal')->firstOrFail()->team_id)->toBe($other->id);
+    expect(ApiKey::query()->firstOrFail()->team_id)->toBe($other->id);
 });
 
-test('an organization admin naming another organization is still scoped to their own', function () {
-    $other = Team::factory()->create();
+test('a revoked key can be deleted', function () {
+    ['key' => $key] = ApiKey::issue('Client portal', $this->admin, $this->org);
+    $this->actingAs($this->admin)->delete(route('api-keys.destroy', $key));
 
-    // The field is for the super admin's benefit; it must not be a way round
-    // the scope for anybody else.
     $this->actingAs($this->admin)
-        ->post(route('api-keys.store'), ['name' => 'Sneaky', 'team_id' => $other->id]);
+        ->delete(route('api-keys.forget', $key))
+        ->assertRedirect();
 
-    expect(ApiKey::query()->firstOrFail()->team_id)->toBe($this->org->id);
+    expect(ApiKey::query()->whereKey($key->id)->exists())->toBeFalse();
 });
 
-test('a super admin sees the organizations they can choose from', function () {
-    Team::factory()->create(['name' => 'Texas Renters']);
+test('a key still in use cannot be deleted without revoking it first', function () {
+    ['key' => $key] = ApiKey::issue('Client portal', $this->admin, $this->org);
 
-    $this->actingAs($this->superAdmin)
-        ->get(route('api-keys.index'))
-        ->assertInertia(fn ($page) => $page->has('organizations'));
+    // One stray click must not sweep away a key something is relying on.
+    $this->actingAs($this->admin)
+        ->delete(route('api-keys.forget', $key))
+        ->assertStatus(422);
+
+    expect(ApiKey::query()->whereKey($key->id)->exists())->toBeTrue();
+});
+
+test('an admin cannot delete another organization revoked key', function () {
+    ['key' => $theirs] = ApiKey::issue('Theirs', null, Team::factory()->create());
+    $theirs->forceFill(['revoked_at' => now()])->save();
 
     $this->actingAs($this->admin)
-        ->get(route('api-keys.index'))
-        ->assertInertia(fn ($page) => $page->has('organizations', 0));
+        ->delete(route('api-keys.forget', $theirs))
+        ->assertForbidden();
+
+    expect(ApiKey::query()->whereKey($theirs->id)->exists())->toBeTrue();
 });

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,12 +23,6 @@ class ApiKeyController extends Controller
             // The only moment the secret is readable. It is flashed by store()
             // and handed over here, then gone.
             'issued' => $request->session()->get('issued_api_key'),
-            'canIssueSystemWide' => (bool) $request->user()?->isSuperAdmin(),
-            // A super admin looks after every organization, so they choose
-            // which one a key speaks for.
-            'organizations' => $request->user()?->isSuperAdmin()
-                ? Team::query()->orderBy('name')->get(['id', 'name'])
-                : [],
             /** @var Collection<int, array<string, mixed>> */
             'keys' => ApiKey::query()
                 ->with(['creator:id,name', 'team:id,name'])
@@ -62,25 +55,17 @@ class ApiKeyController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'system_wide' => ['nullable', 'boolean'],
-            'team_id' => ['nullable', 'integer', 'exists:teams,id'],
         ]);
 
         /** @var User $user */
         $user = $request->user();
-        $chosen = $validated['team_id'] ?? null;
 
-        // An organization's admin can only ever issue for their own. A super
-        // admin looks after all of them, so they may name one — or ask for a
-        // key that speaks for every organization.
-        $team = match (true) {
-            ! $user->isSuperAdmin() => $user->currentTeam,
-            $request->boolean('system_wide') => null,
-            $chosen !== null => Team::query()->whereKey((int) $chosen)->first(),
-            default => $user->currentTeam,
-        };
+        // Always the organization being looked after right now. A super admin
+        // who wants a key for another one switches to it, the same way they
+        // do for everything else about that organization.
+        $team = $user->currentTeam;
 
-        abort_if($team === null && ! $user->isSuperAdmin(), 403);
+        abort_if($team === null, 403);
 
         ['key' => $key, 'token' => $token] = ApiKey::issue($validated['name'], $user, $team);
 
@@ -116,5 +101,32 @@ class ApiKeyController extends Controller
         ]);
 
         return back()->with('success', "\"{$apiKey->name}\" can no longer be used.");
+    }
+
+    /**
+     * Delete a key for good, once it has been revoked.
+     *
+     * Revoking is what stops a key working; this only clears the record. It
+     * is deliberately a second step, so a key in use cannot be swept away by
+     * one stray click — and so the list keeps saying what happened until
+     * somebody decides it no longer needs to.
+     */
+    public function forget(Request $request, ApiKey $apiKey): RedirectResponse
+    {
+        abort_unless(
+            $request->user()?->isSuperAdmin() || $apiKey->team_id === $request->user()?->current_team_id,
+            403,
+        );
+
+        abort_unless($apiKey->isRevoked(), 422, 'Revoke the key before deleting it.');
+
+        $apiKey->delete();
+
+        Log::info('An API key was deleted.', [
+            'api_key_id' => $apiKey->id,
+            'deleted_by' => $request->user()?->id,
+        ]);
+
+        return back()->with('success', "\"{$apiKey->name}\" is gone.");
     }
 }
