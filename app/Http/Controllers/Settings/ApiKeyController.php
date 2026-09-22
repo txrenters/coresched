@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
+use App\Models\Team;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -23,6 +25,11 @@ class ApiKeyController extends Controller
             // and handed over here, then gone.
             'issued' => $request->session()->get('issued_api_key'),
             'canIssueSystemWide' => (bool) $request->user()?->isSuperAdmin(),
+            // A super admin looks after every organization, so they choose
+            // which one a key speaks for.
+            'organizations' => $request->user()?->isSuperAdmin()
+                ? Team::query()->orderBy('name')->get(['id', 'name'])
+                : [],
             /** @var Collection<int, array<string, mixed>> */
             'keys' => ApiKey::query()
                 ->with(['creator:id,name', 'team:id,name'])
@@ -56,24 +63,32 @@ class ApiKeyController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'system_wide' => ['nullable', 'boolean'],
+            'team_id' => ['nullable', 'integer', 'exists:teams,id'],
         ]);
 
+        /** @var User $user */
         $user = $request->user();
+        $chosen = $validated['team_id'] ?? null;
 
-        // Scoped to the admin's own organization. Only a super admin may make
-        // a key that speaks for all of them, and only by asking for one.
-        $team = $user?->isSuperAdmin() && $request->boolean('system_wide')
-            ? null
-            : $user?->currentTeam;
+        // An organization's admin can only ever issue for their own. A super
+        // admin looks after all of them, so they may name one — or ask for a
+        // key that speaks for every organization.
+        $team = match (true) {
+            ! $user->isSuperAdmin() => $user->currentTeam,
+            $request->boolean('system_wide') => null,
+            $chosen !== null => Team::query()->whereKey((int) $chosen)->first(),
+            default => $user->currentTeam,
+        };
 
-        abort_if($team === null && ! $user?->isSuperAdmin(), 403);
+        abort_if($team === null && ! $user->isSuperAdmin(), 403);
 
         ['key' => $key, 'token' => $token] = ApiKey::issue($validated['name'], $user, $team);
 
         Log::info('An API key was issued.', [
             'api_key_id' => $key->id,
             'name' => $key->name,
-            'issued_by' => $request->user()?->id,
+            'team_id' => $key->team_id,
+            'issued_by' => $user?->id,
         ]);
 
         return to_route('api-keys.index')->with('issued_api_key', [

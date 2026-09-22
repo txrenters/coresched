@@ -132,3 +132,36 @@ test('a token with the right prefix but the wrong secret is refused', function (
     expect(ApiKey::findByToken($prefix.'.wrong-secret'))->toBeNull()
         ->and(ApiKey::findByToken($token))->not->toBeNull();
 });
+
+test('a super admin can issue a key for an organization they are not in', function () {
+    $other = Team::factory()->create(['name' => 'Texas Renters']);
+
+    $this->actingAs($this->superAdmin)
+        ->post(route('api-keys.store'), ['name' => 'Client portal', 'team_id' => $other->id])
+        ->assertRedirect(route('api-keys.index'));
+
+    expect(ApiKey::query()->where('name', 'Client portal')->firstOrFail()->team_id)->toBe($other->id);
+});
+
+test('an organization admin naming another organization is still scoped to their own', function () {
+    $other = Team::factory()->create();
+
+    // The field is for the super admin's benefit; it must not be a way round
+    // the scope for anybody else.
+    $this->actingAs($this->admin)
+        ->post(route('api-keys.store'), ['name' => 'Sneaky', 'team_id' => $other->id]);
+
+    expect(ApiKey::query()->firstOrFail()->team_id)->toBe($this->org->id);
+});
+
+test('a super admin sees the organizations they can choose from', function () {
+    Team::factory()->create(['name' => 'Texas Renters']);
+
+    $this->actingAs($this->superAdmin)
+        ->get(route('api-keys.index'))
+        ->assertInertia(fn ($page) => $page->has('organizations'));
+
+    $this->actingAs($this->admin)
+        ->get(route('api-keys.index'))
+        ->assertInertia(fn ($page) => $page->has('organizations', 0));
+});

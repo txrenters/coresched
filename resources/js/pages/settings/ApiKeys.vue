@@ -5,8 +5,7 @@ import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import SettingsLayout from '@/layouts/settings/Layout.vue';
-import { destroy, store } from '@/routes/api-keys';
+import { destroy, index, store } from '@/routes/api-keys';
 
 /**
  * Keys our other applications use to reach the booking API.
@@ -26,10 +25,23 @@ function when(value: string | null): string {
     return value ? new Date(value).toLocaleString() : 'Never';
 }
 
+defineOptions({
+    layout: {
+        breadcrumbs: [
+            {
+                title: 'API keys',
+                href: index(),
+            },
+        ],
+    },
+});
+
 defineProps<{
     /** Present only on the request that issued a key. */
     issued?: { name: string; token: string } | null;
     canIssueSystemWide?: boolean;
+    /** Only a super admin chooses; everyone else is scoped to their own. */
+    organizations?: { id: number; name: string }[];
     keys: {
         id: number;
         name: string;
@@ -41,8 +53,6 @@ defineProps<{
         revokedAt: string | null;
     }[];
 }>();
-
-defineOptions({ layout: SettingsLayout });
 </script>
 
 <template>
@@ -102,6 +112,26 @@ defineOptions({ layout: SettingsLayout });
                     {{ errors.name }}
                 </p>
             </div>
+            <div
+                v-if="canIssueSystemWide && (organizations?.length ?? 0) > 0"
+                class="grid gap-2"
+            >
+                <Label for="team_id">Organization</Label>
+                <select
+                    id="team_id"
+                    name="team_id"
+                    class="h-9 max-w-sm rounded-md border border-input bg-background px-3 text-sm"
+                >
+                    <option
+                        v-for="organization in organizations"
+                        :key="organization.id"
+                        :value="organization.id"
+                    >
+                        {{ organization.name }}
+                    </option>
+                </select>
+            </div>
+
             <label
                 v-if="canIssueSystemWide"
                 class="flex w-fit items-center gap-2 text-sm"
