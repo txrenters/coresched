@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
+import { usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { toUrl } from '@/lib/utils';
+import { index as apiKeys } from '@/routes/api-keys';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import type { NavItem } from '@/types';
+
+const page = usePage();
 
 const sidebarNavItems = computed<NavItem[]>(() => [
     {
@@ -24,6 +28,10 @@ const sidebarNavItems = computed<NavItem[]>(() => [
         title: 'Appearance',
         href: editAppearance(),
     },
+    // Issuing a key reaches every booking page, so only a super admin sees it.
+    ...(page.props.isSuperAdmin
+        ? [{ title: 'API keys', href: apiKeys() }]
+        : []),
 ]);
 
 const { isCurrentOrParentUrl } = useCurrentUrl();

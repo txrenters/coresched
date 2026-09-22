@@ -166,6 +166,10 @@ class AppServiceProvider extends ServiceProvider
     protected function restrictUserDirectoryToSuperAdmins(): void
     {
         Gate::define('manageUsers', fn (User $user): bool => $user->isSuperAdmin());
+
+        // API keys reach every booking page in the system, so issuing one is
+        // not something a team owner can do for their own team.
+        Gate::define('manageApiKeys', fn (User $user): bool => $user->isSuperAdmin());
     }
 
     /**
