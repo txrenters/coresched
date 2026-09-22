@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\EventTypeKind;
 use App\Enums\TeamRole;
 use App\Models\ApiKey;
 use App\Models\AvailabilitySchedule;
@@ -243,4 +244,46 @@ test('a system wide key has no organization of its own', function () {
         ->assertOk()
         ->assertJsonPath('data.systemWide', true)
         ->assertJsonPath('data.organization', null);
+});
+
+test('it lists every meeting an organization offers, across its pages', function () {
+    $team = Team::factory()->create(['slug' => 'ours']);
+    $team->members()->attach($this->owner, ['role' => TeamRole::Admin->value]);
+
+    // One advertised on the organization's page, one on a person's.
+    EventType::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $this->owner->id,
+        'kind' => EventTypeKind::RoundRobin,
+        'name' => 'Shared meeting',
+        'slug' => 'shared-meeting',
+    ]);
+    EventType::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $this->owner->id,
+        'kind' => EventTypeKind::OneOnOne,
+        'name' => 'Personal meeting',
+        'slug' => 'personal-meeting',
+    ]);
+
+    $response = $this->getJson(
+        route('api.v1.organizations.event-types.index', ['organization' => $team->id]),
+        withToken(),
+    )->assertOk();
+
+    $pages = collect($response->json('data'))->pluck('page', 'slug');
+
+    // Each carries the page it is booked on, which is not the same for both.
+    expect($pages['shared-meeting'])->toBe('ours')
+        ->and($pages['personal-meeting'])->toBe($this->owner->booking_slug);
+});
+
+test('an organization key cannot list another organization meetings', function () {
+    $theirs = Team::factory()->create();
+    ['token' => $token] = ApiKey::issue('Theirs', null, Team::factory()->create());
+
+    $this->getJson(
+        route('api.v1.organizations.event-types.index', ['organization' => $theirs->id]),
+        withToken($token),
+    )->assertNotFound();
 });

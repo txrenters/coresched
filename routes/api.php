@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\EventTypeController;
 use App\Http\Controllers\Api\V1\IdentityController;
 use App\Http\Controllers\Api\V1\OrganizationController;
+use App\Http\Controllers\Api\V1\OrganizationEventTypeController;
 use App\Http\Controllers\Api\V1\SlotController;
 use App\Http\Middleware\AuthenticateApiToken;
 use Illuminate\Support\Facades\Route;
@@ -19,6 +20,10 @@ Route::middleware(AuthenticateApiToken::class)->prefix('v1')->name('api.v1.')->g
     Route::get('me', [IdentityController::class, 'show'])->name('me');
 
     Route::get('organizations', [OrganizationController::class, 'index'])->name('organizations.index');
+
+    // Every meeting the organization offers, wherever it is advertised.
+    Route::get('organizations/{organization}/event-types', [OrganizationEventTypeController::class, 'index'])
+        ->name('organizations.event-types.index');
 
     // {page} is a booking slug or an organization id; the id survives a rename.
     Route::get('pages/{page}/event-types', [EventTypeController::class, 'index'])->name('event-types.index');
