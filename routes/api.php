@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\EventTypeController;
+use App\Http\Controllers\Api\V1\IdentityController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\SlotController;
 use App\Http\Middleware\AuthenticateApiToken;
@@ -13,6 +14,10 @@ use Illuminate\Support\Facades\Route;
  * booking pages; the token is here so the endpoints cannot be scraped.
  */
 Route::middleware(AuthenticateApiToken::class)->prefix('v1')->name('api.v1.')->group(function () {
+    // Lets a caller discover the organization its key belongs to, so the
+    // key is the only thing anybody has to configure.
+    Route::get('me', [IdentityController::class, 'show'])->name('me');
+
     Route::get('organizations', [OrganizationController::class, 'index'])->name('organizations.index');
 
     // {page} is a booking slug or an organization id; the id survives a rename.

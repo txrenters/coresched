@@ -225,3 +225,22 @@ test('it lists the organizations that have a booking page', function () {
         ->assertOk()
         ->assertJsonFragment(['name' => 'Texas Renters', 'slug' => 'texas-renters']);
 });
+
+test('a key says which organization it speaks for', function () {
+    $team = Team::factory()->create(['name' => 'Texas Renters', 'slug' => 'texas-renters']);
+    ['token' => $token] = ApiKey::issue('Client portal', null, $team);
+
+    $this->getJson(route('api.v1.me'), withToken($token))
+        ->assertOk()
+        ->assertJsonPath('data.systemWide', false)
+        ->assertJsonPath('data.organization.id', $team->id)
+        ->assertJsonPath('data.organization.page', (string) $team->id);
+});
+
+test('a system wide key has no organization of its own', function () {
+    // Nothing to imply, so whoever configured it has to name the page.
+    $this->getJson(route('api.v1.me'), withToken())
+        ->assertOk()
+        ->assertJsonPath('data.systemWide', true)
+        ->assertJsonPath('data.organization', null);
+});
