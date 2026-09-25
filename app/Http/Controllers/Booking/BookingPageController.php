@@ -146,6 +146,7 @@ class BookingPageController extends Controller
                 'name' => $chosenHost->name,
             ],
             'bookingOnBehalf' => $bookingOnBehalf,
+            'prefill' => $this->prefill($request, $type),
             'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone, $chosenHost)),
         ]);
     }
@@ -190,8 +191,39 @@ class BookingPageController extends Controller
             'chosenHost' => null,
             'bookingOnBehalf' => false,
             'singleUseLink' => $singleUseLink->uid,
+            'prefill' => $this->prefill($request, $type),
             'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone)),
         ]);
+    }
+
+    /**
+     * Details a caller put in the link so the invitee only has to pick a time.
+     *
+     * TEXRA sends a lead here with their name, email and phone plus its own
+     * reference, which the booking carries back to it. Anything malformed is
+     * dropped rather than refused: a damaged link should still book, just
+     * without the shortcut. The phone only comes through where the event
+     * type asks the invitee for one; on any other type it would land in
+     * `location_detail`, which is the host's link or address there.
+     *
+     * @return array{name: string|null, email: string|null, phone: string|null, reference: string|null}
+     */
+    protected function prefill(Request $request, EventType $type): array
+    {
+        $text = function (string $key, int $max) use ($request): ?string {
+            $value = trim($request->string($key)->toString());
+
+            return $value === '' ? null : mb_substr($value, 0, $max);
+        };
+
+        $reference = $request->string('ref')->toString();
+
+        return [
+            'name' => $text('name', 255),
+            'email' => $text('email', 255),
+            'phone' => $type->location_type->requiresInviteeInput() ? $text('phone', 500) : null,
+            'reference' => preg_match('/^[A-Za-z0-9_-]{1,100}$/', $reference) === 1 ? $reference : null,
+        ];
     }
 
     /**

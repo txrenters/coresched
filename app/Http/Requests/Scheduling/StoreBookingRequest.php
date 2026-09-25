@@ -37,6 +37,8 @@ class StoreBookingRequest extends FormRequest
             'answers' => ['array'],
             'answers.*.*' => ['string', 'max:2000'],
             'host_id' => ['nullable', 'integer'],
+            // Opaque to us: the caller that sent the invitee here reads it back.
+            'reference' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_-]{1,100}$/'],
         ];
     }
 

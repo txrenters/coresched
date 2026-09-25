@@ -33,7 +33,7 @@ class CreateBooking
     /**
      * Book a slot on an event type.
      *
-     * @param  array{name: string, email: string, notes?: string|null, timezone?: string|null, location_detail?: string|null, guests?: array<int, string>, answers?: array<int|string, mixed>}  $attributes
+     * @param  array{name: string, email: string, notes?: string|null, timezone?: string|null, location_detail?: string|null, guests?: array<int, string>, answers?: array<int|string, mixed>, reference?: string|null}  $attributes
      *
      * The host pool is resolved before the transaction opens, so that locking
      * the hosts is the first read inside it. A caller that wraps this in its
@@ -72,6 +72,7 @@ class CreateBooking
                 'name' => $attributes['name'],
                 'email' => $attributes['email'],
                 'notes' => $attributes['notes'] ?? null,
+                'reference' => $attributes['reference'] ?? null,
                 'location_type' => $eventType->location_type,
                 'location_detail' => $this->locationDetail($eventType, $attributes['location_detail'] ?? null),
                 'rescheduled_from_id' => $replacing?->id,

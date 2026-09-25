@@ -57,6 +57,8 @@ class RescheduleBooking
             'timezone' => $booking->invitee_timezone,
             'location_detail' => $booking->location_detail,
             'guests' => $booking->guests->pluck('email')->all(),
+            // A moved booking is still the same caller's.
+            'reference' => $booking->reference,
         ];
 
         $replacement = DB::transaction(function () use ($booking, $eventType, $startsAt, $reason, $attributes, $host, $rescheduledBy) {
