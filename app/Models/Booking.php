@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Bookings\NotifyBookingParties;
 use App\Enums\BookingStatus;
 use App\Enums\LocationType;
 use App\Enums\QuestionType;
@@ -63,6 +64,17 @@ class Booking extends Model
 {
     /** @use HasFactory<BookingFactory> */
     use HasFactory;
+
+    /**
+     * Every saved change is offered to the webhook, whoever made it; the
+     * webhook decides whether it concerns anyone outside.
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (Booking $booking): void {
+            app(NotifyBookingParties::class)->changed($booking, array_keys($booking->getChanges()));
+        });
+    }
 
     /**
      * The model's default attribute values.

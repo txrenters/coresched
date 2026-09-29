@@ -25,4 +25,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/Controllers/Settings/OrganizationDirectoryController.php | .ai/rules/settings.md |
 | app/Services/Sms/** | .ai/rules/sms.md |
 | app/Http/Controllers/Teams/** | .ai/rules/teams.md |
-| app/Services/Webhooks/**, app/Jobs/SendBookingWebhook.php, app/Actions/Bookings/NotifyBookingParties.php | .ai/rules/webhooks.md |
+| app/Services/Webhooks/**, app/Jobs/SendBookingWebhook.php, app/Actions/Bookings/NotifyBookingParties.php, app/Models/Booking.php | .ai/rules/webhooks.md |

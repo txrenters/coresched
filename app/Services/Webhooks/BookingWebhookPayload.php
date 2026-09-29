@@ -14,9 +14,10 @@ use Carbon\CarbonInterface;
 class BookingWebhookPayload
 {
     /**
+     * @param  list<string>  $changes  For booking.updated: which columns moved.
      * @return array<string, mixed>
      */
-    public function build(Booking $booking, string $event, int $sequence, string $deliveryId, CarbonInterface $occurredAt): array
+    public function build(Booking $booking, string $event, int $sequence, string $deliveryId, CarbonInterface $occurredAt, array $changes = []): array
     {
         $booking->loadMissing(['eventType', 'host', 'hosts', 'rescheduledFrom']);
 
@@ -28,6 +29,7 @@ class BookingWebhookPayload
             'event' => $event,
             'occurred_at' => $occurredAt->toIso8601String(),
             'sequence' => $sequence,
+            'changes' => $changes,
             'booking' => [
                 'uid' => $booking->uid,
                 'status' => $booking->status->value,
@@ -53,6 +55,9 @@ class BookingWebhookPayload
                     'phone' => $booking->location_type->requiresInviteeInput() ? $booking->location_detail : null,
                 ],
                 'notes' => $booking->notes,
+                'host_notes' => $booking->host_notes,
+                'meeting_url' => $booking->meeting_url,
+                'no_show_at' => $booking->no_show_at?->copy()->utc()->toIso8601String(),
                 'rescheduled_from_uid' => $booking->rescheduledFrom?->uid,
                 'cancellation' => $booking->canceled_at === null ? null : [
                     'reason' => $booking->cancellation_reason,

@@ -37,11 +37,15 @@ class SendBookingWebhook implements ShouldQueue
 
     public readonly string $deliveryId;
 
+    /**
+     * @param  list<string>  $changes  The columns a booking.updated event is about.
+     */
     public function __construct(
         public Booking $booking,
         public string $event,
         public int $sequence,
         ?string $deliveryId = null,
+        public array $changes = [],
     ) {
         $this->deliveryId = $deliveryId ?? (string) Str::uuid();
     }
@@ -57,7 +61,7 @@ class SendBookingWebhook implements ShouldQueue
         }
 
         $body = json_encode(
-            $payloads->build($booking, $this->event, $this->sequence, $this->deliveryId, now()),
+            $payloads->build($booking, $this->event, $this->sequence, $this->deliveryId, now(), $this->changes),
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
         );
         $timestamp = (string) now()->getTimestamp();

@@ -86,6 +86,39 @@ class NotifyBookingParties
     }
 
     /**
+     * Columns whose change is already reported by a lifecycle event above, or
+     * that are bookkeeping nobody outside needs to hear about.
+     *
+     * @var list<string>
+     */
+    private const UNREPORTED_CHANGES = [
+        'status', 'canceled_at', 'canceled_by', 'cancellation_reason', 'rescheduled_from_id',
+        'webhook_sequence', 'created_at', 'updated_at',
+    ];
+
+    /**
+     * Tell the system that sent the invitee here about any other change to
+     * the booking: a no-show, the host's notes, the meeting link, the
+     * invitee's details. Called from the model on every update, so a writer
+     * added later is reported without having to remember to.
+     *
+     * @param  list<string>  $columns
+     */
+    public function changed(Booking $booking, array $columns): void
+    {
+        $changes = array_values(array_diff($columns, self::UNREPORTED_CHANGES));
+
+        if ($booking->reference === null || $changes === []) {
+            return;
+        }
+
+        Booking::withoutEvents(fn () => $booking->increment('webhook_sequence'));
+
+        SendBookingWebhook::dispatch($booking, 'booking.updated', (int) $booking->webhook_sequence, changes: $changes)
+            ->afterCommit();
+    }
+
+    /**
      * Tell the system that sent the invitee here, when one did.
      *
      * The booking's own sequence is bumped first and travels with the job,
@@ -104,7 +137,7 @@ class NotifyBookingParties
             return;
         }
 
-        $booking->increment('webhook_sequence');
+        Booking::withoutEvents(fn () => $booking->increment('webhook_sequence'));
 
         SendBookingWebhook::dispatch($booking, $event, (int) $booking->webhook_sequence);
     }
