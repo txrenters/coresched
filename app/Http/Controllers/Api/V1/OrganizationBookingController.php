@@ -85,6 +85,10 @@ class OrganizationBookingController extends Controller
                         'position' => $index,
                     ])
                     ->all(),
+                // What the invitee wrote in "Please share anything that will
+                // help prepare for our meeting", kept apart from the answers
+                // to the event type's own questions.
+                'notes' => $booking->notes,
                 'canceledAt' => $booking->canceled_at?->toIso8601String(),
                 'manageUrl' => route('booking.show', ['booking' => $booking]),
             ])->values(),

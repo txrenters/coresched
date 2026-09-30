@@ -323,6 +323,7 @@ test('it lists every meeting booked with an organization, canceled ones included
         'event_type_id' => $eventType->id,
         'name' => 'Jane Tenant',
         'email' => 'jane@example.com',
+        'notes' => 'Need the 2025 statements for my taxes',
         'starts_at' => now()->addDays(2),
         'ends_at' => now()->addDays(2)->addMinutes(30),
     ]);
@@ -355,6 +356,7 @@ test('it lists every meeting booked with an organization, canceled ones included
         ->assertJsonPath('data.0.host.name', 'Texas Renters')
         ->assertJsonPath('data.0.answers.0.question', 'Property address')
         ->assertJsonPath('data.0.answers.0.answer', '1 Main St')
+        ->assertJsonPath('data.0.notes', 'Need the 2025 statements for my taxes')
         ->assertJsonPath('data.1.status', 'canceled');
 });
 
