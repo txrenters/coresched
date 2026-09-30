@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\ApiKey;
 use App\Models\Booking;
 use App\Services\Webhooks\BookingWebhookPayload;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -23,6 +24,10 @@ use Throwable;
  *
  * A 5xx or a connection failure is retried on the queue's schedule; a 4xx
  * means the receiver understood and refused, which no retry will change.
+ *
+ * Each receiver gets its own job: an API key that names an endpoint, or,
+ * with no key, the endpoint in services.texra. A key revoked, pointed
+ * nowhere or narrowed in scope before a retry runs is not sent to.
  */
 class SendBookingWebhook implements ShouldQueue
 {
@@ -46,17 +51,22 @@ class SendBookingWebhook implements ShouldQueue
         public int $sequence,
         ?string $deliveryId = null,
         public array $changes = [],
+        public ?ApiKey $receiver = null,
     ) {
         $this->deliveryId = $deliveryId ?? (string) Str::uuid();
     }
 
     public function handle(BookingWebhookPayload $payloads): void
     {
-        $url = (string) config('services.texra.webhook_url', '');
-        $secret = (string) config('services.texra.webhook_secret', '');
         $booking = $this->booking->fresh();
 
-        if ($url === '' || $booking === null || $booking->reference === null) {
+        if ($booking === null) {
+            return;
+        }
+
+        [$url, $secret] = $this->endpoint($booking);
+
+        if ($url === null) {
             return;
         }
 
@@ -105,6 +115,28 @@ class SendBookingWebhook implements ShouldQueue
         }
 
         throw new RuntimeException("The receiver answered booking webhook {$this->deliveryId} with HTTP {$response->status()}.");
+    }
+
+    /**
+     * Where this delivery goes and what signs it, read at send time.
+     *
+     * @return array{0: ?string, 1: string}
+     */
+    private function endpoint(Booking $booking): array
+    {
+        if ($this->receiver === null) {
+            $url = (string) config('services.texra.webhook_url', '');
+
+            return [$url === '' || $booking->reference === null ? null : $url, (string) config('services.texra.webhook_secret', '')];
+        }
+
+        $key = $this->receiver->fresh();
+
+        if ($key === null || ! $key->receivesWebhookFor($booking)) {
+            return [null, ''];
+        }
+
+        return [$key->webhook_url, (string) $key->webhook_secret];
     }
 
     public function failed(?Throwable $exception): void

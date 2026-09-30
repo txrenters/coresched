@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Enums\WebhookScope;
 use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
 use App\Models\User;
@@ -9,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -23,6 +25,8 @@ class ApiKeyController extends Controller
             // The only moment the secret is readable. It is flashed by store()
             // and handed over here, then gone.
             'issued' => $request->session()->get('issued_api_key'),
+            // Likewise the webhook signing secret, flashed by update().
+            'issuedWebhookSecret' => $request->session()->get('issued_webhook_secret'),
             /** @var Collection<int, array<string, mixed>> */
             'keys' => ApiKey::query()
                 ->with(['creator:id,name', 'team:id,name'])
@@ -41,7 +45,60 @@ class ApiKeyController extends Controller
                     'createdAt' => $key->created_at?->toIso8601String(),
                     'lastUsedAt' => $key->last_used_at?->toIso8601String(),
                     'revokedAt' => $key->revoked_at?->toIso8601String(),
+                    'webhookUrl' => $key->webhook_url,
+                    'webhookScope' => $key->webhook_scope->value,
                 ]),
+            'webhookScopes' => collect(WebhookScope::cases())->map(fn (WebhookScope $scope): array => [
+                'value' => $scope->value,
+                'label' => $scope->label(),
+            ]),
+        ]);
+    }
+
+    /**
+     * Rename a key, or point its booking webhooks at an endpoint.
+     *
+     * A key that gains an endpoint gets a signing secret, shown once like the
+     * key itself; asking to rotate makes a new one. Clearing the URL stops the
+     * webhooks and drops the secret.
+     */
+    public function update(Request $request, ApiKey $apiKey): RedirectResponse
+    {
+        abort_unless(
+            $request->user()?->isSuperAdmin() || $apiKey->team_id === $request->user()?->current_team_id,
+            403,
+        );
+
+        abort_if($apiKey->isRevoked(), 422, 'A revoked key cannot be changed.');
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'webhook_url' => ['nullable', 'url:https,http', 'max:2048'],
+            'webhook_scope' => [Rule::enum(WebhookScope::class)],
+            'rotate_secret' => ['boolean'],
+        ]);
+
+        $apiKey->forceFill(['name' => $validated['name']])->save();
+
+        $secret = $apiKey->pointWebhookAt(
+            $validated['webhook_url'] ?? null,
+            $request->boolean('rotate_secret'),
+            WebhookScope::tryFrom($validated['webhook_scope'] ?? '') ?? WebhookScope::Referenced,
+        );
+
+        Log::info('An API key was updated.', [
+            'api_key_id' => $apiKey->id,
+            'webhook_url' => $apiKey->webhook_url,
+            'webhook_scope' => $apiKey->webhook_scope->value,
+            'secret_issued' => $secret !== null,
+            'updated_by' => $request->user()?->id,
+        ]);
+
+        $redirect = to_route('api-keys.index')->with('success', "\"{$apiKey->name}\" is saved.");
+
+        return $secret === null ? $redirect : $redirect->with('issued_webhook_secret', [
+            'name' => $apiKey->name,
+            'secret' => $secret,
         ]);
     }
 

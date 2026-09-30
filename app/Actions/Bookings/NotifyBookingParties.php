@@ -2,7 +2,9 @@
 
 namespace App\Actions\Bookings;
 
+use App\Enums\WebhookScope;
 use App\Jobs\SendBookingWebhook;
+use App\Models\ApiKey;
 use App\Models\Booking;
 use App\Notifications\Bookings\BookingCanceled;
 use App\Notifications\Bookings\BookingConfirmed;
@@ -97,7 +99,7 @@ class NotifyBookingParties
     ];
 
     /**
-     * Tell the system that sent the invitee here about any other change to
+     * Tell the systems listening for this booking about any other change to
      * the booking: a no-show, the host's notes, the meeting link, the
      * invitee's details. Called from the model on every update, so a writer
      * added later is reported without having to remember to.
@@ -108,18 +110,26 @@ class NotifyBookingParties
     {
         $changes = array_values(array_diff($columns, self::UNREPORTED_CHANGES));
 
-        if ($booking->reference === null || $changes === []) {
+        if ($changes === []) {
+            return;
+        }
+
+        $receivers = $this->receivers($booking);
+
+        if ($receivers === []) {
             return;
         }
 
         Booking::withoutEvents(fn () => $booking->increment('webhook_sequence'));
 
-        SendBookingWebhook::dispatch($booking, 'booking.updated', (int) $booking->webhook_sequence, changes: $changes)
-            ->afterCommit();
+        foreach ($receivers as $receiver) {
+            SendBookingWebhook::dispatch($booking, 'booking.updated', (int) $booking->webhook_sequence, changes: $changes, receiver: $receiver)
+                ->afterCommit();
+        }
     }
 
     /**
-     * Tell the system that sent the invitee here, when one did.
+     * Tell the systems listening for this booking, when any are.
      *
      * The booking's own sequence is bumped first and travels with the job,
      * so the receiver can tell a late retry of an older event from the
@@ -127,18 +137,48 @@ class NotifyBookingParties
      */
     private function report(Booking $booking, mixed $notification): void
     {
-        if ($booking->reference === null || ! is_object($notification)) {
+        if (! is_object($notification)) {
             return;
         }
 
         $event = self::WEBHOOK_EVENTS[$notification::class] ?? null;
+        $receivers = $event === null ? [] : $this->receivers($booking);
 
-        if ($event === null) {
+        if ($receivers === []) {
             return;
         }
 
         Booking::withoutEvents(fn () => $booking->increment('webhook_sequence'));
 
-        SendBookingWebhook::dispatch($booking, $event, (int) $booking->webhook_sequence);
+        foreach ($receivers as $receiver) {
+            SendBookingWebhook::dispatch($booking, $event, (int) $booking->webhook_sequence, receiver: $receiver);
+        }
+    }
+
+    /**
+     * Who hears about a booking: every key of its organization whose webhook
+     * scope covers it, plus, for a referenced booking, the endpoint in
+     * services.texra (null) when no key takes referenced bookings only.
+     *
+     * The fallback stands in for such a key, never alongside it, so an
+     * application moved from the env to its key is not told twice with two
+     * different secrets. A key taking every booking is a different listener
+     * and does not displace it.
+     *
+     * @return list<?ApiKey>
+     */
+    private function receivers(Booking $booking): array
+    {
+        $keys = ApiKey::query()->receivingWebhooksFor($booking->team_id)->get();
+
+        $receivers = array_values($keys
+            ->filter(fn (ApiKey $key): bool => $key->webhook_scope->covers($booking->reference))
+            ->all());
+
+        $referencedKeyExists = $keys->contains(fn (ApiKey $key): bool => $key->webhook_scope === WebhookScope::Referenced);
+
+        return $booking->reference !== null && ! $referencedKeyExists
+            ? [...$receivers, null]
+            : $receivers;
     }
 }
