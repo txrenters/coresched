@@ -62,10 +62,10 @@ class MeetingController extends Controller
             $scope = $defaultScope;
         }
 
-        $range = $request->string('filter', 'upcoming')->toString();
+        $range = $request->string('filter', 'today')->toString();
 
         if (! collect($this->ranges)->pluck('value')->contains($range)) {
-            $range = 'upcoming';
+            $range = 'today';
         }
 
         $status = $request->string('status', 'active')->toString();

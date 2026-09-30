@@ -150,7 +150,7 @@ test('the meetings page offers the pool as hosts to reschedule to, but not for a
     ])->hosts()->attach($this->host);
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertInertia(fn ($page) => $page
             ->where('meetings.0.eventTypeName', 'Leasing Team Meeting')
             ->where('meetings.0.reassignableHosts', [

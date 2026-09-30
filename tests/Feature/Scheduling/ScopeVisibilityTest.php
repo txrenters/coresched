@@ -86,7 +86,7 @@ test('a member sees only their own meetings', function () {
     ]);
 
     $this->actingAs($this->member)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->has('meetings', 1)

@@ -47,7 +47,7 @@ test('the bookings page lists upcoming bookings in the viewers timezone', functi
     bookingFor($this->host, $this->eventType, ['name' => 'Sam Rivera']);
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('scheduling/meetings/Index')
@@ -66,7 +66,7 @@ test('past bookings are only listed under the past filter', function () {
     ]);
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertInertia(fn ($page) => $page->has('meetings', 0));
 
     $this->actingAs($this->host)
@@ -86,7 +86,7 @@ test('a member only sees bookings they host', function () {
     bookingFor($this->host, $eventType);
 
     $this->actingAs($member)
-        ->get(route('meetings.index', ['current_team' => $team->slug]))
+        ->get(route('meetings.index', ['current_team' => $team->slug, 'filter' => 'upcoming']))
         ->assertInertia(fn ($page) => $page->has('meetings', 0));
 });
 
@@ -102,7 +102,7 @@ test('a team admin sees every booking in the team', function () {
     bookingFor($this->host, $eventType);
 
     $this->actingAs($admin)
-        ->get(route('meetings.index', ['current_team' => $team->slug]))
+        ->get(route('meetings.index', ['current_team' => $team->slug, 'filter' => 'upcoming']))
         ->assertInertia(fn ($page) => $page->has('meetings', 1));
 });
 
@@ -264,7 +264,7 @@ test('meetings are grouped under a day heading', function () {
     ]);
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertInertia(fn ($page) => $page
             ->where('meetings.0.dateLabel', 'Today')
             ->where('meetings.0.dateKey', '2026-09-01'));
@@ -300,6 +300,22 @@ test('the today chip only covers today', function () {
         ->assertInertia(fn ($page) => $page->has('meetings', 1)->where('total', 1));
 });
 
+test('the meetings page opens on today', function () {
+    bookingFor($this->host, $this->eventType, [
+        'starts_at' => CarbonImmutable::parse('2026-09-01 15:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-09-01 15:30:00', 'UTC'),
+    ]);
+    bookingFor($this->host, $this->eventType);
+
+    $this->actingAs($this->host)
+        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->assertInertia(fn ($page) => $page->where('filter', 'today')->has('meetings', 1));
+
+    $this->actingAs($this->host)
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'nonsense']))
+        ->assertInertia(fn ($page) => $page->where('filter', 'today'));
+});
+
 test('cancelled meetings are found through the status filter', function () {
     bookingFor($this->host, $this->eventType, ['status' => BookingStatus::Canceled]);
 
@@ -326,7 +342,7 @@ test('the detail payload carries everything the side panel shows', function () {
     $booking->answers()->create(['label' => 'Best number?', 'answer' => '+1 832 298 6554']);
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertInertia(fn ($page) => $page
             ->where('meetings.0.inviteeInitials', 'MM')
             ->where('meetings.0.fullDateLabel', 'Thursday, 3 September')
@@ -366,7 +382,7 @@ test('meetings can be searched by invitee or event type', function () {
     bookingFor($this->host, $this->eventType, ['name' => 'Jo Baker']);
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'search' => 'Rivera']))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming', 'search' => 'Rivera']))
         ->assertInertia(fn ($page) => $page
             ->has('meetings', 1)
             ->where('meetings.0.inviteeName', 'Sam Rivera'));
@@ -381,6 +397,7 @@ test('meetings can be filtered to one event type', function () {
     $this->actingAs($this->host)
         ->get(route('meetings.index', [
             'current_team' => $this->team->slug,
+            'filter' => 'upcoming',
             'event_type' => $other->id,
         ]))
         ->assertInertia(fn ($page) => $page
@@ -397,14 +414,14 @@ test('the list reports whether more meetings are waiting', function () {
     }
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertInertia(fn ($page) => $page
             ->where('total', 21)
             ->where('hasMore', true)
             ->has('meetings', 20));
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'page' => 2]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming', 'page' => 2]))
         ->assertInertia(fn ($page) => $page
             ->where('hasMore', false)
             ->has('meetings', 1));
@@ -412,7 +429,7 @@ test('the list reports whether more meetings are waiting', function () {
 
 test('the scope picker is offered on the meetings list', function () {
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertInertia(fn ($page) => $page
             ->where('scope', 'all')
             ->has('scopeOptions.primary', 2)
@@ -522,7 +539,7 @@ test('the pending filter lists only pending meetings', function () {
     ]);
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'status' => 'pending']))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming', 'status' => 'pending']))
         ->assertInertia(fn ($page) => $page
             ->has('meetings', 1)
             ->where('meetings.0.inviteeName', 'Sam Rivera')
@@ -531,7 +548,7 @@ test('the pending filter lists only pending meetings', function () {
 
     // The default active listing keeps pending requests visible.
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertInertia(fn ($page) => $page->has('meetings', 2));
 });
 
@@ -592,7 +609,7 @@ test('a meeting that is running now stays under upcoming', function () {
     ]);
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->has('meetings', 1)

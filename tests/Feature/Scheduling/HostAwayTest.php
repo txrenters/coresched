@@ -55,14 +55,14 @@ test('the meetings page flags meetings that fall during a host\'s leave', functi
     $afterLeave->hosts()->attach($this->host);
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug]))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming']))
         ->assertInertia(fn ($page) => $page
             ->where('hostAwayCount', 1)
             ->where('meetings.0.awayHostNames', ['Samuel Upchurch'])
             ->where('meetings.1.awayHostNames', []));
 
     $this->actingAs($this->host)
-        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'status' => 'host_away']))
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'upcoming', 'status' => 'host_away']))
         ->assertInertia(fn ($page) => $page->has('meetings', 1)->where('meetings.0.uid', $this->booking->uid));
 });
 
