@@ -45,6 +45,7 @@ class BookingPageController extends Controller
                 'isTeam' => $owner instanceof Team,
                 'logoUrl' => $this->pages->logoUrl($owner),
                 'websiteUrl' => $this->pages->websiteUrl($owner),
+                'websiteName' => $this->pages->websiteName($owner),
             ],
             'eventTypes' => $eventTypes->map(fn (EventType $eventType) => [
                 'slug' => $eventType->slug,
@@ -60,6 +61,47 @@ class BookingPageController extends Controller
     }
 
     /**
+     * Display a page listing a chosen set of an organization's teams.
+     *
+     * Each card leads on to that team's own landing page, tagged with where the
+     * visitor came from so the team page can lead back here: a team can sit on
+     * any number of these pages.
+     */
+    public function departmentPage(string $page, string $departmentPage): Response
+    {
+        $owner = $this->pages->resolve($page);
+
+        abort_if($owner === null, 404);
+
+        $department = $this->pages->departmentPage($owner, $departmentPage);
+
+        abort_if($department === null, 404);
+
+        return Inertia::render('book/Departments', [
+            'page' => [
+                'slug' => $page,
+                'name' => $department->name,
+                'description' => $department->description,
+                'logoUrl' => $this->pages->logoUrl($owner),
+                'websiteUrl' => $this->pages->websiteUrl($owner),
+                'websiteName' => $this->pages->websiteName($owner),
+            ],
+            'organizationName' => $this->pages->name($owner),
+            'departments' => $department->groups()->orderBy('name')->get()->map(fn (Group $group) => [
+                'slug' => $group->slug,
+                'name' => $group->name,
+                'description' => $group->description,
+                'eventTypeCount' => $this->pages->eventTypesForGroup($group)->count(),
+                'url' => route('book.event-type', [
+                    'page' => $page,
+                    'eventType' => $group->slug,
+                    'from' => $department->slug,
+                ]),
+            ]),
+        ]);
+    }
+
+    /**
      * Display one team's own landing page.
      *
      * Rendered with the same component as the organization page: it is the
@@ -67,9 +109,20 @@ class BookingPageController extends Controller
      * would only be a copy to keep in step. The `parent` prop is what tells it
      * to offer a way back up to the organization.
      */
-    protected function teamPage(User|Team $owner, string $page, Group $group): Response
+    protected function teamPage(Request $request, User|Team $owner, string $page, Group $group): Response
     {
         $eventTypes = $this->pages->eventTypesForGroup($group);
+
+        /*
+         * Lead back to the department page the visitor came from, but only one
+         * that really lists this team; anything else falls back to the
+         * organization page.
+         */
+        $department = $this->pages->departmentPage($owner, $request->string('from')->toString());
+
+        if ($department !== null && ! $department->groups()->whereKey($group->id)->exists()) {
+            $department = null;
+        }
 
         return Inertia::render('book/Page', [
             'page' => [
@@ -79,11 +132,17 @@ class BookingPageController extends Controller
                 'isTeam' => true,
                 'logoUrl' => $this->pages->logoUrl($owner),
                 'websiteUrl' => $this->pages->websiteUrl($owner),
+                'websiteName' => $this->pages->websiteName($owner),
             ],
-            'parent' => [
-                'name' => $this->pages->name($owner),
-                'url' => route('book.page', ['page' => $page]),
-            ],
+            'parent' => $department !== null
+                ? [
+                    'name' => $department->name,
+                    'url' => route('book.departments', ['page' => $page, 'departmentPage' => $department->slug]),
+                ]
+                : [
+                    'name' => $this->pages->name($owner),
+                    'url' => route('book.page', ['page' => $page]),
+                ],
             'eventTypes' => $eventTypes->map(fn (EventType $eventType) => [
                 'slug' => $eventType->slug,
                 'name' => $eventType->name,
@@ -119,7 +178,7 @@ class BookingPageController extends Controller
 
             abort_if($group === null, 404);
 
-            return $this->teamPage($owner, $page, $group);
+            return $this->teamPage($request, $owner, $page, $group);
         }
 
         $timezone = $this->resolveTimezone($owner);

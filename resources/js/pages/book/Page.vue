@@ -11,6 +11,7 @@ type Props = {
         isTeam: boolean;
         logoUrl: string | null;
         websiteUrl: string | null;
+        websiteName: string | null;
     };
     eventTypes: Array<{
         slug: string;
@@ -160,7 +161,7 @@ withDefaults(defineProps<Props>(), {
                     rel="noopener noreferrer"
                     class="rounded-md font-medium text-primary underline underline-offset-2 hover:no-underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                 >
-                    {{ page.name }} website
+                    {{ page.websiteName ?? page.name }} website
                 </a>
             </p>
         </div>

@@ -2,6 +2,7 @@
 
 use App\Enums\EventTypeKind;
 use App\Enums\TeamRole;
+use App\Models\DepartmentPage;
 use App\Models\EventType;
 use App\Models\Group;
 use App\Models\User;
@@ -179,4 +180,63 @@ test('a hidden event type picked for a team page is not listed', function () {
             ->has('eventTypes', 1)
             ->where('eventTypes.0.slug', 'tour-a-property'),
         );
+});
+
+/*
+ * A department page lists only the teams picked for it, and each card leads on
+ * to that team's page -- which then leads back to the department page.
+ */
+test('a department page lists the teams picked for it', function () {
+    Group::factory()->create(['team_id' => $this->team->id, 'name' => 'Internal']);
+    $residents = DepartmentPage::factory()->create(['team_id' => $this->team->id, 'name' => 'Residents']);
+    $residents->groups()->attach($this->group);
+
+    $this->get("/book/{$this->team->slug}/departments/{$residents->slug}")
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('book/Departments')
+            ->where('page.name', 'Residents')
+            ->where('organizationName', $this->team->name)
+            ->has('departments', 1)
+            ->where('departments.0.name', 'Leasing')
+            ->where('departments.0.eventTypeCount', 1)
+            ->where('departments.0.url', route('book.event-type', [
+                'page' => $this->team->slug,
+                'eventType' => 'leasing',
+                'from' => $residents->slug,
+            ])),
+        );
+
+    $this->get("/book/{$this->team->slug}/leasing?from={$residents->slug}")
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('parent.name', 'Residents')
+            ->where('parent.url', route('book.departments', ['page' => $this->team->slug, 'departmentPage' => $residents->slug])),
+        );
+});
+
+test('a team page only leads back to a department page that lists it', function () {
+    $owners = DepartmentPage::factory()->create(['team_id' => $this->team->id, 'name' => 'Owners']);
+
+    $this->get("/book/{$this->team->slug}/leasing?from={$owners->slug}")
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('parent.url', route('book.page', ['page' => $this->team->slug])),
+        );
+});
+
+test('a department page from another organization is not reachable', function () {
+    $other = User::factory()->create();
+    $foreign = DepartmentPage::factory()->create(['team_id' => $other->currentTeam->id, 'name' => 'Residents']);
+
+    $this->get("/book/{$this->team->slug}/departments/{$foreign->slug}")->assertNotFound();
+});
+
+test('the website link is labelled with the organization name on team and department pages', function () {
+    $residents = DepartmentPage::factory()->create(['team_id' => $this->team->id, 'name' => 'Residents']);
+    $residents->groups()->attach($this->group);
+
+    $this->get("/book/{$this->team->slug}/leasing")
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('page.websiteName', $this->team->name));
+
+    $this->get("/book/{$this->team->slug}/departments/{$residents->slug}")
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('page.websiteName', $this->team->name));
 });

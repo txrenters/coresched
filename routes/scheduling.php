@@ -4,6 +4,7 @@ use App\Http\Controllers\Scheduling\AutomationController;
 use App\Http\Controllers\Scheduling\AvailabilityScheduleController;
 use App\Http\Controllers\Scheduling\CalendarAccountController;
 use App\Http\Controllers\Scheduling\CalendarOAuthController;
+use App\Http\Controllers\Scheduling\DepartmentPageController;
 use App\Http\Controllers\Scheduling\EventTypeController;
 use App\Http\Controllers\Scheduling\GroupController;
 use App\Http\Controllers\Scheduling\MeetingController;
@@ -32,6 +33,14 @@ Route::prefix('{current_team}')
         Route::scopeBindings()->group(function () {
             Route::patch('groups/{group}', [GroupController::class, 'update'])->name('groups.update');
             Route::delete('groups/{group}', [GroupController::class, 'destroy'])->name('groups.destroy');
+        });
+
+        // Listed and edited on the Teams page, which is why there is no index.
+        Route::post('department-pages', [DepartmentPageController::class, 'store'])->name('department-pages.store');
+
+        Route::scopeBindings()->group(function () {
+            Route::patch('department-pages/{department_page}', [DepartmentPageController::class, 'update'])->name('department-pages.update');
+            Route::delete('department-pages/{department_page}', [DepartmentPageController::class, 'destroy'])->name('department-pages.destroy');
         });
 
         // "Workflows" in the UI; the rule itself is an Automation.

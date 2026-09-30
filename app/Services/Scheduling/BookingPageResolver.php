@@ -3,6 +3,7 @@
 namespace App\Services\Scheduling;
 
 use App\Enums\EventTypeKind;
+use App\Models\DepartmentPage;
 use App\Models\EventType;
 use App\Models\Group;
 use App\Models\Team;
@@ -76,6 +77,23 @@ class BookingPageResolver
     }
 
     /**
+     * Find a department page on an organization page by its slug.
+     *
+     * Like teams, only an organization page has them.
+     */
+    public function departmentPage(User|Team $page, string $slug): ?DepartmentPage
+    {
+        if (! $page instanceof Team) {
+            return null;
+        }
+
+        return DepartmentPage::query()
+            ->where('team_id', $page->id)
+            ->where('slug', $slug)
+            ->first();
+    }
+
+    /**
      * Get the event types listed on a team's own landing page.
      *
      * That is every event type hosting from the team, plus any picked to show
@@ -136,6 +154,17 @@ class BookingPageResolver
         $team = $page instanceof Team ? $page : $page->currentTeam;
 
         return $team?->website_url;
+    }
+
+    /**
+     * Get the name to label that website with: the organization's, even on a
+     * team's or a person's page.
+     */
+    public function websiteName(User|Team $page): ?string
+    {
+        $team = $page instanceof Team ? $page : $page->currentTeam;
+
+        return $team?->name;
     }
 
     /**

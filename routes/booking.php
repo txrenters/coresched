@@ -15,6 +15,8 @@ Route::post('book/once/{singleUseLink}', [PublicBookingController::class, 'store
     ->name('book.once.store');
 
 Route::get('book/{page}', [BookingPageController::class, 'show'])->name('book.page');
+// One segment longer than book/{page}/{eventType}, so it can never collide with it.
+Route::get('book/{page}/departments/{departmentPage}', [BookingPageController::class, 'departmentPage'])->name('book.departments');
 Route::get('book/{page}/{eventType}', [BookingPageController::class, 'eventType'])->name('book.event-type');
 Route::post('book/{page}/{eventType}', [PublicBookingController::class, 'store'])
     ->middleware('throttle:20,1')

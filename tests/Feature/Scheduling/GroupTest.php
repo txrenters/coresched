@@ -230,6 +230,17 @@ test('an admin can pick event types to show on a team page', function () {
             ->where('eventTypes.0.id', $eventType->id));
 });
 
+test('a team counts event types hosting from it and those picked for its page once each', function () {
+    $group = Group::factory()->create(['team_id' => $this->team->id]);
+    $hosting = EventType::factory()->ownedBy($this->owner)->create(['group_id' => $group->id]);
+    $picked = EventType::factory()->ownedBy($this->owner)->create();
+    $group->pageEventTypes()->attach([$hosting->id, $picked->id]);
+
+    $this->actingAs($this->owner)
+        ->get(route('groups.index', ['current_team' => $this->team->slug]))
+        ->assertInertia(fn ($page) => $page->where('groups.0.eventTypeCount', 2));
+});
+
 test('saving a group without page event types keeps the ones already picked', function () {
     $group = Group::factory()->create(['team_id' => $this->team->id]);
     $eventType = EventType::factory()->ownedBy($this->owner)->create();

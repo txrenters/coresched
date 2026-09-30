@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Scheduling;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Scheduling\SaveGroupRequest;
 use App\Models\AvailabilitySchedule;
+use App\Models\DepartmentPage;
 use App\Models\EventType;
 use App\Models\Group;
 use App\Models\Team;
@@ -26,8 +27,7 @@ class GroupController extends Controller
         Gate::authorize('viewAny', Group::class);
 
         $groups = $current_team->groups()
-            ->with(['members:id,name,email', 'team:id,slug', 'availabilitySchedule:id,name', 'pageEventTypes:id'])
-            ->withCount('eventTypes')
+            ->with(['members:id,name,email', 'team:id,slug', 'availabilitySchedule:id,name', 'pageEventTypes:id', 'eventTypes:id,group_id'])
             ->orderBy('name')
             ->get();
 
@@ -40,6 +40,19 @@ class GroupController extends Controller
                     'email' => $member->email,
                 ]),
             'canManage' => $request->user()->can('create', [Group::class, $current_team]),
+            'departmentPages' => $current_team->departmentPages()
+                ->with('groups:id,name')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (DepartmentPage $page) => [
+                    'id' => $page->id,
+                    'slug' => $page->slug,
+                    'name' => $page->name,
+                    'description' => $page->description,
+                    'groupIds' => $page->groups->pluck('id')->values(),
+                    'groupNames' => $page->groups->sortBy('name')->pluck('name')->values(),
+                    'url' => route('book.departments', ['page' => $current_team->slug, 'departmentPage' => $page->slug]),
+                ]),
             'sharedSchedules' => $current_team->availabilitySchedules()
                 ->orderBy('name')
                 ->get(['id', 'name'])
@@ -159,7 +172,14 @@ class GroupController extends Controller
             'description' => $group->description,
             'availabilityScheduleId' => $group->availability_schedule_id,
             'availabilityScheduleName' => $group->availabilitySchedule?->name,
-            'eventTypeCount' => $group->event_types_count,
+            /*
+             * Everything the team's page lists: event types hosting from the
+             * team plus those picked for its page, each counted once.
+             */
+            'eventTypeCount' => $group->eventTypes->pluck('id')
+                ->merge($group->pageEventTypes->pluck('id'))
+                ->unique()
+                ->count(),
             /*
              * Each team has its own public landing page listing just its event
              * types. Built here rather than in the component so the URL shape

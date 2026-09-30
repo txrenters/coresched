@@ -160,6 +160,16 @@ class Team extends Model
     }
 
     /**
+     * Get the public pages listing a chosen set of this team's groups.
+     *
+     * @return HasMany<DepartmentPage, $this>
+     */
+    public function departmentPages(): HasMany
+    {
+        return $this->hasMany(DepartmentPage::class);
+    }
+
+    /**
      * Get the bookings made against this team's event types.
      *
      * @return HasMany<Booking, $this>

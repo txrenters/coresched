@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { Link2, Pencil, Plus, Trash2, Users } from '@lucide/vue';
+import { ExternalLink, Link2, Pencil, Plus, Trash2, Users } from '@lucide/vue';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 import InputError from '@/components/InputError.vue';
@@ -28,6 +28,11 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { useCurrentTeam } from '@/composables/useCurrentTeam';
+import {
+    destroy as destroyPage,
+    store as storePage,
+    update as updatePage,
+} from '@/routes/department-pages';
 import { destroy, index, store, update } from '@/routes/groups';
 
 type Member = { id: number; name: string; email: string };
@@ -46,6 +51,16 @@ type Group = {
     pageEventTypeIds: number[];
 };
 
+type DepartmentPage = {
+    id: number;
+    slug: string;
+    name: string;
+    description: string | null;
+    groupIds: number[];
+    groupNames: string[];
+    url: string;
+};
+
 type EventTypeOption = {
     id: number;
     name: string;
@@ -58,6 +73,8 @@ type Props = {
     groups: Group[];
     teamMembers: Member[];
     canManage: boolean;
+    /** Public pages each listing a chosen set of these teams. */
+    departmentPages: DepartmentPage[];
     /** Hours the organization shares, selectable as this team's own. */
     sharedSchedules: Array<{ value: number; label: string }>;
     /** Every event type in the organization, pickable for a team's page. */
@@ -68,9 +85,9 @@ defineProps<Props>();
 
 const { teamSlug } = useCurrentTeam();
 
-const copyLink = async (url: string) => {
+const copyLink = async (url: string, message = 'Booking link copied') => {
     await navigator.clipboard.writeText(url);
-    toast.success('Booking link copied');
+    toast.success(message);
 };
 
 const editing = ref<Group | null>(null);
@@ -138,6 +155,77 @@ const confirmDelete = () => {
         destroy({ current_team: teamSlug.value, group: deleting.value.slug })
             .url,
         { preserveScroll: true, onFinish: () => (deleting.value = null) },
+    );
+};
+
+const editingPage = ref<DepartmentPage | null>(null);
+const pagePanelOpen = ref(false);
+const deletingPage = ref<DepartmentPage | null>(null);
+
+const pageForm = useForm({
+    name: '',
+    description: '',
+    group_ids: [] as number[],
+});
+
+const togglePageGroup = (id: number, checked: boolean | 'indeterminate') => {
+    pageForm.group_ids =
+        checked === true
+            ? [...pageForm.group_ids, id]
+            : pageForm.group_ids.filter((selected) => selected !== id);
+};
+
+const openCreatePage = () => {
+    editingPage.value = null;
+    pageForm.reset();
+    pageForm.clearErrors();
+    pagePanelOpen.value = true;
+};
+
+const openEditPage = (page: DepartmentPage) => {
+    editingPage.value = page;
+    pageForm.clearErrors();
+    pageForm.name = page.name;
+    pageForm.description = page.description ?? '';
+    pageForm.group_ids = [...page.groupIds];
+    pagePanelOpen.value = true;
+};
+
+const submitPage = () => {
+    const onSuccess = () => (pagePanelOpen.value = false);
+
+    if (editingPage.value) {
+        pageForm.patch(
+            updatePage({
+                current_team: teamSlug.value,
+                department_page: editingPage.value.slug,
+            }).url,
+            { preserveScroll: true, onSuccess },
+        );
+
+        return;
+    }
+
+    pageForm.post(storePage(teamSlug.value).url, {
+        preserveScroll: true,
+        onSuccess,
+    });
+};
+
+const confirmDeletePage = () => {
+    if (!deletingPage.value) {
+        return;
+    }
+
+    router.delete(
+        destroyPage({
+            current_team: teamSlug.value,
+            department_page: deletingPage.value.slug,
+        }).url,
+        {
+            preserveScroll: true,
+            onFinish: () => (deletingPage.value = null),
+        },
     );
 };
 
@@ -224,6 +312,22 @@ setLayoutProps({
                     >
                         <Link2 class="size-3.5" /> Copy link
                     </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        as-child
+                        :data-test="`open-group-page-${group.id}`"
+                    >
+                        <a
+                            :href="group.bookingUrl"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            :aria-label="`Open ${group.name}'s page`"
+                            :title="`Open ${group.name}'s page`"
+                        >
+                            <ExternalLink class="size-4" />
+                        </a>
+                    </Button>
                     <div class="flex-1" />
                     <Button
                         variant="ghost"
@@ -251,6 +355,113 @@ setLayoutProps({
                 Create a team
             </Button>
         </div>
+
+        <section class="flex flex-col gap-4" data-test="department-pages">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold">Pages</h2>
+                    <p class="text-sm text-muted-foreground">
+                        Public pages that list a chosen set of teams — one for
+                        residents, one for owners — each with its own link.
+                    </p>
+                </div>
+                <Button
+                    v-if="canManage && groups.length"
+                    variant="outline"
+                    data-test="new-department-page"
+                    @click="openCreatePage"
+                >
+                    <Plus /> New page
+                </Button>
+            </div>
+
+            <div
+                v-if="departmentPages.length"
+                class="grid gap-3 md:grid-cols-2"
+            >
+                <div
+                    v-for="page in departmentPages"
+                    :key="page.id"
+                    data-test="department-page-card"
+                    class="flex flex-col rounded-lg border border-border bg-card p-5 shadow-flat"
+                >
+                    <p class="font-medium">{{ page.name }}</p>
+                    <p
+                        v-if="page.description"
+                        class="mt-0.5 text-sm text-muted-foreground"
+                    >
+                        {{ page.description }}
+                    </p>
+
+                    <ul class="mt-4 flex flex-wrap gap-1.5">
+                        <li
+                            v-for="name in page.groupNames"
+                            :key="name"
+                            class="rounded-md bg-muted px-2 py-1 text-xs"
+                        >
+                            {{ name }}
+                        </li>
+                    </ul>
+
+                    <div class="mt-4 flex items-center gap-2 border-t pt-4">
+                        <Button
+                            v-if="canManage"
+                            variant="outline"
+                            size="sm"
+                            :data-test="`edit-department-page-${page.id}`"
+                            @click="openEditPage(page)"
+                        >
+                            <Pencil class="size-3.5" /> Edit
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            :data-test="`copy-department-page-link-${page.id}`"
+                            @click="copyLink(page.url, 'Page link copied')"
+                        >
+                            <Link2 class="size-3.5" /> Copy link
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            as-child
+                            :data-test="`open-department-page-${page.id}`"
+                        >
+                            <a
+                                :href="page.url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                :aria-label="`Open ${page.name}`"
+                                :title="`Open ${page.name}`"
+                            >
+                                <ExternalLink class="size-4" />
+                            </a>
+                        </Button>
+                        <div class="flex-1" />
+                        <Button
+                            v-if="canManage"
+                            variant="ghost"
+                            size="icon"
+                            :aria-label="`Delete ${page.name}`"
+                            @click="deletingPage = page"
+                        >
+                            <Trash2 class="size-4" />
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                v-else
+                class="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+            >
+                No pages yet.
+                <template v-if="groups.length">
+                    Create one to share a single link for a set of teams.
+                </template>
+                <template v-else>Create a team first.</template>
+            </div>
+        </section>
     </div>
 
     <Sheet v-model:open="panelOpen">
@@ -406,6 +617,118 @@ setLayoutProps({
             </form>
         </SheetContent>
     </Sheet>
+
+    <Sheet v-model:open="pagePanelOpen">
+        <SheetContent
+            side="right"
+            class="w-full gap-0 overflow-y-auto sm:max-w-md"
+        >
+            <SheetHeader>
+                <SheetTitle>
+                    {{ editingPage ? editingPage.name : 'New page' }}
+                </SheetTitle>
+                <SheetDescription>
+                    Visitors pick a team here, then book on that team's page.
+                </SheetDescription>
+            </SheetHeader>
+
+            <form
+                class="flex flex-col gap-6 px-4 pb-4"
+                @submit.prevent="submitPage"
+            >
+                <div class="grid gap-2">
+                    <Label for="department-page-name">Name</Label>
+                    <Input
+                        id="department-page-name"
+                        v-model="pageForm.name"
+                        placeholder="Residents"
+                        data-test="department-page-name"
+                        required
+                    />
+                    <InputError :message="pageForm.errors.name" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="department-page-description">Description</Label>
+                    <Input
+                        id="department-page-description"
+                        v-model="pageForm.description"
+                        placeholder="Who is this page for?"
+                    />
+                    <InputError :message="pageForm.errors.description" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label>Teams</Label>
+                    <div
+                        class="grid max-h-64 gap-1 overflow-y-auto rounded-md border border-border p-2"
+                    >
+                        <label
+                            v-for="group in groups"
+                            :key="group.id"
+                            class="flex items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-muted"
+                            :data-test="`department-page-group-${group.id}`"
+                        >
+                            <Checkbox
+                                :model-value="
+                                    pageForm.group_ids.includes(group.id)
+                                "
+                                @update:model-value="
+                                    (checked) =>
+                                        togglePageGroup(group.id, checked)
+                                "
+                            />
+                            <span class="min-w-0 flex-1 truncate">
+                                {{ group.name }}
+                            </span>
+                        </label>
+                    </div>
+                    <InputError :message="pageForm.errors.group_ids" />
+                </div>
+
+                <SheetFooter class="flex-row justify-end gap-2 px-0">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="pagePanelOpen = false"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        :disabled="pageForm.processing"
+                        data-test="save-department-page"
+                    >
+                        {{ editingPage ? 'Save page' : 'Create page' }}
+                    </Button>
+                </SheetFooter>
+            </form>
+        </SheetContent>
+    </Sheet>
+
+    <Dialog :open="deletingPage !== null" @update:open="deletingPage = null">
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Delete {{ deletingPage?.name }}?</DialogTitle>
+                <DialogDescription>
+                    Its link stops working. The teams and their own pages are
+                    untouched.
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button variant="outline" @click="deletingPage = null">
+                    Keep it
+                </Button>
+                <Button
+                    variant="destructive"
+                    data-test="confirm-delete-department-page"
+                    @click="confirmDeletePage"
+                >
+                    Delete
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 
     <Dialog :open="deleting !== null" @update:open="deleting = null">
         <DialogContent>
