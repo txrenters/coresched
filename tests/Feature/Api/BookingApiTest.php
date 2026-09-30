@@ -2,6 +2,7 @@
 
 use App\Actions\Bookings\CancelBooking;
 use App\Enums\EventTypeKind;
+use App\Enums\LocationType;
 use App\Enums\TeamRole;
 use App\Models\ApiKey;
 use App\Models\AvailabilitySchedule;
@@ -324,6 +325,8 @@ test('it lists every meeting booked with an organization, canceled ones included
         'name' => 'Jane Tenant',
         'email' => 'jane@example.com',
         'notes' => 'Need the 2025 statements for my taxes',
+        'location_type' => LocationType::Phone,
+        'location_detail' => '(512) 555-0100',
         'starts_at' => now()->addDays(2),
         'ends_at' => now()->addDays(2)->addMinutes(30),
     ]);
@@ -356,6 +359,7 @@ test('it lists every meeting booked with an organization, canceled ones included
         ->assertJsonPath('data.0.host.name', 'Texas Renters')
         ->assertJsonPath('data.0.answers.0.question', 'Property address')
         ->assertJsonPath('data.0.answers.0.answer', '1 Main St')
+        ->assertJsonPath('data.0.invitee.phone', '(512) 555-0100')
         ->assertJsonPath('data.0.notes', 'Need the 2025 statements for my taxes')
         ->assertJsonPath('data.1.status', 'canceled');
 });

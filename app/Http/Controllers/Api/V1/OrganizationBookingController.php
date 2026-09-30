@@ -53,7 +53,7 @@ class OrganizationBookingController extends Controller
         abort_if($from->diffInDays($to) > 366, 422, 'The window may not be longer than a year.');
 
         $bookings = Booking::query()
-            ->with(['eventType', 'host', 'answers'])
+            ->with(['eventType', 'host', 'answers.question'])
             ->where('team_id', $organization->id)
             ->whereBetween('starts_at', [$from, $to])
             ->orderBy('starts_at')
@@ -72,6 +72,7 @@ class OrganizationBookingController extends Controller
                     'name' => $booking->name,
                     'email' => $booking->email,
                     'timezone' => $booking->invitee_timezone,
+                    'phone' => $booking->inviteePhone(),
                 ],
                 'host' => [
                     'name' => $booking->host?->name,
