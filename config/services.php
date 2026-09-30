@@ -19,6 +19,17 @@ return [
         'base_url' => env('CALENDLY_API_URL', 'https://api.calendly.com'),
     ],
 
+    /*
+     | TEXRA, the lead CRM. A booking that carries a `reference` came from a
+     | TEXRA link, and every change to it is reported to this URL, signed
+     | with the secret (which must equal BOOKINGS_WEBHOOK_SECRET over there).
+     | With no URL nothing is sent. See .ai/rules/webhooks.md.
+     */
+    'texra' => [
+        'webhook_url' => env('TEXRA_WEBHOOK_URL'),
+        'webhook_secret' => env('TEXRA_WEBHOOK_SECRET'),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

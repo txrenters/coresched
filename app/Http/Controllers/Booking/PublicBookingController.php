@@ -57,6 +57,7 @@ class PublicBookingController extends Controller
                         : null,
                     'guests' => $validated['guests'] ?? [],
                     'answers' => $validated['answers'] ?? [],
+                    'reference' => $validated['reference'] ?? null,
                 ],
                 host: $host,
             );

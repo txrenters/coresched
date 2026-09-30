@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Bookings\NotifyBookingParties;
 use App\Enums\BookingStatus;
 use App\Enums\LocationType;
 use App\Enums\QuestionType;
@@ -31,6 +32,8 @@ use Illuminate\Support\Str;
  * @property string $name
  * @property string $email
  * @property string|null $notes
+ * @property string|null $reference
+ * @property int $webhook_sequence
  * @property string|null $host_notes
  * @property LocationType $location_type
  * @property string|null $location_detail
@@ -54,13 +57,24 @@ use Illuminate\Support\Str;
  */
 #[Fillable([
     'uid', 'event_type_id', 'team_id', 'user_id', 'status', 'starts_at', 'ends_at', 'invitee_timezone',
-    'name', 'email', 'notes', 'host_notes', 'location_type', 'location_detail', 'meeting_url', 'rescheduled_from_id',
-    'cancellation_reason', 'canceled_by', 'canceled_at', 'no_show_at',
+    'name', 'email', 'notes', 'reference', 'webhook_sequence', 'host_notes', 'location_type', 'location_detail',
+    'meeting_url', 'rescheduled_from_id', 'cancellation_reason', 'canceled_by', 'canceled_at', 'no_show_at',
 ])]
 class Booking extends Model
 {
     /** @use HasFactory<BookingFactory> */
     use HasFactory;
+
+    /**
+     * Every saved change is offered to the webhook, whoever made it; the
+     * webhook decides whether it concerns anyone outside.
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (Booking $booking): void {
+            app(NotifyBookingParties::class)->changed($booking, array_keys($booking->getChanges()));
+        });
+    }
 
     /**
      * The model's default attribute values.

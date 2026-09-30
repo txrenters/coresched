@@ -48,6 +48,13 @@ type Question = {
 
 type Props = {
     page: { slug: string; name: string; url: string; logoUrl: string | null };
+    /** Details the link carried, so the invitee only has to pick a time. */
+    prefill?: {
+        name: string | null;
+        email: string | null;
+        phone: string | null;
+        reference: string | null;
+    } | null;
     eventType: {
         slug: string;
         name: string;
@@ -117,13 +124,16 @@ const selectedDateLabel = computed(() =>
 const form = useForm({
     starts_at: '',
     timezone: props.timezone,
-    name: '',
-    email: '',
+    name: props.prefill?.name ?? '',
+    email: props.prefill?.email ?? '',
     notes: '',
-    location_detail: '',
+    location_detail: props.prefill?.phone ?? '',
     guests: [] as string[],
     answers: {} as Record<number, string | string[]>,
     reason: '',
+    // Never shown or edited: it ties the booking back to whoever sent the
+    // invitee here, and goes out again in every webhook about it.
+    reference: props.prefill?.reference ?? null,
 });
 
 /*
