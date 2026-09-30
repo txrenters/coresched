@@ -308,3 +308,73 @@ test('an organization key cannot list another organization meetings', function (
         withToken($token),
     )->assertNotFound();
 });
+
+test('it lists every meeting booked with an organization, canceled ones included', function () {
+    $team = Team::factory()->create(['slug' => 'ours']);
+    ['token' => $token] = ApiKey::issue('Scoreboard', null, $team);
+
+    $eventType = EventType::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $this->owner->id,
+        'name' => 'Leasing call',
+    ]);
+
+    $booked = Booking::factory()->create([
+        'event_type_id' => $eventType->id,
+        'name' => 'Jane Tenant',
+        'email' => 'jane@example.com',
+        'starts_at' => now()->addDays(2),
+        'ends_at' => now()->addDays(2)->addMinutes(30),
+    ]);
+    $booked->answers()->create(['label' => 'Property address', 'answer' => '1 Main St']);
+
+    Booking::factory()->canceled()->create([
+        'event_type_id' => $eventType->id,
+        'starts_at' => now()->addDays(3),
+        'ends_at' => now()->addDays(3)->addMinutes(30),
+    ]);
+
+    // Another organization's meeting, and one outside the window.
+    Booking::factory()->create(['starts_at' => now()->addDays(2), 'ends_at' => now()->addDays(2)->addMinutes(30)]);
+    Booking::factory()->create([
+        'event_type_id' => $eventType->id,
+        'starts_at' => now()->addYear(),
+        'ends_at' => now()->addYear()->addMinutes(30),
+    ]);
+
+    $this->getJson(
+        route('api.v1.organizations.bookings.index', ['organization' => $team->id]),
+        withToken($token),
+    )
+        ->assertOk()
+        ->assertJsonCount(2, 'data')
+        ->assertJsonPath('data.0.uid', $booked->uid)
+        ->assertJsonPath('data.0.status', 'confirmed')
+        ->assertJsonPath('data.0.eventName', 'Leasing call')
+        ->assertJsonPath('data.0.invitee.email', 'jane@example.com')
+        ->assertJsonPath('data.0.host.name', 'Texas Renters')
+        ->assertJsonPath('data.0.answers.0.question', 'Property address')
+        ->assertJsonPath('data.0.answers.0.answer', '1 Main St')
+        ->assertJsonPath('data.1.status', 'canceled');
+});
+
+test('an organization key cannot list another organization bookings', function () {
+    $theirs = Team::factory()->create();
+    ['token' => $token] = ApiKey::issue('Ours', null, Team::factory()->create());
+
+    $this->getJson(
+        route('api.v1.organizations.bookings.index', ['organization' => $theirs->id]),
+        withToken($token),
+    )->assertNotFound();
+});
+
+test('the organization bookings window is capped at a year', function () {
+    $team = Team::factory()->create();
+    ['token' => $token] = ApiKey::issue('Ours', null, $team);
+
+    $this->getJson(route('api.v1.organizations.bookings.index', [
+        'organization' => $team->id,
+        'from' => now()->toDateString(),
+        'to' => now()->addYears(2)->toDateString(),
+    ]), withToken($token))->assertStatus(422);
+});
