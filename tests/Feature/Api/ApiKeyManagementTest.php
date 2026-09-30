@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\TeamRole;
+use App\Enums\WebhookScope;
 use App\Models\ApiKey;
 use App\Models\Team;
 use App\Models\User;
@@ -163,4 +164,102 @@ test('an admin cannot delete another organization revoked key', function () {
         ->assertForbidden();
 
     expect(ApiKey::query()->whereKey($theirs->id)->exists())->toBeTrue();
+});
+
+test('an admin can point a key at a webhook endpoint, and sees its secret once', function () {
+    ['key' => $key] = ApiKey::issue('TEXRA', $this->admin, $this->org);
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $key), ['name' => 'TEXRA CRM', 'webhook_url' => 'https://crm.example.com/api/bookings/webhook'])
+        ->assertRedirect(route('api-keys.index'))
+        ->assertSessionHas('issued_webhook_secret.name', 'TEXRA CRM');
+
+    $secret = session('issued_webhook_secret')['secret'];
+    $key->refresh();
+
+    expect($key->name)->toBe('TEXRA CRM')
+        ->and($key->webhook_url)->toBe('https://crm.example.com/api/bookings/webhook')
+        ->and($key->webhook_secret)->toBe($secret)
+        // Encrypted at rest: the column never holds the secret itself.
+        ->and($key->getRawOriginal('webhook_secret'))->not->toBe($secret);
+
+    $this->actingAs($this->admin)
+        ->get(route('api-keys.index'))
+        ->assertInertia(fn ($page) => $page
+            ->where('keys.0.webhookUrl', 'https://crm.example.com/api/bookings/webhook')
+            ->missing('keys.0.webhookSecret'));
+});
+
+test('moving the endpoint keeps the secret, and only rotating replaces it', function () {
+    ['key' => $key] = ApiKey::issue('TEXRA', $this->admin, $this->org);
+    $first = $key->pointWebhookAt('https://old.example.com/hook');
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $key), ['name' => 'TEXRA', 'webhook_url' => 'https://new.example.com/hook'])
+        ->assertSessionMissing('issued_webhook_secret');
+
+    expect($key->fresh()->webhook_secret)->toBe($first);
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $key), ['name' => 'TEXRA', 'webhook_url' => 'https://new.example.com/hook', 'rotate_secret' => true])
+        ->assertSessionHas('issued_webhook_secret');
+
+    expect($key->fresh()->webhook_secret)->not->toBe($first);
+});
+
+test('clearing the endpoint stops the webhooks and drops the secret', function () {
+    ['key' => $key] = ApiKey::issue('TEXRA', $this->admin, $this->org);
+    $key->pointWebhookAt('https://crm.example.com/hook');
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $key), ['name' => 'TEXRA', 'webhook_url' => null]);
+
+    expect($key->fresh()->only('webhook_url', 'webhook_secret'))->toBe(['webhook_url' => null, 'webhook_secret' => null]);
+});
+
+test('an endpoint must be a web address', function () {
+    ['key' => $key] = ApiKey::issue('TEXRA', $this->admin, $this->org);
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $key), ['name' => 'TEXRA', 'webhook_url' => 'ftp://crm.example.com/hook'])
+        ->assertSessionHasErrors('webhook_url');
+});
+
+test('an admin cannot edit another organization key, or a revoked one', function () {
+    ['key' => $theirs] = ApiKey::issue('Theirs', null, Team::factory()->create());
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $theirs), ['name' => 'Mine now', 'webhook_url' => 'https://evil.example.com'])
+        ->assertForbidden();
+
+    ['key' => $revoked] = ApiKey::issue('Old', $this->admin, $this->org);
+    $revoked->forceFill(['revoked_at' => now()])->save();
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $revoked), ['name' => 'Old', 'webhook_url' => 'https://crm.example.com/hook'])
+        ->assertStatus(422);
+
+    expect($theirs->fresh()->webhook_url)->toBeNull()
+        ->and($revoked->fresh()->webhook_url)->toBeNull();
+});
+
+test('a member who does not run the organization cannot edit its keys', function () {
+    ['key' => $key] = ApiKey::issue('TEXRA', $this->admin, $this->org);
+
+    $this->actingAs(member($this->org))
+        ->patch(route('api-keys.update', $key), ['name' => 'TEXRA', 'webhook_url' => 'https://crm.example.com/hook'])
+        ->assertForbidden();
+});
+
+test('an admin can choose that a key hears about every booking', function () {
+    ['key' => $key] = ApiKey::issue('Operations', $this->admin, $this->org);
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $key), ['name' => 'Operations', 'webhook_url' => 'https://ops.example.com/hook', 'webhook_scope' => 'all']);
+
+    expect($key->fresh()->webhook_scope)->toBe(WebhookScope::All);
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $key), ['name' => 'Operations', 'webhook_url' => 'https://ops.example.com/hook', 'webhook_scope' => 'everything'])
+        ->assertSessionHasErrors('webhook_scope');
 });

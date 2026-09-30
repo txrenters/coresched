@@ -34,6 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('can:manageApiKeys')->group(function () {
         Route::get('settings/api-keys', [ApiKeyController::class, 'index'])->name('api-keys.index');
         Route::post('settings/api-keys', [ApiKeyController::class, 'store'])->name('api-keys.store');
+        Route::patch('settings/api-keys/{apiKey}', [ApiKeyController::class, 'update'])->name('api-keys.update');
         Route::delete('settings/api-keys/{apiKey}', [ApiKeyController::class, 'destroy'])->name('api-keys.destroy');
         Route::delete('settings/api-keys/{apiKey}/forget', [ApiKeyController::class, 'forget'])->name('api-keys.forget');
     });

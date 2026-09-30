@@ -83,7 +83,8 @@ class OrganizationBookingController extends Controller
                         'question' => $answer->label,
                         'answer' => $answer->answer,
                         'position' => $index,
-                    ]),
+                    ])
+                    ->all(),
                 'canceledAt' => $booking->canceled_at?->toIso8601String(),
                 'manageUrl' => route('booking.show', ['booking' => $booking]),
             ])->values(),

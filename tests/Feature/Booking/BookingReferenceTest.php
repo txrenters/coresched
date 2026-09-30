@@ -5,10 +5,13 @@ use App\Actions\Bookings\CancelBooking;
 use App\Actions\Bookings\DeclineBooking;
 use App\Actions\Bookings\RescheduleBooking;
 use App\Enums\LocationType;
+use App\Enums\WebhookScope;
 use App\Jobs\SendBookingWebhook;
+use App\Models\ApiKey;
 use App\Models\AvailabilitySchedule;
 use App\Models\Booking;
 use App\Models\EventType;
+use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Notification;
@@ -169,4 +172,68 @@ test('a request awaiting approval is reported as requested, then as confirmed or
     Queue::assertPushed(SendBookingWebhook::class, fn (SendBookingWebhook $job): bool => $job->booking->is($second)
         && $job->event === 'booking.declined'
         && $job->sequence === 2);
+});
+
+test('with no key naming an endpoint, the booking is reported to the configured one', function () {
+    Notification::fake();
+    Queue::fake();
+
+    ApiKey::issue('No webhook', null, $this->eventType->team);
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), referencedBooking());
+
+    Queue::assertPushed(SendBookingWebhook::class, 1);
+    Queue::assertPushed(SendBookingWebhook::class, fn (SendBookingWebhook $job): bool => $job->receiver === null);
+});
+
+test('each of the organization keys with an endpoint hears about it instead', function () {
+    Notification::fake();
+    Queue::fake();
+
+    ['key' => $crm] = ApiKey::issue('CRM', null, $this->eventType->team);
+    $crm->pointWebhookAt('https://crm.example.com/hook');
+    ['key' => $portal] = ApiKey::issue('Portal', null, $this->eventType->team);
+    $portal->pointWebhookAt('https://portal.example.com/hook');
+
+    // Not these: revoked, or another organization's.
+    ['key' => $revoked] = ApiKey::issue('Old', null, $this->eventType->team);
+    $revoked->pointWebhookAt('https://old.example.com/hook');
+    $revoked->forceFill(['revoked_at' => now()])->save();
+    ['key' => $theirs] = ApiKey::issue('Theirs', null, Team::factory()->create());
+    $theirs->pointWebhookAt('https://theirs.example.com/hook');
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), referencedBooking());
+
+    Queue::assertPushed(SendBookingWebhook::class, 2);
+    Queue::assertPushed(SendBookingWebhook::class, fn (SendBookingWebhook $job): bool => (bool) $job->receiver?->is($crm) && $job->sequence === 1);
+    Queue::assertPushed(SendBookingWebhook::class, fn (SendBookingWebhook $job): bool => (bool) $job->receiver?->is($portal) && $job->sequence === 1);
+});
+
+test('a key taking every booking hears about one with no reference, and the configured endpoint does not', function () {
+    Notification::fake();
+    Queue::fake();
+
+    ['key' => $all] = ApiKey::issue('Operations', null, $this->eventType->team);
+    $all->pointWebhookAt('https://ops.example.com/hook', scope: WebhookScope::All);
+    ['key' => $referenced] = ApiKey::issue('CRM', null, $this->eventType->team);
+    $referenced->pointWebhookAt('https://crm.example.com/hook');
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), referencedBooking(['reference' => null]));
+
+    Queue::assertPushed(SendBookingWebhook::class, 1);
+    Queue::assertPushed(SendBookingWebhook::class, fn (SendBookingWebhook $job): bool => (bool) $job->receiver?->is($all) && $job->sequence === 1);
+});
+
+test('a key taking every booking does not displace the configured endpoint for a referenced one', function () {
+    Notification::fake();
+    Queue::fake();
+
+    ['key' => $all] = ApiKey::issue('Operations', null, $this->eventType->team);
+    $all->pointWebhookAt('https://ops.example.com/hook', scope: WebhookScope::All);
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), referencedBooking());
+
+    Queue::assertPushed(SendBookingWebhook::class, 2);
+    Queue::assertPushed(SendBookingWebhook::class, fn (SendBookingWebhook $job): bool => (bool) $job->receiver?->is($all));
+    Queue::assertPushed(SendBookingWebhook::class, fn (SendBookingWebhook $job): bool => $job->receiver === null);
 });

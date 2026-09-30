@@ -1,7 +1,9 @@
 <?php
 
 use App\Enums\LocationType;
+use App\Enums\WebhookScope;
 use App\Jobs\SendBookingWebhook;
+use App\Models\ApiKey;
 use App\Models\Booking;
 use App\Services\Webhooks\BookingWebhookPayload;
 use Illuminate\Http\Client\Request;
@@ -115,4 +117,59 @@ test('sends nothing for a booking that carries no reference', function () {
     runWebhook(Booking::factory()->create());
 
     Http::assertNothingSent();
+});
+
+test('a delivery for a key goes to its endpoint, signed with its own secret', function () {
+    Http::fake(['*' => Http::response(['result' => 'recorded'])]);
+
+    ['key' => $key] = ApiKey::issue('CRM', null, $this->booking->team);
+    $secret = $key->pointWebhookAt('https://crm.example.com/hook');
+
+    $job = new SendBookingWebhook($this->booking, 'booking.confirmed', 1, receiver: $key);
+    $job->handle(app(BookingWebhookPayload::class));
+
+    Http::assertSentCount(1);
+    Http::assertSent(function (Request $request) use ($secret): bool {
+        $timestamp = $request->header('X-Bookings-Timestamp')[0];
+
+        return $request->url() === 'https://crm.example.com/hook'
+            && $request->header('X-Bookings-Signature')[0] === 'sha256='.hash_hmac('sha256', $timestamp.'.'.$request->body(), $secret);
+    });
+});
+
+test('a key revoked or cleared before the delivery runs is not sent to', function () {
+    Http::fake(['*' => Http::response(['result' => 'recorded'])]);
+
+    ['key' => $key] = ApiKey::issue('CRM', null, $this->booking->team);
+    $key->pointWebhookAt('https://crm.example.com/hook');
+    $job = new SendBookingWebhook($this->booking, 'booking.confirmed', 1, receiver: $key);
+
+    $key->forceFill(['revoked_at' => now()])->save();
+    $job->handle(app(BookingWebhookPayload::class));
+
+    $key->forceFill(['revoked_at' => null])->save();
+    $key->pointWebhookAt(null);
+    $job->handle(app(BookingWebhookPayload::class));
+
+    Http::assertNothingSent();
+});
+
+test('a booking with no reference goes only to a key taking every booking', function () {
+    Http::fake(['*' => Http::response(['result' => 'recorded'])]);
+
+    $booking = Booking::factory()->create(['reference' => null]);
+    ['key' => $key] = ApiKey::issue('Operations', null, $booking->team);
+    $key->pointWebhookAt('https://ops.example.com/hook', scope: WebhookScope::All);
+
+    (new SendBookingWebhook($booking, 'booking.confirmed', 1))->handle(app(BookingWebhookPayload::class));
+    Http::assertNothingSent();
+
+    (new SendBookingWebhook($booking, 'booking.confirmed', 1, receiver: $key))->handle(app(BookingWebhookPayload::class));
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://ops.example.com/hook'
+        && json_decode($request->body(), true)['booking']['reference'] === null);
+
+    // Narrowed to referenced bookings before a retry: not sent again.
+    $key->pointWebhookAt('https://ops.example.com/hook');
+    (new SendBookingWebhook($booking, 'booking.confirmed', 1, receiver: $key))->handle(app(BookingWebhookPayload::class));
+    Http::assertSentCount(1);
 });
