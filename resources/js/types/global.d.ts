@@ -25,6 +25,8 @@ declare module '@inertiajs/core' {
             canCreateTeam: boolean;
             canViewUsers: boolean;
             canViewOrganizations: boolean;
+            canManageApiKeys: boolean;
+            canManageOrganization: boolean;
             [key: string]: unknown;
         };
     }

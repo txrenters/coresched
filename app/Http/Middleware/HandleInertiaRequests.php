@@ -55,8 +55,10 @@ class HandleInertiaRequests extends Middleware
             'canCreateTeam' => (bool) $user?->can('create', Team::class),
             // Gates the Users nav entry; the controller enforces it as well.
             'canViewUsers' => (bool) $user?->can('viewUsers'),
-            // Gates the API keys settings entry; the route enforces it as well.
+            // Gates the API keys tab of the organization settings; the route enforces it as well.
             'canManageApiKeys' => (bool) $user?->can('manageApiKeys'),
+            // Gates the Settings nav entry, which opens the current organization's settings.
+            'canManageOrganization' => (bool) ($user?->currentTeam && $user->can('update', $user->currentTeam)),
             // Gates the Organizations nav entry; the controller enforces it as well.
             'canViewOrganizations' => (bool) $user?->can('viewOrganizations'),
         ];

@@ -29,17 +29,15 @@ class ApiKeyController extends Controller
             'issuedWebhookSecret' => $request->session()->get('issued_webhook_secret'),
             /** @var Collection<int, array<string, mixed>> */
             'keys' => ApiKey::query()
-                ->with(['creator:id,name', 'team:id,name'])
-                // An admin sees their own organization's keys; a super admin
-                // sees every one, including the system-wide keys.
-                ->unless($request->user()?->isSuperAdmin(), fn ($query) => $query
-                    ->where('team_id', $request->user()?->current_team_id))
+                ->with('creator:id,name')
+                // Only the organization being looked after, super admins
+                // included: they switch organization to see another's keys.
+                ->where('team_id', $request->user()?->current_team_id)
                 ->latest()
                 ->get()
                 ->map(fn (ApiKey $key): array => [
                     'id' => $key->id,
                     'name' => $key->name,
-                    'organization' => $key->team?->name,
                     'prefix' => $key->prefix,
                     'createdBy' => $key->creator?->name,
                     'createdAt' => $key->created_at?->toIso8601String(),

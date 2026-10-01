@@ -38,8 +38,8 @@ import { index as groupsIndex } from '@/routes/groups';
 import { index as logsIndex } from '@/routes/log-viewer';
 import { index as meetingsIndex } from '@/routes/meetings';
 import { index as organizationsIndex } from '@/routes/organizations';
-import { edit as profileSettings } from '@/routes/profile';
 import { index as schedulingIndex } from '@/routes/scheduling';
+import { edit as editTeam } from '@/routes/teams';
 import { index as usersIndex } from '@/routes/users';
 import type { NavItem } from '@/types';
 
@@ -93,12 +93,17 @@ const otherNavItems = computed<NavItem[]>(() => [
         href: activityIndex(teamSlug.value),
         icon: History,
     },
-    {
-        title: 'Settings',
-        href: profileSettings(),
-        icon: Settings,
-        activePrefix: '/settings',
-    },
+    // The organization's settings; personal ones live in the user menu.
+    ...(page.props.canManageOrganization || page.props.canManageApiKeys
+        ? [
+              {
+                  title: 'Settings',
+                  href: editTeam(teamSlug.value),
+                  icon: Settings,
+                  activePrefix: ['/settings/teams', '/settings/api-keys'],
+              },
+          ]
+        : []),
     // Admins get a read-only view of the people in their organizations; super
     // admins get the whole installation and the actions that go with it.
     ...(page.props.canViewUsers

@@ -56,7 +56,6 @@ defineProps<{
     keys: {
         id: number;
         name: string;
-        organization: string | null;
         prefix: string;
         createdBy: string | null;
         createdAt: string | null;
@@ -188,10 +187,6 @@ defineProps<{
                         </p>
                         <p class="text-xs text-muted-foreground">
                             <code class="font-mono">{{ key.prefix }}…</code>
-                            <span v-if="key.organization">
-                                · {{ key.organization }}</span
-                            >
-                            <span v-else> · every organization</span>
                             · last used {{ when(key.lastUsedAt) }}
                             <span v-if="key.createdBy">
                                 · issued by {{ key.createdBy }}</span

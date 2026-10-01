@@ -50,13 +50,27 @@ test('an admin sees only their own organization keys', function () {
         ->assertInertia(fn ($page) => $page->has('keys', 1)->where('keys.0.name', 'Mine'));
 });
 
-test('a super admin sees every key', function () {
+test('a super admin sees only the keys of the organization they are looking after', function () {
     ApiKey::issue('Mine', $this->admin, $this->org);
     ApiKey::issue('Someone else', null, Team::factory()->create());
+    ApiKey::issue('System wide', $this->superAdmin, null);
+    $this->superAdmin->switchTeam($this->org);
 
     $this->actingAs($this->superAdmin)
         ->get(route('api-keys.index'))
-        ->assertInertia(fn ($page) => $page->has('keys', 2));
+        ->assertInertia(fn ($page) => $page->has('keys', 1)->where('keys.0.name', 'Mine'));
+});
+
+test('only those who run the organization are offered its settings', function () {
+    $member = member($this->org);
+
+    $this->actingAs($this->admin)
+        ->get(route('api-keys.index'))
+        ->assertInertia(fn ($page) => $page->where('canManageOrganization', true));
+
+    $this->actingAs($member)
+        ->get(route('profile.edit'))
+        ->assertInertia(fn ($page) => $page->where('canManageOrganization', false));
 });
 
 test('an admin cannot revoke another organization key', function () {

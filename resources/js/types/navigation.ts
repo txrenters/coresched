@@ -11,8 +11,8 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon;
     isActive?: boolean;
-    /** Highlight the item for every URL under this path, not just an exact match. */
-    activePrefix?: string;
+    /** Highlight the item for every URL under these paths, not just an exact match. */
+    activePrefix?: string | string[];
     /**
      * Not an Inertia page. Opens in a new tab through a plain anchor, rather
      * than an Inertia visit that would receive HTML it cannot render.
