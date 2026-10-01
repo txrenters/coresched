@@ -30,7 +30,6 @@ function eventTypePayload(array $overrides = []): array
         'duration_minutes' => 30,
         'buffer_before_minutes' => 0,
         'buffer_after_minutes' => 0,
-        'minimum_notice_minutes' => 240,
         'seats_per_slot' => 1,
         'date_range_type' => 'rolling_days',
         'rolling_days' => 60,
@@ -87,6 +86,16 @@ test('an event type can be created from the quick create panel', function () {
         ->and($eventType->user_id)->toBe($this->user->id)
         ->and($eventType->team_id)->toBe($this->team->id)
         ->and($eventType->kind)->toBe(EventTypeKind::OneOnOne);
+});
+
+test('an event type cannot be given a minimum notice', function () {
+    $this->actingAs($this->user)
+        ->post(route('scheduling.store', ['current_team' => $this->team->slug]), eventTypePayload([
+            'minimum_notice_minutes' => 240,
+        ]))
+        ->assertRedirect(route('scheduling.index', ['current_team' => $this->team->slug]));
+
+    expect(EventType::first()->minimum_notice_minutes)->toBe(0);
 });
 
 test('the slug must be unique within the team', function () {
@@ -442,7 +451,6 @@ test('the index carries the settings the detail panel summarises', function () {
 
     EventType::factory()->ownedBy($this->user)->create([
         'availability_schedule_id' => $schedule->id,
-        'minimum_notice_minutes' => 240,
         'buffer_before_minutes' => 10,
         'date_range_type' => 'rolling_days',
         'rolling_days' => 60,
@@ -452,7 +460,6 @@ test('the index carries the settings the detail panel summarises', function () {
     $this->actingAs($this->user)
         ->get(route('scheduling.index', ['current_team' => $this->team->slug]))
         ->assertInertia(fn ($page) => $page
-            ->where('eventTypes.0.minimumNoticeMinutes', 240)
             ->where('eventTypes.0.bufferBeforeMinutes', 10)
             ->where('eventTypes.0.dateRangeType', 'rolling_days')
             ->where('eventTypes.0.rollingDays', 60)

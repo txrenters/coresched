@@ -80,7 +80,7 @@ class EventType extends Model
         'duration_minutes' => 30,
         'buffer_before_minutes' => 0,
         'buffer_after_minutes' => 0,
-        'minimum_notice_minutes' => 240,
+        'minimum_notice_minutes' => 0,
         'seats_per_slot' => 1,
         'date_range_type' => 'rolling_days',
         'rolling_days' => 60,

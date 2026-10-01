@@ -84,7 +84,6 @@ const form = useForm({
     slot_interval_minutes: null as number | null,
     buffer_before_minutes: 0,
     buffer_after_minutes: 0,
-    minimum_notice_minutes: 240,
     daily_booking_limit: null as number | null,
     seats_per_slot: 1,
     date_range_type: 'rolling_days',

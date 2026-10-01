@@ -42,7 +42,6 @@ type EventType = {
     upcomingBookings: number;
     hosts: Array<{ id: number; name: string; initial: string }>;
     publicUrl: string;
-    minimumNoticeMinutes: number;
     bufferBeforeMinutes: number;
     bufferAfterMinutes: number;
     slotIntervalMinutes: number | null;
@@ -288,17 +287,7 @@ const displayUrl = (url: string) => url.replace(/^https?:\/\//, '');
 
                     <p class="text-sm">
                         Invitees can schedule
-                        <span class="font-medium">{{ dateRangeLabel }}</span>
-                        <template v-if="eventType.minimumNoticeMinutes">
-                            with at least
-                            <span class="font-medium">
-                                {{
-                                    describeMinutes(
-                                        eventType.minimumNoticeMinutes,
-                                    )
-                                }}
-                            </span>
-                            notice</template
+                        <span class="font-medium">{{ dateRangeLabel }}</span
                         >.
                     </p>
 

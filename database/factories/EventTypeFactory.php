@@ -32,7 +32,6 @@ class EventTypeFactory extends Factory
             'slug' => Str::slug($name),
             'description' => fake()->sentence(),
             'duration_minutes' => 30,
-            'minimum_notice_minutes' => 0,
             'rolling_days' => 60,
             'location_type' => LocationType::CustomLink,
             'location_detail' => 'https://example.com/meet',

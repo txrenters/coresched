@@ -229,6 +229,19 @@ test('minimum notice hides slots that are too soon', function () {
         ->and($starts)->toContain('13:00:00');
 });
 
+test('the rest of today is bookable straight away from the host hours', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-09-02 10:10:00', 'UTC'));
+
+    $host = scheduledHost();
+    $eventType = EventType::factory()->ownedBy($host)->create(['duration_minutes' => 30]);
+
+    $starts = engine()->slots($eventType, wednesday())
+        ->map(fn ($slot) => $slot->startsAt->toTimeString());
+
+    expect($starts->first())->toBe('10:30:00')
+        ->and($starts->last())->toBe('16:30:00');
+});
+
 test('a date override closes the day', function () {
     $host = scheduledHost();
     $eventType = EventType::factory()->ownedBy($host)->create(['duration_minutes' => 60]);

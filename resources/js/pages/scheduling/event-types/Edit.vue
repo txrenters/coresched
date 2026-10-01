@@ -37,7 +37,6 @@ const form = useForm({
     slot_interval_minutes: props.eventType.slotIntervalMinutes,
     buffer_before_minutes: props.eventType.bufferBeforeMinutes,
     buffer_after_minutes: props.eventType.bufferAfterMinutes,
-    minimum_notice_minutes: props.eventType.minimumNoticeMinutes,
     daily_booking_limit: props.eventType.dailyBookingLimit,
     seats_per_slot: props.eventType.seatsPerSlot,
     date_range_type: props.eventType.dateRangeType,

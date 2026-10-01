@@ -391,19 +391,6 @@ const removeOption = (question: Record<string, any>, index: number) => {
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="minimum_notice">Minimum notice (minutes)</Label>
-                    <Input
-                        id="minimum_notice"
-                        v-model.number="fields.minimum_notice_minutes"
-                        type="number"
-                        min="0"
-                    />
-                    <InputError
-                        :message="fields.errors.minimum_notice_minutes"
-                    />
-                </div>
-
-                <div class="grid gap-2">
                     <Label for="buffer_before">Buffer before (minutes)</Label>
                     <Input
                         id="buffer_before"

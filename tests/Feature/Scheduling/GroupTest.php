@@ -177,7 +177,7 @@ test('an event type can use a group instead of pinned hosts', function () {
         ->post(route('scheduling.store', ['current_team' => $this->team->slug]), [
             'name' => 'Demo', 'slug' => 'demo', 'kind' => EventTypeKind::RoundRobin->value,
             'duration_minutes' => 30, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0,
-            'minimum_notice_minutes' => 240, 'seats_per_slot' => 1, 'date_range_type' => 'rolling_days',
+            'seats_per_slot' => 1, 'date_range_type' => 'rolling_days',
             'rolling_days' => 60, 'location_type' => 'custom_link', 'location_detail' => 'https://example.com',
             'is_active' => true, 'is_hidden' => false, 'group_id' => $group->id,
         ])

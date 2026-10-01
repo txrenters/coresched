@@ -42,7 +42,6 @@ class SaveEventTypeRequest extends FormRequest
             'slot_interval_minutes' => ['nullable', 'integer', 'min:5', 'max:1440'],
             'buffer_before_minutes' => ['required', 'integer', 'min:0', 'max:720'],
             'buffer_after_minutes' => ['required', 'integer', 'min:0', 'max:720'],
-            'minimum_notice_minutes' => ['required', 'integer', 'min:0', 'max:100000'],
             'daily_booking_limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'seats_per_slot' => ['required', 'integer', 'min:1', 'max:500'],
             'date_range_type' => ['required', Rule::enum(DateRangeType::class)],

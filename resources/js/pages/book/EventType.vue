@@ -179,6 +179,27 @@ const reload = (query: Record<string, string>) => {
     });
 };
 
+/*
+ * Open on a day rather than an empty picker: today when it still has times,
+ * else the month's first open day. Set directly, not through selectDate, so
+ * a phone is not scrolled past the calendar before the invitee has looked.
+ */
+watch(
+    () => props.slots,
+    (slots) => {
+        if (!slots || selectedDate.value) {
+            return;
+        }
+
+        const openDates = Object.keys(slots).sort();
+
+        selectedDate.value = openDates.includes(today.value)
+            ? today.value
+            : (openDates[0] ?? null);
+    },
+    { immediate: true },
+);
+
 watch(
     () => props.timezone,
     (value) => {
