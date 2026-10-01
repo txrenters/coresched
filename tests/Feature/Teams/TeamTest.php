@@ -79,9 +79,33 @@ test('the team edit page can be rendered', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('teams/Edit')
+            ->where('team.slug', $team->slug)
+            ->missing('members'),
+        );
+});
+
+test('the team members page can be rendered', function () {
+    $user = User::factory()->create();
+    $team = Team::factory()->create();
+
+    $team->members()->attach($user, ['role' => TeamRole::Admin->value]);
+
+    $this->actingAs($user)
+        ->get(route('teams.members.index', $team))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('teams/Members')
             ->where('members.0.role', TeamRole::Admin->value)
             ->where('members.0.role_label', TeamRole::Admin->label()),
         );
+});
+
+test('someone outside the organization cannot see its members', function () {
+    $team = Team::factory()->create();
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('teams.members.index', $team))
+        ->assertForbidden();
 });
 
 test('teams can be updated by owners', function () {

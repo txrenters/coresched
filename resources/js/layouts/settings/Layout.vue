@@ -12,6 +12,7 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import { edit as editTeam } from '@/routes/teams';
+import { index as teamMembers } from '@/routes/teams/members';
 import type { NavItem } from '@/types';
 
 const page = usePage();
@@ -40,6 +41,7 @@ const organizationTabs = computed<NavItem[]>(() => {
 
     return [
         { title: 'Organization', href: editTeam(organization.value.slug) },
+        { title: 'Members', href: teamMembers(organization.value.slug) },
         // API keys belong to the current organization, so the tab is only
         // offered while looking at that one.
         ...(page.props.canManageApiKeys &&
@@ -64,7 +66,7 @@ const accountNavItems: NavItem[] = [
     },
 ];
 
-const { isCurrentOrParentUrl } = useCurrentUrl();
+const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
 
 // Settings pages are forms, so the content column is deliberately narrow.
 </script>
@@ -76,7 +78,7 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
                 title="Settings"
                 :description="
                     organization
-                        ? `Manage ${organization.name} and its API keys.`
+                        ? `Manage ${organization.name}, its members and its API keys.`
                         : 'Manage your organization.'
                 "
             />
@@ -91,7 +93,7 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
                     :href="item.href"
                     :class="[
                         '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-                        isCurrentOrParentUrl(item.href)
+                        isCurrentUrl(item.href)
                             ? 'border-primary text-foreground'
                             : 'border-transparent text-muted-foreground hover:text-foreground',
                     ]"

@@ -21,7 +21,7 @@ test('a super admin creates a user directly inside an organization', function ()
             'role' => TeamRole::Member->value,
         ]);
 
-    $response->assertRedirect(route('teams.edit', $team));
+    $response->assertRedirect(route('teams.members.index', $team));
 
     $user = User::where('email', 'new.hire@example.com')->firstOrFail();
 

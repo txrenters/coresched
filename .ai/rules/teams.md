@@ -25,7 +25,7 @@ App\Actions\Teams\CreateTeamUser does the work and differs from CreateNewUser in
 
 It still calls CreateDefaultAvailability and ApplyDefaultHolidays, so a created user lands with working hours rather than an empty calendar — same as a self-registered one.
 
-The UI is CreateMemberModal.vue on the team edit page, shown on the shared isSuperAdmin Inertia prop (HandleInertiaRequests), not on the TeamPermissions DTO.
+The UI is CreateMemberModal.vue on the Members tab (teams/Members.vue), shown on the shared isSuperAdmin Inertia prop (HandleInertiaRequests), not on the TeamPermissions DTO.
 
 ## Invitation codes are credentials: GET never joins, and only managers see codes
-GET invitations/{code}/join (showJoin) only renders auth/JoinInvitation; POST invitations.join.store creates the account and signs in. Mail scanners (Safe Links) fetch emailed links, so a GET that joined burned invitations and handed scanners a session. Never make the GET act again. TeamController::edit only sends `invitations` (which carry the code) to users who can inviteMember or cancelInvitation — a plain member holding a code could take an admin invitation via the join link.
+GET invitations/{code}/join (showJoin) only renders auth/JoinInvitation; POST invitations.join.store creates the account and signs in. Mail scanners (Safe Links) fetch emailed links, so a GET that joined burned invitations and handed scanners a session. Never make the GET act again. TeamMemberController::index (the Members tab, teams/Members) only sends `invitations` (which carry the code) to users who can inviteMember or cancelInvitation — a plain member holding a code could take an admin invitation via the join link.

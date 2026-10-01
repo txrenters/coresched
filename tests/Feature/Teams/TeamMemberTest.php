@@ -18,7 +18,7 @@ test('team member roles can be updated by owners', function () {
             'role' => TeamRole::Admin->value,
         ]);
 
-    $response->assertRedirect(route('teams.edit', $team));
+    $response->assertRedirect(route('teams.members.index', $team));
 
     expect($team->members()->where('user_id', $member->id)->first()->pivot->role->value)->toEqual(TeamRole::Admin->value);
 });
@@ -54,7 +54,7 @@ test('team members can be removed by owners', function () {
         ->actingAs($owner)
         ->delete(route('teams.members.destroy', [$team, $member]));
 
-    $response->assertRedirect(route('teams.edit', $team));
+    $response->assertRedirect(route('teams.members.index', $team));
 
     expect($member->fresh()->belongsToTeam($team))->toBeFalse();
 });
@@ -147,7 +147,7 @@ test('a member who belongs nowhere else can be removed', function () {
 
     $this->actingAs($owner)
         ->delete(route('teams.members.destroy', [$team, $member]))
-        ->assertRedirect(route('teams.edit', $team));
+        ->assertRedirect(route('teams.members.index', $team));
 
     expect($member->fresh()->belongsToTeam($team))->toBeFalse()
         ->and($member->fresh()->current_team_id)->toBeNull();
@@ -198,9 +198,10 @@ test('a super admin is left off the organizations member roster', function () {
     $team->members()->attach($operator, ['role' => TeamRole::Admin->value]);
 
     $this->actingAs($owner)
-        ->get(route('teams.edit', ['team' => $team->slug]))
+        ->get(route('teams.members.index', ['team' => $team->slug]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
+            ->component('teams/Members')
             ->has('members', 1)
             ->where('members.0.email', $owner->email));
 });

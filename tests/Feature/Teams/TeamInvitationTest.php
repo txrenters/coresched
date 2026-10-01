@@ -22,7 +22,7 @@ test('team invitations can be created', function () {
             'role' => TeamRole::Member->value,
         ]);
 
-    $response->assertRedirect(route('teams.edit', $team));
+    $response->assertRedirect(route('teams.members.index', $team));
 
     $this->assertDatabaseHas('team_invitations', [
         'team_id' => $team->id,
@@ -213,7 +213,7 @@ test('team invitations can be created by admins', function () {
             'role' => TeamRole::Member->value,
         ]);
 
-    $response->assertRedirect(route('teams.edit', $team));
+    $response->assertRedirect(route('teams.members.index', $team));
 });
 
 test('existing team members cannot be invited', function () {
@@ -292,7 +292,7 @@ test('team invitations can be cancelled by owners', function () {
         ->actingAs($owner)
         ->delete(route('teams.invitations.destroy', [$team, $invitation]));
 
-    $response->assertRedirect(route('teams.edit', $team));
+    $response->assertRedirect(route('teams.members.index', $team));
 
     $this->assertDatabaseMissing('team_invitations', [
         'id' => $invitation->id,
@@ -485,12 +485,12 @@ test('a plain member is not shown pending invitations or their join codes', func
     ]);
 
     $this->actingAs($member)
-        ->get(route('teams.edit', $team))
+        ->get(route('teams.members.index', $team))
         ->assertOk()
         ->assertInertia(fn ($page) => $page->has('invitations', 0));
 });
 
-test('an admin still sees pending invitations on the organization page', function () {
+test('an admin still sees pending invitations on the members page', function () {
     $admin = User::factory()->create();
     $team = Team::factory()->create();
 
@@ -504,7 +504,7 @@ test('an admin still sees pending invitations on the organization page', functio
     ]);
 
     $this->actingAs($admin)
-        ->get(route('teams.edit', $team))
+        ->get(route('teams.members.index', $team))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->has('invitations', 1)

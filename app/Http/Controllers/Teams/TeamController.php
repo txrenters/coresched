@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\Teams;
 
 use App\Actions\Teams\CreateTeam;
-use App\Enums\TeamRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Teams\DeleteTeamRequest;
 use App\Http\Requests\Teams\SaveTeamRequest;
-use App\Models\Membership;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Activity\ActivityLogger;
@@ -55,7 +53,6 @@ class TeamController extends Controller
     public function edit(Request $request, Team $team): Response
     {
         $user = $request->user();
-        $adminCount = $team->memberships()->where('role', TeamRole::Admin)->count();
 
         return Inertia::render('teams/Edit', [
             'team' => [
@@ -68,47 +65,7 @@ class TeamController extends Controller
                 'timezone' => $team->timezone,
                 'smsFromNumber' => $team->sms_from_number,
             ],
-            // Super admins operate across organizations rather than belonging
-            // to one, so they stay off the roster people manage here. They keep
-            // their place in the scheduling pickers, where they may host.
-            'members' => $team->members()->where('users.is_super_admin', false)->get()->map(function (User $member) use ($adminCount) {
-                /** @var Membership $membership */
-                $membership = $member->getRelation('pivot');
-
-                return [
-                    'id' => $member->id,
-                    'name' => $member->name,
-                    'email' => $member->email,
-                    'avatar' => $member->avatar ?? null,
-                    'role' => $membership->role->value,
-                    'role_label' => $membership->role->label(),
-                    // The screen hides demote and remove for this member: an
-                    // organization has to keep an administrator, and the
-                    // controller refuses it anyway.
-                    'isLastAdmin' => $membership->role === TeamRole::Admin && $adminCount === 1,
-                ];
-            }),
-            /*
-             * Only people who manage invitations see them. Each row carries its
-             * code, and the code alone is enough to join through the emailed
-             * link with the role the invitation grants, so a plain member
-             * shown this list could take an admin invitation meant for someone else.
-             */
-            'invitations' => $user->can('inviteMember', $team) || $user->can('cancelInvitation', $team)
-                ? $team->invitations()
-                    ->whereNull('accepted_at')
-                    ->get()
-                    ->map(fn ($invitation) => [
-                        'code' => $invitation->code,
-                        'email' => $invitation->email,
-                        'role' => $invitation->role->value,
-                        'role_label' => $invitation->role->label(),
-                        'created_at' => $invitation->created_at->toISOString(),
-                    ])
-                : [],
             'permissions' => $user->toTeamPermissions($team),
-            'canCreateMember' => $user->can('createMember', $team),
-            'availableRoles' => TeamRole::assignable(),
             'timezones' => timezone_identifiers_list(),
             /*
              * The numbers the installation's Twilio account owns, for the admin
