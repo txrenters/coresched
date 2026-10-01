@@ -638,7 +638,7 @@ test('a finished meeting is listed under past', function () {
             ->where('meetings.0.inviteeName', 'Already over'));
 });
 
-test('a meeting carries its history, oldest first', function () {
+test('a meeting carries its history, newest first', function () {
     $booking = bookingFor($this->host, $this->eventType, [
         'name' => 'Sam Rivera',
         'starts_at' => CarbonImmutable::parse('2026-09-01 07:00:00', 'UTC'),
@@ -666,13 +666,13 @@ test('a meeting carries its history, oldest first', function () {
         ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'past']))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            // Booked, reminded, started, ended.
+            // Ended, started, reminded, booked.
             ->has('meetings.0.timeline', 4)
-            ->where('meetings.0.timeline.0.label', 'Booked Intro call')
-            ->where('meetings.0.timeline.0.detail', 'Sam Rivera')
-            ->where('meetings.0.timeline.1.label', 'Reminder sent')
-            ->where('meetings.0.timeline.2.label', 'Meeting started')
-            ->where('meetings.0.timeline.3.label', 'Meeting ended'));
+            ->where('meetings.0.timeline.0.label', 'Meeting ended')
+            ->where('meetings.0.timeline.1.label', 'Meeting started')
+            ->where('meetings.0.timeline.2.label', 'Reminder sent')
+            ->where('meetings.0.timeline.3.label', 'Booked Intro call')
+            ->where('meetings.0.timeline.3.detail', 'Sam Rivera'));
 });
 
 test('a cancelled meeting does not claim it went ahead', function () {

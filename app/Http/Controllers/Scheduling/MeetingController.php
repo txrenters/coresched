@@ -182,7 +182,7 @@ class MeetingController extends Controller
     }
 
     /**
-     * Build the meeting's history, newest last.
+     * Build the meeting's history, newest first.
      *
      * Three sources, because no single one knows the whole story: what people
      * did to the booking (the activity log), what the app sent about it
@@ -246,7 +246,7 @@ class MeetingController extends Controller
 
         return $entries
             ->unique(fn (array $entry) => $entry['label'].$entry['at']->toIso8601String())
-            ->sortBy(fn (array $entry) => $entry['at']->getTimestamp())
+            ->sortByDesc(fn (array $entry) => $entry['at']->getTimestamp())
             ->map(fn (array $entry) => [
                 'label' => $entry['label'],
                 'detail' => $entry['detail'],
