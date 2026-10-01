@@ -16,6 +16,9 @@ Kind matters: round robin/one-on-one take the UNION of hosts' free time (slot ke
 Always store timestamps in UTC; convert at the edges only.
 
 ## Public page listings split by event type kind, both ways
-BookingPageResolver::eventTypes() filters by kind on BOTH page types: an organization page lists only EventTypeKind::shared() (round robin, collective), a person's page lists only the other kinds. user_id is the creator, not the host pool, so without the whereNotIn a round robin its creator handed to another host kept showing on the creator's own /book/{slug} page.
+BookingPageResolver::eventTypes() filters by kind: an organization page lists only EventTypeKind::shared() (round robin, collective). A person's page lists their own other kinds, plus shared events by host pool (see below). user_id is the creator, not the host pool, so a round robin its creator handed to another host must not show on the creator's own /book/{slug} page.
 
 Listing is not resolution: eventType() applies no kind filter, so every link already handed out still opens on either page.
+
+## A person's page also lists the shared events they host
+Supersedes "person's page lists only the other kinds". BookingPageResolver::eventTypes() for a User now returns their own non-shared kinds PLUS shared (round robin, collective) event types in their organizations whose hostPool() contains them. Being the creator (user_id) still does not list a shared event — only being in its host pool does. Shared events only resolve under the organization slug, so BookingPageController::toListing() links their cards via the team slug, and every card carries kind/kindLabel/isShared for the type tag.

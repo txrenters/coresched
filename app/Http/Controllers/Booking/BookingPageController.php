@@ -47,16 +47,7 @@ class BookingPageController extends Controller
                 'websiteUrl' => $this->pages->websiteUrl($owner),
                 'websiteName' => $this->pages->websiteName($owner),
             ],
-            'eventTypes' => $eventTypes->map(fn (EventType $eventType) => [
-                'slug' => $eventType->slug,
-                'name' => $eventType->name,
-                'description' => $eventType->description,
-                'color' => $eventType->color,
-                'durationMinutes' => $eventType->duration_minutes,
-                'locationType' => $eventType->location_type->value,
-                'locationLabel' => $eventType->location_type->label(),
-                'url' => route('book.event-type', ['page' => $page, 'eventType' => $eventType->slug]),
-            ]),
+            'eventTypes' => $eventTypes->map(fn (EventType $eventType) => $this->toListing($eventType, $owner, $page)),
         ]);
     }
 
@@ -143,16 +134,7 @@ class BookingPageController extends Controller
                     'name' => $this->pages->name($owner),
                     'url' => route('book.page', ['page' => $page]),
                 ],
-            'eventTypes' => $eventTypes->map(fn (EventType $eventType) => [
-                'slug' => $eventType->slug,
-                'name' => $eventType->name,
-                'description' => $eventType->description,
-                'color' => $eventType->color,
-                'durationMinutes' => $eventType->duration_minutes,
-                'locationType' => $eventType->location_type->value,
-                'locationLabel' => $eventType->location_type->label(),
-                'url' => route('book.event-type', ['page' => $page, 'eventType' => $eventType->slug]),
-            ]),
+            'eventTypes' => $eventTypes->map(fn (EventType $eventType) => $this->toListing($eventType, $owner, $page)),
         ]);
     }
 
@@ -255,6 +237,36 @@ class BookingPageController extends Controller
             'prefill' => $this->prefill($request, $type),
             'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone)),
         ]);
+    }
+
+    /**
+     * Present an event type as a card on a listing page.
+     *
+     * A person's page lists the shared events they host, but those are the
+     * organization's and only resolve under its slug, so their cards link
+     * through the organization page.
+     *
+     * @return array<string, mixed>
+     */
+    protected function toListing(EventType $eventType, User|Team $owner, string $page): array
+    {
+        $pageSlug = $owner instanceof User && $eventType->kind->hasHostPool()
+            ? $eventType->team->slug
+            : $page;
+
+        return [
+            'slug' => $eventType->slug,
+            'name' => $eventType->name,
+            'description' => $eventType->description,
+            'color' => $eventType->color,
+            'durationMinutes' => $eventType->duration_minutes,
+            'kind' => $eventType->kind->value,
+            'kindLabel' => $eventType->kind->label(),
+            'isShared' => $eventType->kind->hasHostPool(),
+            'locationType' => $eventType->location_type->value,
+            'locationLabel' => $eventType->location_type->label(),
+            'url' => route('book.event-type', ['page' => $pageSlug, 'eventType' => $eventType->slug]),
+        ];
     }
 
     /**

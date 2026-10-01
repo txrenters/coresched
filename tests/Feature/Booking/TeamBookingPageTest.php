@@ -120,6 +120,52 @@ test('a shared event type is not listed on its creator personal page', function 
         ->assertInertia(fn (AssertableInertia $page) => $page->component('book/EventType'));
 });
 
+test('a personal page lists the shared event types its person hosts, with their kind', function () {
+    $host = User::factory()->create(['booking_slug' => 'robin']);
+    $this->team->members()->attach($host, ['role' => TeamRole::Member->value]);
+
+    $pinned = EventType::factory()->ownedBy($this->user)->roundRobin()->create([
+        'name' => 'Lease signing',
+        'slug' => 'lease-signing',
+    ]);
+    $pinned->hosts()->sync([$host->id => ['priority' => 0]]);
+
+    $this->group->members()->attach($host);
+
+    EventType::factory()->ownedBy($this->user)->create([
+        'name' => 'Move-out inspection',
+        'slug' => 'move-out-inspection',
+        'kind' => EventTypeKind::Collective,
+        'group_id' => $this->group->id,
+    ]);
+
+    // Shared, but hosted by someone else.
+    EventType::factory()->ownedBy($this->user)->roundRobin()->create(['slug' => 'repair-visit']);
+
+    $this->get('/book/robin')
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->has('eventTypes', 2)
+            ->where('eventTypes.0.slug', 'lease-signing')
+            ->where('eventTypes.0.kindLabel', 'Round robin')
+            ->where('eventTypes.0.isShared', true)
+            ->where('eventTypes.0.url', route('book.event-type', ['page' => $this->team->slug, 'eventType' => 'lease-signing']))
+            ->where('eventTypes.1.slug', 'move-out-inspection')
+            ->where('eventTypes.1.kindLabel', 'Collective'),
+        );
+});
+
+test('a personal page tags its own event types with their kind', function () {
+    $this->user->forceFill(['booking_slug' => 'sam'])->save();
+
+    $this->get('/book/sam')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('eventTypes.0.kindLabel', 'One-on-one')
+            ->where('eventTypes.0.isShared', false)
+            ->where('eventTypes.0.url', route('book.event-type', ['page' => 'sam', 'eventType' => 'discovery-call'])),
+        );
+});
+
 /*
  * A team page and an event type share the /book/{page}/{slug} shape, so the
  * order they resolve in decides which wins. Event types go first, or naming a

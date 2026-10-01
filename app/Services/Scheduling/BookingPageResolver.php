@@ -39,23 +39,50 @@ class BookingPageResolver
      */
     public function eventTypes(User|Team $page): Collection
     {
-        return $this->query($page)
+        $listed = $this->query($page)
             ->where('is_hidden', false)
             /*
-             * The split is by kind, and it cuts both ways. An organization page
-             * advertises only the shared kinds; a person's page advertises only
-             * the kinds they host alone. A shared event is hosted by a pool that
-             * its creator may not even be in, so it belongs on the organization
-             * page and never on theirs -- but it still RESOLVES on both, so any
-             * link already handed out keeps working.
+             * An organization page advertises only the shared kinds. A person's
+             * page advertises the kinds they host alone, plus -- added below --
+             * the shared events whose host pool they are in. Being the creator
+             * is not enough: user_id is who made a shared event, not who hosts
+             * it, so one handed to someone else stays off the creator's page.
              */
             ->when(
                 $page instanceof Team,
                 fn (Builder $query) => $query->whereIn('kind', EventTypeKind::shared()),
                 fn (Builder $query) => $query->whereNotIn('kind', EventTypeKind::shared()),
             )
-            ->orderBy('name')
             ->get();
+
+        if ($page instanceof User) {
+            $listed = $listed->merge($this->sharedEventTypesHostedBy($page));
+        }
+
+        return $listed
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+    }
+
+    /**
+     * Get the listed shared event types a person is in the host pool for.
+     *
+     * The pool is resolved through EventType::hostPool(), so a group's members
+     * and pinned hosts count exactly as they do when slots are worked out.
+     *
+     * @return Collection<int, EventType>
+     */
+    protected function sharedEventTypesHostedBy(User $user): Collection
+    {
+        return EventType::query()
+            ->bookable()
+            ->with(['owner', 'hosts', 'questions', 'team', 'group.members'])
+            ->where('is_hidden', false)
+            ->whereIn('kind', EventTypeKind::shared())
+            ->whereIn('team_id', $user->teams()->pluck('teams.id'))
+            ->get()
+            ->filter(fn (EventType $eventType) => $eventType->hostPool()->contains('id', $user->id))
+            ->values();
     }
 
     /**

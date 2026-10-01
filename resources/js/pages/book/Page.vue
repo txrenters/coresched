@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
-import { ArrowLeft, ArrowRight, CalendarClock, Clock } from '@lucide/vue';
+import {
+    ArrowLeft,
+    ArrowRight,
+    CalendarClock,
+    Clock,
+    User,
+    Users,
+} from '@lucide/vue';
 import { locationIcon } from '@/lib/locationIcons';
 
 type Props = {
@@ -19,6 +26,10 @@ type Props = {
         description: string | null;
         color: string;
         durationMinutes: number;
+        kind: string;
+        kindLabel: string;
+        /** Hosted by a pool (round robin, collective) rather than one person. */
+        isShared: boolean;
         locationType: string;
         locationLabel: string;
         url: string;
@@ -82,7 +93,7 @@ withDefaults(defineProps<Props>(), {
             </header>
 
             <ul v-if="eventTypes.length" class="mt-10 space-y-3">
-                <li v-for="eventType in eventTypes" :key="eventType.slug">
+                <li v-for="eventType in eventTypes" :key="eventType.url">
                     <a
                         :href="eventType.url"
                         :data-test="`event-type-${eventType.slug}`"
@@ -119,6 +130,17 @@ withDefaults(defineProps<Props>(), {
                                     <span data-numeric>
                                         {{ eventType.durationMinutes }} min
                                     </span>
+                                </span>
+                                <span
+                                    class="inline-flex items-center gap-1.5"
+                                    :data-test="`event-type-kind-${eventType.slug}`"
+                                >
+                                    <component
+                                        :is="eventType.isShared ? Users : User"
+                                        class="size-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    {{ eventType.kindLabel }}
                                 </span>
                                 <span class="inline-flex items-center gap-1.5">
                                     <component
