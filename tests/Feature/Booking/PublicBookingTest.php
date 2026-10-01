@@ -387,6 +387,21 @@ test('the booking page falls back to the configured default timezone', function 
         ->assertInertia(fn ($page) => $page->where('timezone', 'America/Chicago'));
 });
 
+test('the booking page tells the calendar today in the organizer timezone, not the visitor clock', function () {
+    // 02:00 UTC on 2 October is still the evening of 1 October in Chicago.
+    $this->travelTo(CarbonImmutable::parse('2026-10-02 02:00:00', 'UTC'));
+
+    $host = User::factory()->create(['booking_slug' => 'casey', 'timezone' => 'America/Chicago']);
+
+    AvailabilitySchedule::factory()->for($host)->everyDay()->create();
+
+    EventType::factory()->ownedBy($host)->create(['slug' => 'chat']);
+
+    $this->get(route('book.event-type', ['page' => 'casey', 'eventType' => 'chat']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('today', '2026-10-01'));
+});
+
 test('booking a requires-confirmation event creates a pending request', function () {
     Notification::fake();
     Queue::fake();

@@ -71,6 +71,8 @@ type Props = {
         questions: Question[];
     };
     timezone: string;
+    /** Today as YYYY-MM-DD in the organizer's timezone. */
+    today: string;
     month: string;
     slots?: Record<string, Slot[]>;
     reschedule?: string | null;
@@ -97,12 +99,10 @@ const isRescheduling = computed(() => Boolean(props.reschedule));
 const slotsLoaded = computed(() => props.slots !== undefined);
 const availableDates = computed(() => Object.keys(props.slots ?? {}));
 /*
- * "Today" is the organizer's today, the same timezone the times are shown in,
- * so the calendar does not roll over at midnight UTC.
+ * "Today" is the organizer's today, worked out on the server in the timezone
+ * the times are shown in, so a visitor's wrong or foreign clock cannot move it.
  */
-const today = computed(() =>
-    new Date().toLocaleDateString('en-CA', { timeZone: props.timezone }),
-);
+const today = computed(() => props.today);
 const currentMonth = computed(() => today.value.slice(0, 7));
 
 const slotsForSelectedDate = computed(() =>

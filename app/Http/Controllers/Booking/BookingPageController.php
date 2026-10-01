@@ -198,6 +198,7 @@ class BookingPageController extends Controller
             ],
             'eventType' => $this->toPayload($type),
             'timezone' => $timezone,
+            'today' => CarbonImmutable::now($timezone)->toDateString(),
             'month' => $month->format('Y-m'),
             'reschedule' => $request->string('reschedule')->toString() ?: null,
             'chosenHost' => $chosenHost === null ? null : [
@@ -245,6 +246,7 @@ class BookingPageController extends Controller
             ],
             'eventType' => $this->toPayload($type),
             'timezone' => $timezone,
+            'today' => CarbonImmutable::now($timezone)->toDateString(),
             'month' => $month->format('Y-m'),
             'reschedule' => null,
             'chosenHost' => null,
