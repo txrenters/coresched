@@ -94,6 +94,13 @@ test('a server error is thrown so the queue retries', function () {
     expect(fn () => runWebhook($this->booking))->toThrow(RuntimeException::class);
 });
 
+test('the retries outlast a receiver that is down for hours', function () {
+    $job = new SendBookingWebhook($this->booking, 'booking.confirmed', 1);
+
+    expect($job->backoff)->toHaveCount($job->tries - 1)
+        ->and(array_sum($job->backoff))->toBeGreaterThanOrEqual(6 * 3600);
+});
+
 test('a client error is final and is not thrown', function () {
     Http::fake(['*' => Http::response(['message' => 'The given data was invalid.'], 422)]);
 

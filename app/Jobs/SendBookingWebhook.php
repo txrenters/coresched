@@ -33,12 +33,16 @@ class SendBookingWebhook implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 5;
+    public int $tries = 8;
 
     /**
+     * Retries spread over about eight hours. A receiver that is down for an
+     * hour (it was, on 2026-09-30, answering 503 throughout) would otherwise
+     * outlast the forty minutes the first four cover, and the event is lost.
+     *
      * @var array<int, int>
      */
-    public array $backoff = [30, 120, 600, 1800];
+    public array $backoff = [30, 120, 600, 1800, 3600, 7200, 14400];
 
     public readonly string $deliveryId;
 

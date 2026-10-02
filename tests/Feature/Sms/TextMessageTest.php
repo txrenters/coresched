@@ -96,14 +96,17 @@ test('a text message is posted to twilio with the number dialled properly', func
         && $request['Body'] === 'Sam booked a meeting.');
 });
 
-test('a number twilio could never dial is refused before it is sent', function () {
+test('a number twilio could never dial is refused before it is sent', function (string $number) {
     Http::fake();
 
-    expect(fn () => app(TwilioClient::class)->send('+15125550000', '12345', 'Hello'))
+    expect(fn () => app(TwilioClient::class)->send('+15125550000', $number, 'Hello'))
         ->toThrow(RuntimeException::class);
 
     Http::assertNothingSent();
-});
+})->with([
+    'too few digits' => '12345',
+    'an area code that does not exist' => '(861) 239-0100',
+]);
 
 test('twilio refusing the message is reported rather than swallowed', function () {
     Http::fake(['*/Messages.json' => Http::response(['message' => 'The From number is not valid'], 400)]);
