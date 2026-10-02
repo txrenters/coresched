@@ -2,6 +2,7 @@
 import { Head, router, setLayoutProps, useForm } from '@inertiajs/vue3';
 import {
     Check,
+    CircleCheck,
     Clock,
     Plane,
     Plus,
@@ -152,6 +153,14 @@ const isInProgress = (meeting: Meeting) =>
     meeting.status === 'confirmed' &&
     new Date(meeting.startsAt).getTime() <= now.value &&
     now.value < new Date(meeting.endsAt).getTime();
+
+/** Whether the meeting's end has passed, whatever became of it. */
+const isPast = (meeting: Meeting) =>
+    new Date(meeting.endsAt).getTime() <= now.value;
+
+/** A confirmed meeting whose end has passed: it took place. */
+const isDone = (meeting: Meeting) =>
+    meeting.status === 'confirmed' && isPast(meeting);
 
 /**
  * The detail panel and these dialogs are each modal layers, and two open at
@@ -550,8 +559,11 @@ setLayoutProps({
                             'flex w-full cursor-pointer flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border p-4 text-left transition-colors',
                             selected?.uid === meeting.uid
                                 ? 'border-primary bg-accent/50'
-                                : 'bg-card shadow-flat hover:bg-accent/30 hover:shadow-raised',
+                                : isPast(meeting)
+                                  ? 'bg-muted hover:bg-accent/40'
+                                  : 'bg-card shadow-flat hover:bg-accent/30 hover:shadow-raised',
                         ]"
+                        :data-past="isPast(meeting) || undefined"
                         @click="selected = meeting"
                     >
                         <span class="w-40 shrink-0">
@@ -580,6 +592,13 @@ setLayoutProps({
                             >
                                 <UserX class="size-3" /> No-show
                             </Badge>
+                            <span
+                                v-else-if="isDone(meeting)"
+                                class="flex items-center gap-1.5 text-xs text-muted-foreground"
+                                data-test="done-label"
+                            >
+                                <CircleCheck class="size-3" /> Done
+                            </span>
                             <Badge
                                 v-else-if="meeting.status === 'pending'"
                                 variant="secondary"
