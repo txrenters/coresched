@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountSetupController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\BookingQrCodeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Settings\OrganizationDirectoryController;
@@ -69,6 +70,8 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('users/{user}/organizations/{team}', [UserDirectoryController::class, 'removeFromTeam'])
         ->name('users.organizations.destroy');
     Route::delete('users/{user}', [UserDirectoryController::class, 'destroy'])->name('users.destroy');
+
+    Route::get('qr-code', BookingQrCodeController::class)->name('booking-qr-code');
 
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');

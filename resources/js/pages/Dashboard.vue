@@ -11,11 +11,13 @@ import {
     History,
     LayoutList,
     Plus,
+    QrCode,
     UserPlus,
 } from '@lucide/vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import PageHeader from '@/components/PageHeader.vue';
 import PendingInvitationsModal from '@/components/PendingInvitationsModal.vue';
+import BookingQrCodeDialog from '@/components/scheduling/BookingQrCodeDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -132,6 +134,8 @@ const copyBookingLink = async () => {
         copied.value = false;
     }
 };
+
+const showingQrCode = ref(false);
 
 const displayUrl = computed(
     () => props.bookingUrl?.replace(/^https?:\/\//, '') ?? '',
@@ -604,6 +608,15 @@ const quickActions = computed(() =>
                             {{ copied ? 'Copied!' : 'Copy' }}
                         </Button>
                         <Button
+                            variant="outline"
+                            class="cursor-pointer bg-card font-medium"
+                            data-test="booking-page-qr-code"
+                            @click="showingQrCode = true"
+                        >
+                            <QrCode class="size-4" aria-hidden="true" />
+                            QR code
+                        </Button>
+                        <Button
                             variant="ghost"
                             class="cursor-pointer font-medium"
                             as-child
@@ -625,6 +638,11 @@ const quickActions = computed(() =>
                     <p aria-live="polite" class="sr-only">
                         {{ copied ? 'Booking link copied to clipboard' : '' }}
                     </p>
+                    <BookingQrCodeDialog
+                        :url="showingQrCode ? bookingUrl : null"
+                        name="your booking page"
+                        @close="showingQrCode = false"
+                    />
                 </section>
             </div>
         </div>

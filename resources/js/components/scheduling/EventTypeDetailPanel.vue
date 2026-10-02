@@ -12,6 +12,7 @@ import {
     MapPin,
     Pencil,
     Power,
+    QrCode,
     Trash2,
     Users,
 } from '@lucide/vue';
@@ -68,6 +69,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
     (e: 'close'): void;
     (e: 'copy'): void;
+    (e: 'qr-code'): void;
     (e: 'duplicate'): void;
     (e: 'toggle-active'): void;
     (e: 'delete'): void;
@@ -197,6 +199,15 @@ const displayUrl = (url: string) => url.replace(/^https?:\/\//, '');
                         />
                         <Copy v-else class="size-3.5" aria-hidden="true" />
                         {{ copied ? 'Copied!' : 'Copy link' }}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="cursor-pointer rounded-full"
+                        data-test="panel-qr-code"
+                        @click="emit('qr-code')"
+                    >
+                        <QrCode class="size-3.5" aria-hidden="true" /> QR code
                     </Button>
                     <Button
                         variant="outline"

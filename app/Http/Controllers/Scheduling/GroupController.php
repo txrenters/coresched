@@ -40,6 +40,9 @@ class GroupController extends Controller
                     'email' => $member->email,
                 ]),
             'canManage' => $request->user()->can('create', [Group::class, $current_team]),
+            'organizationUrl' => $current_team->slug === null
+                ? null
+                : route('book.page', ['page' => $current_team->slug]),
             'departmentPages' => $current_team->departmentPages()
                 ->with('groups:id,name')
                 ->orderBy('name')

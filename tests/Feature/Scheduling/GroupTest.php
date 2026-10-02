@@ -270,3 +270,10 @@ test('an event type from another organization cannot be shown on a team page', f
 
     expect($group->fresh()->pageEventTypes)->toBeEmpty();
 });
+
+test('the groups page links to the organizations own booking page', function () {
+    $this->actingAs($this->owner)
+        ->get(route('groups.index', ['current_team' => $this->team->slug]))
+        ->assertInertia(fn ($page) => $page
+            ->where('organizationUrl', route('book.page', ['page' => $this->team->slug])));
+});

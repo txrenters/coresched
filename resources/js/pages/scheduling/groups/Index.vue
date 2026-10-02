@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { Head, router, setLayoutProps, useForm } from '@inertiajs/vue3';
-import { ExternalLink, Link2, Pencil, Plus, Trash2, Users } from '@lucide/vue';
+import {
+    ExternalLink,
+    Link2,
+    Pencil,
+    Plus,
+    QrCode,
+    Trash2,
+    Users,
+} from '@lucide/vue';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 import InputError from '@/components/InputError.vue';
 import PageHeader from '@/components/PageHeader.vue';
+import BookingQrCodeDialog from '@/components/scheduling/BookingQrCodeDialog.vue';
 import HostPriorityList from '@/components/scheduling/HostPriorityList.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -73,6 +82,8 @@ type Props = {
     groups: Group[];
     teamMembers: Member[];
     canManage: boolean;
+    /** The organization's own public booking page, when it has a slug. */
+    organizationUrl: string | null;
     /** Public pages each listing a chosen set of these teams. */
     departmentPages: DepartmentPage[];
     /** Hours the organization shares, selectable as this team's own. */
@@ -89,6 +100,9 @@ const copyLink = async (url: string, message = 'Booking link copied') => {
     await navigator.clipboard.writeText(url);
     toast.success(message);
 };
+
+/** The booking link whose QR code is open, if any. */
+const qrCode = ref<{ url: string; name: string } | null>(null);
 
 const editing = ref<Group | null>(null);
 const panelOpen = ref(false);
@@ -253,6 +267,54 @@ setLayoutProps({
             </template>
         </PageHeader>
 
+        <section
+            v-if="organizationUrl"
+            class="flex flex-col gap-3 rounded-lg border border-border bg-card p-5 shadow-flat sm:flex-row sm:items-center"
+            data-test="organization-page"
+        >
+            <div class="min-w-0 flex-1">
+                <h2 class="font-semibold">Organization page</h2>
+                <p class="text-sm text-muted-foreground" data-wrap-anywhere>
+                    {{ organizationUrl.replace(/^https?:\/\//, '') }}
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    data-test="copy-organization-link"
+                    @click="copyLink(organizationUrl)"
+                >
+                    <Link2 class="size-3.5" /> Copy link
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    data-test="organization-qr-code"
+                    @click="
+                        qrCode = {
+                            url: organizationUrl,
+                            name:
+                                $page.props.currentTeam?.name ?? 'Organization',
+                        }
+                    "
+                >
+                    <QrCode class="size-3.5" /> QR code
+                </Button>
+                <Button variant="ghost" size="icon" as-child>
+                    <a
+                        :href="organizationUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Open the organization page"
+                        title="Open the organization page"
+                    >
+                        <ExternalLink class="size-4" />
+                    </a>
+                </Button>
+            </div>
+        </section>
+
         <div v-if="groups.length" class="grid gap-3 md:grid-cols-2">
             <div
                 v-for="group in groups"
@@ -311,6 +373,16 @@ setLayoutProps({
                         @click="copyLink(group.bookingUrl)"
                     >
                         <Link2 class="size-3.5" /> Copy link
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        :data-test="`group-qr-code-${group.id}`"
+                        @click="
+                            qrCode = { url: group.bookingUrl, name: group.name }
+                        "
+                    >
+                        <QrCode class="size-3.5" /> QR code
                     </Button>
                     <Button
                         variant="ghost"
@@ -420,6 +492,14 @@ setLayoutProps({
                             @click="copyLink(page.url, 'Page link copied')"
                         >
                             <Link2 class="size-3.5" /> Copy link
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            :data-test="`department-page-qr-code-${page.id}`"
+                            @click="qrCode = { url: page.url, name: page.name }"
+                        >
+                            <QrCode class="size-3.5" /> QR code
                         </Button>
                         <Button
                             variant="ghost"
@@ -753,4 +833,10 @@ setLayoutProps({
             </DialogFooter>
         </DialogContent>
     </Dialog>
+
+    <BookingQrCodeDialog
+        :url="qrCode?.url ?? null"
+        :name="qrCode?.name ?? ''"
+        @close="qrCode = null"
+    />
 </template>

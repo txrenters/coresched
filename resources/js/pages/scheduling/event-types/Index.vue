@@ -14,6 +14,7 @@ import {
     Pencil,
     Plus,
     Power,
+    QrCode,
     Search,
     SearchX,
     SlidersHorizontal,
@@ -24,6 +25,7 @@ import { computed, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import MonthCalendar from '@/components/booking/MonthCalendar.vue';
 import PageHeader from '@/components/PageHeader.vue';
+import BookingQrCodeDialog from '@/components/scheduling/BookingQrCodeDialog.vue';
 import CreateEventTypePanel from '@/components/scheduling/CreateEventTypePanel.vue';
 import EventTypeDetailPanel from '@/components/scheduling/EventTypeDetailPanel.vue';
 import ScopePicker from '@/components/scheduling/ScopePicker.vue';
@@ -303,6 +305,9 @@ const changeCalendarMonth = (month: string) => {
     });
 };
 
+/** The booking link whose QR code is open, if any. */
+const qrCode = ref<{ url: string; name: string } | null>(null);
+
 const copiedSlug = ref<string | null>(null);
 let copyTimer: number | undefined;
 
@@ -546,18 +551,39 @@ setLayoutProps({
                                   page offers the link: a person's own page or a
                                   team's. "Shared" stands for none.
                                 -->
-                                <Button
+                                <div
                                     v-if="group.landingUrl"
-                                    variant="link"
-                                    size="sm"
-                                    class="h-auto p-0"
-                                    as-child
+                                    class="flex items-center gap-3"
                                 >
-                                    <a :href="group.landingUrl" target="_blank">
-                                        View landing page
-                                        <ExternalLink class="size-3.5" />
-                                    </a>
-                                </Button>
+                                    <Button
+                                        variant="link"
+                                        size="sm"
+                                        class="h-auto cursor-pointer p-0"
+                                        @click="
+                                            qrCode = {
+                                                url: group.landingUrl,
+                                                name: group.name,
+                                            }
+                                        "
+                                    >
+                                        <QrCode class="size-3.5" />
+                                        QR code
+                                    </Button>
+                                    <Button
+                                        variant="link"
+                                        size="sm"
+                                        class="h-auto p-0"
+                                        as-child
+                                    >
+                                        <a
+                                            :href="group.landingUrl"
+                                            target="_blank"
+                                        >
+                                            View landing page
+                                            <ExternalLink class="size-3.5" />
+                                        </a>
+                                    </Button>
+                                </div>
                             </header>
 
                             <div class="flex flex-col gap-3">
@@ -795,6 +821,18 @@ setLayoutProps({
                                                 >
                                                     <Link2 class="size-4" />
                                                     Single-use link
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    :data-test="`qr-code-${eventType.slug}`"
+                                                    @select="
+                                                        qrCode = {
+                                                            url: eventType.publicUrl,
+                                                            name: eventType.name,
+                                                        }
+                                                    "
+                                                >
+                                                    <QrCode class="size-4" />
+                                                    QR code
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     v-if="canCreate"
@@ -1042,9 +1080,19 @@ setLayoutProps({
         :copied="copiedSlug !== null && copiedSlug === selected?.slug"
         @close="selected = null"
         @copy="selected && copyLink(selected)"
+        @qr-code="
+            selected &&
+            (qrCode = { url: selected.publicUrl, name: selected.name })
+        "
         @duplicate="selected && duplicateEventType(selected)"
         @toggle-active="selected && toggleActive(selected)"
         @delete="askToDelete"
+    />
+
+    <BookingQrCodeDialog
+        :url="qrCode?.url ?? null"
+        :name="qrCode?.name ?? ''"
+        @close="qrCode = null"
     />
 
     <Dialog :open="deleting !== null" @update:open="dismissDelete">
