@@ -500,3 +500,22 @@ test('an organization admin cannot delete their organization', function () {
 
     $this->assertNotSoftDeleted('teams', ['id' => $team->id]);
 });
+
+test('a member of more than one organization can open the switcher', function () {
+    $user = User::factory()->create();
+    $team = ownerOfAnOrganization($user);
+
+    $this->actingAs($user)
+        ->get(route('dashboard', ['current_team' => $team->slug]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('canSwitchTeams', true)
+            ->has('teams', 2));
+});
+
+test('a member of a single organization cannot open the switcher', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('dashboard', ['current_team' => $user->currentTeam->slug]))
+        ->assertInertia(fn (Assert $page) => $page->where('canSwitchTeams', false));
+});

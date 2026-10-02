@@ -36,13 +36,21 @@ const updateIsMobile = () => {
 
 const currentTeam = computed(() => page.props.currentTeam);
 const teams = computed(() => page.props.teams ?? []);
-const canCreateTeam = computed(() => page.props.canCreateTeam);
 
 /**
- * Only a super admin moves between organizations. Everyone else belongs to
- * one, so the switcher reads as a label rather than a menu.
+ * A super admin moves between every organization, and a member of more than
+ * one moves between their own. Anyone in a single organization sees the
+ * switcher as a label rather than a menu.
  */
-const canSwitchTeams = computed(() => page.props.isSuperAdmin);
+const canSwitchTeams = computed(() => page.props.canSwitchTeams);
+
+/**
+ * "New organization" stays a super admin's tool: an organization admin who
+ * also belongs elsewhere now opens this menu, and should not find it there.
+ */
+const canCreateTeam = computed(
+    () => page.props.isSuperAdmin && page.props.canCreateTeam,
+);
 const menuContentClass = computed(() =>
     props.inHeader
         ? 'w-64'
