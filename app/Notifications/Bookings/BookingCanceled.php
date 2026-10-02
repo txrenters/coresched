@@ -36,7 +36,7 @@ class BookingCanceled extends Notification implements ShouldQueue
             $message->line('**Reason:** '.$booking->cancellation_reason);
         }
 
-        return $message->attachData(
+        return $presenter->withSender($message)->attachData(
             app(IcsGenerator::class)->forBooking($booking),
             'invite.ics',
             ['mime' => 'text/calendar; charset=UTF-8; method=CANCEL'],

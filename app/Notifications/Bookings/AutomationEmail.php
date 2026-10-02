@@ -58,13 +58,10 @@ class AutomationEmail extends Notification implements ShouldQueue
         /*
          * A reply has to reach a person: the scheduling mailbox it sends as is
          * shared and unread. The same rule the booking emails follow -- a host
-         * hears back from the invitee, everyone else from the hosts.
+         * hears back from the invitee, everyone else from the hosts -- and the
+         * same organization header.
          */
-        foreach ((new BookingMailPresenter($this->booking, $notifiable))->replyToAddresses() as $replyTo) {
-            $mail->replyTo($replyTo['address'], $replyTo['name']);
-        }
-
-        return $mail;
+        return (new BookingMailPresenter($this->booking, $notifiable))->withSender($mail);
     }
 
     /**

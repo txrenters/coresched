@@ -40,7 +40,7 @@ class BookingDeclined extends Notification implements ShouldQueue
             $message->line('**Reason:** '.$booking->cancellation_reason);
         }
 
-        return $message;
+        return $presenter->withSender($message);
     }
 
     /**

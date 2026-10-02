@@ -158,6 +158,65 @@ test('a reply to a booking email reaches the other party, not the shared mailbox
         ->toBe([['sam@example.com', 'Sam Rivera']]);
 });
 
+test('a reply to a canceled or declined email reaches the other party too', function (string $notificationClass) {
+    $booking = bookingFor($this->host, $this->eventType, [
+        'name' => 'Sam Rivera',
+        'email' => 'sam@example.com',
+    ]);
+
+    $notification = new $notificationClass($booking->fresh(['eventType', 'host', 'hosts', 'guests']));
+
+    expect($notification->toMail(new AnonymousNotifiable)->replyTo)
+        ->toBe([[$this->host->email, 'Dana Reed']])
+        ->and($notification->toMail($this->host)->replyTo)
+        ->toBe([['sam@example.com', 'Sam Rivera']]);
+})->with([
+    'canceled' => BookingCanceled::class,
+    'declined' => BookingDeclined::class,
+]);
+
+test('a booking email is headed with the organizations name and logo', function () {
+    $this->team->forceFill(['name' => 'Acme Leasing', 'logo_path' => 'team-logos/acme.png'])->save();
+    $booking = bookingFor($this->host, $this->eventType);
+
+    $html = (string) (new BookingConfirmed($booking->fresh(['eventType', 'host', 'hosts', 'guests', 'answers'])))
+        ->toMail(new AnonymousNotifiable)
+        ->render();
+
+    expect($html)
+        ->toContain('src="'.$this->team->fresh()->logoUrl().'"')
+        ->toContain('alt="Acme Leasing"')
+        ->toContain('href="'.route('book.page', ['page' => $this->team->fresh()->slug]).'"')
+        ->toContain('© '.date('Y').' Acme Leasing.');
+});
+
+test('a booking email is sent from the scheduling mailbox under the organizations name', function (string $notificationClass) {
+    $this->team->forceFill(['name' => 'Acme Leasing'])->save();
+    $booking = bookingFor($this->host, $this->eventType);
+
+    $notification = new $notificationClass($booking->fresh(['eventType', 'host', 'hosts', 'guests', 'answers']));
+
+    expect($notification->toMail(new AnonymousNotifiable)->from)
+        ->toBe([config('mail.from.address'), 'Acme Leasing']);
+})->with([
+    'confirmed' => BookingConfirmed::class,
+    'canceled' => BookingCanceled::class,
+    'declined' => BookingDeclined::class,
+]);
+
+test('a booking email without an organization logo is headed with its name', function () {
+    $this->team->forceFill(['name' => 'Acme Leasing', 'logo_path' => null])->save();
+    $booking = bookingFor($this->host, $this->eventType);
+
+    $html = (string) (new BookingCanceled($booking->fresh(['eventType', 'host', 'hosts', 'guests'])))
+        ->toMail(new AnonymousNotifiable)
+        ->render();
+
+    expect($html)
+        ->toMatch('/<td class="header"[^>]*>\s*<a [^>]+>\s*Acme Leasing\s*<\/a>/')
+        ->not->toContain('<img');
+});
+
 test('a stranger cannot cancel a booking', function () {
     $booking = bookingFor($this->host, $this->eventType);
     $stranger = User::factory()->create();

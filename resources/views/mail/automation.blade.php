@@ -4,6 +4,6 @@
     escapes literal HTML, so what they typed is what the reader gets, and a
     pasted <script> stays visible text rather than markup.
 --}}
-@component('mail::message')
+@component('mail::message', ['organization' => $organization ?? null])
 {!! $body !!}
 @endcomponent

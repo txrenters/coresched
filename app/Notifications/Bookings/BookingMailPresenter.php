@@ -204,7 +204,44 @@ class BookingMailPresenter
     }
 
     /**
-     * Add the reply address and the manage links appropriate to the recipient.
+     * Get the organization the email is sent on behalf of, for its header.
+     *
+     * @return array{name: string, logoUrl: string|null, url: string}
+     */
+    public function organization(): array
+    {
+        $team = $this->booking->team;
+
+        return [
+            'name' => $team->name,
+            'logoUrl' => $team->logoUrl(),
+            'url' => $team->slug === null ? config('app.url') : route('book.page', ['page' => $team->slug]),
+        ];
+    }
+
+    /**
+     * Brand the email as the organization's and point replies at a person.
+     *
+     * Only the display name changes: the address stays the scheduling mailbox,
+     * which is the one Graph is allowed to send as. Every booking email needs
+     * this, including the ones with no footer (canceled, declined): a reply to
+     * the shared mailbox is never read.
+     */
+    public function withSender(MailMessage $message): MailMessage
+    {
+        $message->from(config('mail.from.address'), $this->booking->team->name);
+
+        foreach ($this->replyToAddresses() as $replyTo) {
+            $message->replyTo($replyTo['address'], $replyTo['name']);
+        }
+
+        $message->viewData = [...$message->viewData, 'organization' => $this->organization()];
+
+        return $message;
+    }
+
+    /**
+     * Add the sender details and the manage links appropriate to the recipient.
      *
      * Only the host gets a link. An invitee is deliberately offered no way to
      * reschedule or cancel themselves -- changes go through the organizer, so
@@ -214,9 +251,7 @@ class BookingMailPresenter
      */
     public function withFooter(MailMessage $message): MailMessage
     {
-        foreach ($this->replyToAddresses() as $replyTo) {
-            $message->replyTo($replyTo['address'], $replyTo['name']);
-        }
+        $this->withSender($message);
 
         if ($this->isHost()) {
             return $message->action('View booking', route('meetings.index', ['current_team' => $this->booking->team->slug]));
