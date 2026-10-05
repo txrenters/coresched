@@ -123,6 +123,24 @@ class AvailabilityEngine
      */
     protected function freeRangesByHost(EventType $eventType, Collection $hosts, TimeRange $window, ?int $ignoringBookingId): Collection
     {
+        // A host with no open time has nothing to offer a slot.
+        return $this->hostAvailability($eventType, $hosts, $window, $ignoringBookingId)
+            ->filter(fn (HostAvailability $entry) => $entry->free->isNotEmpty());
+    }
+
+    /**
+     * Work out each host's working windows and open time inside the window.
+     *
+     * Unlike the slots, this keeps a host whose day is fully booked: their
+     * working windows are still when they are on duty, which is what a
+     * coverage view needs to tell "booked up" from "not working". A host
+     * with no schedule at all is left out.
+     *
+     * @param  Collection<int, User>  $hosts
+     * @return Collection<int, HostAvailability> Keyed by user id.
+     */
+    public function hostAvailability(EventType $eventType, Collection $hosts, TimeRange $window, ?int $ignoringBookingId = null): Collection
+    {
         $userIds = $hosts->pluck('id')->all();
 
         $busyByHost = $this->busyTimes->forHosts(
@@ -152,9 +170,7 @@ class AvailabilityEngine
                 ->flatMap(fn (TimeRange $range) => $range->subtract($busy))
                 ->values();
 
-            if ($ranges->isNotEmpty()) {
-                $available->put($host->id, new HostAvailability($ranges, $windows));
-            }
+            $available->put($host->id, new HostAvailability($ranges, $windows));
         }
 
         return $available;
