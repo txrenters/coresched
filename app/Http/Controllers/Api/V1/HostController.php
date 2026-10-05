@@ -126,16 +126,15 @@ class HostController extends Controller
             // Shared hours belong to the organization: the host cannot edit them.
             'kind' => $schedule->isShared() ? 'shared' : 'personal',
             'timezone' => $timezone,
-            'weekly' => $schedule->rules
+            'weekly' => array_values($schedule->rules
                 ->sortBy(fn (AvailabilityRule $rule): string => $rule->day_of_week.$rule->starts_at)
                 ->map(fn (AvailabilityRule $rule): array => [
                     'dayOfWeek' => $rule->day_of_week,
                     'startsAt' => $this->clock($rule->starts_at),
                     'endsAt' => $this->clock($rule->ends_at),
                 ])
-                ->values()
-                ->all(),
-            'overrides' => $schedule->overrides
+                ->all()),
+            'overrides' => array_values($schedule->overrides
                 ->filter(fn (AvailabilityOverride $override): bool => $override->date->toDateString() >= $today)
                 ->sortBy(fn (AvailabilityOverride $override): string => $override->date->toDateString())
                 ->take(self::MAX_OVERRIDES)
@@ -145,8 +144,7 @@ class HostController extends Controller
                     'startsAt' => $override->starts_at === null ? null : $this->clock($override->starts_at),
                     'endsAt' => $override->ends_at === null ? null : $this->clock($override->ends_at),
                 ])
-                ->values()
-                ->all(),
+                ->all()),
         ];
     }
 
@@ -156,13 +154,12 @@ class HostController extends Controller
      */
     private function ranges(?Collection $ranges): array
     {
-        return ($ranges ?? new Collection)
+        return array_values(($ranges ?? new Collection)
             ->map(fn (TimeRange $range): array => [
                 'startsAt' => $range->start->toIso8601String(),
                 'endsAt' => $range->end->toIso8601String(),
             ])
-            ->values()
-            ->all();
+            ->all());
     }
 
     /** "09:00:00" as stored, "09:00" as anybody would read it. */
