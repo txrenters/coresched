@@ -1,13 +1,13 @@
 {{--
     $organization is set on booking emails (BookingMailPresenter::withSender)
-    so the header and sign-off carry the organization's own name and logo.
+    so the header and sign-off carry the organization's own name.
     Account emails have no organization and keep the app's name.
 --}}
 @props(['organization' => null])
 <x-mail::layout>
 {{-- Header --}}
 <x-slot:header>
-<x-mail::header :url="$organization['url'] ?? config('app.url')" :logo="$organization['logoUrl'] ?? null">
+<x-mail::header :url="$organization['url'] ?? config('app.url')">
 {{ $organization['name'] ?? config('app.name') }}
 </x-mail::header>
 </x-slot:header>
