@@ -71,7 +71,7 @@ return [
             'mailbox' => env('MAIL_GRAPH_MAILBOX') ?: env('MAIL_FROM_ADDRESS'),
             // Also sent through as themselves when a message is from them.
             'send_as' => array_values(array_filter([env('MAIL_ACCOUNT_FROM_ADDRESS')])),
-            'save_to_sent_items' => env('MAIL_GRAPH_SAVE_TO_SENT_ITEMS', false),
+            'save_to_sent_items' => env('MAIL_GRAPH_SAVE_TO_SENT_ITEMS', true),
         ],
 
         'ses' => [

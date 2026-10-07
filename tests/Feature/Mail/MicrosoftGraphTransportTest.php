@@ -71,6 +71,26 @@ test('mail is sent from the shared mailbox through graph', function () {
         ->and($body['saveToSentItems'])->toBeFalse();
 });
 
+test('a copy is kept in sent items when the mailer is set to save one', function () {
+    config(['mail.mailers.microsoft-graph.save_to_sent_items' => true]);
+    fakeGraph();
+    $body = sendThroughGraph(fn ($message) => $message
+        ->to('invitee@example.com')
+        ->subject('Reminder: Showing in 1 hour'));
+
+    expect($body['saveToSentItems'])->toBeTrue();
+});
+
+test('the mailer keeps a sent items copy when the setting is left out', function () {
+    config(['mail.mailers.microsoft-graph' => collect(config('mail.mailers.microsoft-graph'))->except('save_to_sent_items')->all()]);
+    fakeGraph();
+    $body = sendThroughGraph(fn ($message) => $message
+        ->to('invitee@example.com')
+        ->subject('Reminder: Showing in 1 hour'));
+
+    expect($body['saveToSentItems'])->toBeTrue();
+});
+
 test('mail from the no-reply address is sent through that mailbox', function () {
     fakeGraph();
     $body = sendThroughGraph(fn ($message) => $message

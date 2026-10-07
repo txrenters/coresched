@@ -116,7 +116,7 @@ class AppServiceProvider extends ServiceProvider
                 clientId: $config['client_id'],
                 clientSecret: $config['client_secret'],
                 mailbox: $config['mailbox'],
-                saveToSentItems: (bool) ($config['save_to_sent_items'] ?? false),
+                saveToSentItems: (bool) ($config['save_to_sent_items'] ?? true),
                 sendAs: array_values(array_filter((array) ($config['send_as'] ?? []))),
             );
         });
