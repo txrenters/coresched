@@ -301,10 +301,10 @@ class MeetingController extends Controller
         match ($range) {
             'today' => $query
                 ->whereBetween('starts_at', [$now->startOfDay()->utc(), $now->endOfDay()->utc()])
-                ->orderBy('starts_at'),
+                ->tap(fn (Builder $query) => $this->orderComingUpFirst($query, $now)),
             'this_week' => $query
                 ->whereBetween('starts_at', [$now->startOfWeek()->utc(), $now->endOfWeek()->utc()])
-                ->orderBy('starts_at'),
+                ->tap(fn (Builder $query) => $this->orderComingUpFirst($query, $now)),
             'last_week' => $query
                 ->whereBetween('starts_at', [
                     $now->subWeek()->startOfWeek()->utc(),
@@ -321,6 +321,21 @@ class MeetingController extends Controller
             'past' => $query->where('ends_at', '<=', $now->utc())->orderByDesc('starts_at'),
             default => $query->where('ends_at', '>', $now->utc())->orderBy('starts_at'),
         };
+    }
+
+    /**
+     * Put meetings that have not ended yet first, soonest first, then the
+     * finished ones, most recent first, so a range that is partly over opens
+     * on what is coming up rather than on meetings already done.
+     *
+     * @param  Builder<Booking>  $query
+     */
+    protected function orderComingUpFirst(Builder $query, CarbonImmutable $now): void
+    {
+        $query
+            ->orderByRaw('case when ends_at > ? then 0 else 1 end', [$now->utc()])
+            ->orderByRaw('case when ends_at > ? then starts_at end', [$now->utc()])
+            ->orderByDesc('starts_at');
     }
 
     /**

@@ -357,6 +357,24 @@ test('the this week range only covers the current week', function () {
         ->assertInertia(fn ($page) => $page->has('meetings', 1)->where('total', 1));
 });
 
+test('the this week range lists meetings still to come first, then finished ones latest first', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-09-03 16:00:00', 'UTC'));
+
+    foreach (['2026-08-31 15:00', '2026-09-02 15:00', '2026-09-03 15:00', '2026-09-03 18:00', '2026-09-04 15:00'] as $start) {
+        bookingFor($this->host, $this->eventType, [
+            'starts_at' => CarbonImmutable::parse($start, 'UTC'),
+            'ends_at' => CarbonImmutable::parse($start, 'UTC')->addMinutes(30),
+        ]);
+    }
+
+    $this->actingAs($this->host)
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'this_week']))
+        ->assertInertia(fn ($page) => $page
+            ->where('meetings', fn ($meetings) => collect($meetings)->pluck('dateKey')->all() === [
+                '2026-09-03', '2026-09-04', '2026-09-03', '2026-09-02', '2026-08-31',
+            ]));
+});
+
 test('the today chip only covers today', function () {
     bookingFor($this->host, $this->eventType, [
         'starts_at' => CarbonImmutable::parse('2026-09-01 15:00:00', 'UTC'),
