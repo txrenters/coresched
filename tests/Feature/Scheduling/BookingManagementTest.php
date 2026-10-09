@@ -190,6 +190,19 @@ test('a booking email is headed with the organizations name, not its logo', func
         ->toContain('© '.date('Y').' Acme Leasing.');
 });
 
+test('a booking email is styled with the app theme palette', function () {
+    $booking = bookingFor($this->host, $this->eventType);
+
+    $html = (string) (new BookingConfirmed($booking->fresh(['eventType', 'host', 'hosts', 'guests', 'answers'])))
+        ->toMail(new AnonymousNotifiable)
+        ->render();
+
+    expect($html)
+        ->toMatch('/<a [^>]*class="button button-primary"[^>]*style="[^"]*background-color: #006bff/')
+        ->toMatch('/<table class="wrapper"[^>]*style="[^"]*background-color: #f5f8fd/')
+        ->not->toContain('#18181b');
+});
+
 test('a booking email is sent from the scheduling mailbox under the organizations name', function (string $notificationClass) {
     $this->team->forceFill(['name' => 'Acme Leasing'])->save();
     $booking = bookingFor($this->host, $this->eventType);
