@@ -63,6 +63,7 @@ defineProps<{
         revokedAt: string | null;
         webhookUrl: string | null;
         webhookScope: string;
+        canWrite: boolean;
     }[];
 }>();
 </script>
@@ -335,6 +336,24 @@ defineProps<{
                             />
                             Make a new signing secret (the old one stops
                             verifying at once)
+                        </label>
+                        <label class="flex items-start gap-2 text-sm">
+                            <input
+                                type="checkbox"
+                                name="can_write"
+                                value="1"
+                                :checked="key.canWrite"
+                                class="mt-0.5 size-4 rounded border-input"
+                            />
+                            <span>
+                                Allow writes: put people on a meeting's rota
+                                and save their hours.
+                                <span class="block text-xs text-muted-foreground">
+                                    Only for an application that keeps its own
+                                    people in step with this one, such as the
+                                    CRM. Reading never needs it.
+                                </span>
+                            </span>
                         </label>
                         <div class="flex gap-2">
                             <Button

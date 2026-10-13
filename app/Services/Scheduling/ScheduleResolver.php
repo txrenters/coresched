@@ -24,6 +24,37 @@ class ScheduleResolver
      * next candidate. Substituting different hours for a schedule someone
      * deliberately switched off would be worse than offering nothing.
      */
+    /**
+     * Which layer governs a host's hours for an event type, by the same
+     * order resolve() walks: another application showing a host their own
+     * hours needs to know whether changing them would change anything.
+     *
+     * @return 'host_override'|'event_type'|'group'|'personal'
+     */
+    public function source(EventType $eventType, User $host): string
+    {
+        $pivot = $host->relationLoaded('pivot') ? $host->getRelation('pivot') : null;
+        $pivotScheduleId = $pivot?->availability_schedule_id;
+
+        if ($pivotScheduleId !== null && AvailabilitySchedule::query()->whereKey((int) $pivotScheduleId)->exists()) {
+            return 'host_override';
+        }
+
+        if ($eventType->availability_schedule_id !== null) {
+            $schedule = $eventType->availabilitySchedule;
+
+            if ($schedule !== null && ($schedule->isShared() || $eventType->user_id === $host->id)) {
+                return 'event_type';
+            }
+        }
+
+        if ($eventType->group_id !== null && $eventType->group?->availabilitySchedule !== null) {
+            return 'group';
+        }
+
+        return 'personal';
+    }
+
     public function resolve(EventType $eventType, User $host): ?AvailabilitySchedule
     {
         $pivot = $host->relationLoaded('pivot') ? $host->getRelation('pivot') : null;

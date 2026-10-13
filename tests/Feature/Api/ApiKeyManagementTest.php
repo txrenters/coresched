@@ -277,3 +277,31 @@ test('an admin can choose that a key hears about every booking', function () {
         ->patch(route('api-keys.update', $key), ['name' => 'Operations', 'webhook_url' => 'https://ops.example.com/hook', 'webhook_scope' => 'everything'])
         ->assertSessionHasErrors('webhook_scope');
 });
+
+test('an admin can let a key write, and take it back', function () {
+    ['key' => $key] = ApiKey::issue('TEXRA', $this->admin, $this->org);
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $key), ['name' => 'TEXRA', 'can_write' => true])
+        ->assertRedirect(route('api-keys.index'));
+
+    expect($key->fresh()->canWrite())->toBeTrue();
+
+    $this->actingAs($this->admin)
+        ->patch(route('api-keys.update', $key), ['name' => 'TEXRA']);
+
+    expect($key->fresh()->canWrite())->toBeFalse();
+});
+
+test('the key list says which keys may write', function () {
+    ['key' => $key] = ApiKey::issue('TEXRA', $this->admin, $this->org, canWrite: true);
+    ApiKey::issue('Reader', $this->admin, $this->org);
+
+    $this->actingAs($this->admin)
+        ->get(route('api-keys.index'))
+        ->assertInertia(fn ($page) => $page
+            ->has('keys', 2)
+            // Two keys made in the same second have no fixed order.
+            ->where('keys', fn ($keys) => collect($keys)->firstWhere('id', $key->id)['canWrite'] === true
+                && collect($keys)->firstWhere('name', 'Reader')['canWrite'] === false));
+});

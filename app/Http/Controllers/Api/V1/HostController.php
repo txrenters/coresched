@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\Teams\EnsureEventTypeHost;
 use App\Http\Controllers\Api\Concerns\ResolvesBookingPage;
+use App\Http\Controllers\Api\Concerns\SerialisesHostSchedule;
 use App\Http\Controllers\Controller;
-use App\Models\AvailabilityOverride;
-use App\Models\AvailabilityRule;
-use App\Models\AvailabilitySchedule;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Scheduling\AvailabilityEngine;
@@ -17,22 +16,65 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 
 class HostController extends Controller
 {
-    use ResolvesBookingPage;
+    use ResolvesBookingPage, SerialisesHostSchedule;
 
     /** The longest window one request may ask for. */
     private const MAX_DAYS = 31;
-
-    /** Date overrides further out than this many are not worth sending. */
-    private const MAX_OVERRIDES = 60;
 
     public function __construct(
         private BookingPageResolver $pages,
         private AvailabilityEngine $availability,
         private ScheduleResolver $schedules,
     ) {}
+
+    /**
+     * Put somebody on an event type's rota, making their account if needed.
+     *
+     * The write TEXRA needs before it can save an agent's hours: the agent
+     * has to exist here, in the organization, and in the pool. An address
+     * that already has an account is used as it is and never duplicated.
+     * Answers 201 when an account was made and 200 when it already existed,
+     * and in both cases which layer governs the person's hours, so the
+     * caller can warn when personal hours would not apply.
+     */
+    public function store(Request $request, string $page, string $eventType, EnsureEventTypeHost $ensure): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'timezone' => ['nullable', 'string', Rule::in(timezone_identifiers_list())],
+        ]);
+
+        $owner = $this->pageForKey($request, $this->pages, $page);
+        $type = $this->pages->eventType($owner, $eventType);
+
+        abort_if($type === null, 404);
+
+        $team = $owner instanceof Team ? $owner : $request->attributes->get('api_key')?->team;
+
+        abort_if($team === null, 404);
+
+        ['user' => $host, 'created' => $created] = $ensure->handle(
+            $team,
+            $type,
+            $validated['name'],
+            $validated['email'],
+            $validated['timezone'] ?? null,
+        );
+
+        return response()->json([
+            'host' => [
+                'name' => $host->name,
+                'email' => $host->email,
+                'created' => $created,
+            ],
+            'governs' => $this->schedules->source($type->fresh(['group']), $host),
+        ], $created ? 201 : 200);
+    }
 
     /**
      * The hours each host of an event type keeps.
@@ -108,47 +150,6 @@ class HostController extends Controller
     }
 
     /**
-     * The schedule as its owner set it: wall-clock hours in its own timezone.
-     *
-     * @return array{name: string, kind: string, timezone: string, weekly: list<array{dayOfWeek: int, startsAt: string, endsAt: string}>, overrides: list<array{date: string, isUnavailable: bool, startsAt: string|null, endsAt: string|null}>}|null
-     */
-    private function schedule(?AvailabilitySchedule $schedule): ?array
-    {
-        if ($schedule === null) {
-            return null;
-        }
-
-        $timezone = $schedule->timezone ?: 'UTC';
-        $today = CarbonImmutable::now($timezone)->toDateString();
-
-        return [
-            'name' => $schedule->name,
-            // Shared hours belong to the organization: the host cannot edit them.
-            'kind' => $schedule->isShared() ? 'shared' : 'personal',
-            'timezone' => $timezone,
-            'weekly' => array_values($schedule->rules
-                ->sortBy(fn (AvailabilityRule $rule): string => $rule->day_of_week.$rule->starts_at)
-                ->map(fn (AvailabilityRule $rule): array => [
-                    'dayOfWeek' => $rule->day_of_week,
-                    'startsAt' => $this->clock($rule->starts_at),
-                    'endsAt' => $this->clock($rule->ends_at),
-                ])
-                ->all()),
-            'overrides' => array_values($schedule->overrides
-                ->filter(fn (AvailabilityOverride $override): bool => $override->date->toDateString() >= $today)
-                ->sortBy(fn (AvailabilityOverride $override): string => $override->date->toDateString())
-                ->take(self::MAX_OVERRIDES)
-                ->map(fn (AvailabilityOverride $override): array => [
-                    'date' => $override->date->toDateString(),
-                    'isUnavailable' => $override->is_unavailable,
-                    'startsAt' => $override->starts_at === null ? null : $this->clock($override->starts_at),
-                    'endsAt' => $override->ends_at === null ? null : $this->clock($override->ends_at),
-                ])
-                ->all()),
-        ];
-    }
-
-    /**
      * @param  Collection<int, TimeRange>|null  $ranges
      * @return list<array{startsAt: string, endsAt: string}>
      */
@@ -160,11 +161,5 @@ class HostController extends Controller
                 'endsAt' => $range->end->toIso8601String(),
             ])
             ->all());
-    }
-
-    /** "09:00:00" as stored, "09:00" as anybody would read it. */
-    private function clock(string $time): string
-    {
-        return substr($time, 0, 5);
     }
 }
