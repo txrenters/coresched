@@ -346,9 +346,11 @@ defineProps<{
                                 class="mt-0.5 size-4 rounded border-input"
                             />
                             <span>
-                                Allow writes: put people on a meeting's rota
-                                and save their hours.
-                                <span class="block text-xs text-muted-foreground">
+                                Allow writes: put people on a meeting's rota and
+                                save their hours.
+                                <span
+                                    class="block text-xs text-muted-foreground"
+                                >
                                     Only for an application that keeps its own
                                     people in step with this one, such as the
                                     CRM. Reading never needs it.
