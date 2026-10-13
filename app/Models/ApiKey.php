@@ -32,13 +32,14 @@ use Illuminate\Support\Str;
  * @property ?string $webhook_url
  * @property ?string $webhook_secret
  * @property WebhookScope $webhook_scope
+ * @property bool $can_write
  * @property ?int $created_by
  * @property ?Carbon $last_used_at
  * @property ?Carbon $revoked_at
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
-#[Fillable(['name', 'team_id', 'prefix', 'token_hash', 'created_by'])]
+#[Fillable(['name', 'team_id', 'prefix', 'token_hash', 'created_by', 'can_write'])]
 #[Hidden(['token_hash', 'webhook_secret'])]
 class ApiKey extends Model
 {
@@ -59,6 +60,7 @@ class ApiKey extends Model
             'revoked_at' => 'datetime',
             'webhook_secret' => 'encrypted',
             'webhook_scope' => WebhookScope::class,
+            'can_write' => 'boolean',
         ];
     }
 
@@ -84,11 +86,12 @@ class ApiKey extends Model
      * Make a key, returning the model and the one and only copy of the secret.
      *
      * A key with no organization speaks for all of them, which is why only a
-     * super admin can issue one.
+     * super admin can issue one. Write permission is granted here or in
+     * settings; it is never implied.
      *
      * @return array{key: self, token: string}
      */
-    public static function issue(string $name, ?User $creator = null, ?Team $team = null): array
+    public static function issue(string $name, ?User $creator = null, ?Team $team = null, bool $canWrite = false): array
     {
         $prefix = Str::lower(Str::random(self::PREFIX_LENGTH));
         $secret = Str::random(48);
@@ -99,9 +102,22 @@ class ApiKey extends Model
             'prefix' => $prefix,
             'token_hash' => Hash::make($secret),
             'created_by' => $creator?->id,
+            'can_write' => $canWrite,
         ]);
 
         return ['key' => $key, 'token' => $prefix.'.'.$secret];
+    }
+
+    /**
+     * Whether this key may change things: put a host on a rota, save hours.
+     *
+     * Only an organization's own key can, and only when the flag was set.
+     * A system-wide key reads every organization, and letting it write to
+     * all of them from one credential is more reach than any caller needs.
+     */
+    public function canWrite(): bool
+    {
+        return $this->team_id !== null && $this->can_write;
     }
 
     /**

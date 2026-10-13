@@ -45,6 +45,7 @@ class ApiKeyController extends Controller
                     'revokedAt' => $key->revoked_at?->toIso8601String(),
                     'webhookUrl' => $key->webhook_url,
                     'webhookScope' => $key->webhook_scope->value,
+                    'canWrite' => $key->canWrite(),
                 ]),
             'webhookScopes' => collect(WebhookScope::cases())->map(fn (WebhookScope $scope): array => [
                 'value' => $scope->value,
@@ -54,11 +55,13 @@ class ApiKeyController extends Controller
     }
 
     /**
-     * Rename a key, or point its booking webhooks at an endpoint.
+     * Rename a key, point its booking webhooks at an endpoint, or let it write.
      *
      * A key that gains an endpoint gets a signing secret, shown once like the
      * key itself; asking to rotate makes a new one. Clearing the URL stops the
-     * webhooks and drops the secret.
+     * webhooks and drops the secret. Write permission is a plain switch, and
+     * an unchecked box takes it back: the form always says the whole truth
+     * about the key.
      */
     public function update(Request $request, ApiKey $apiKey): RedirectResponse
     {
@@ -74,9 +77,13 @@ class ApiKeyController extends Controller
             'webhook_url' => ['nullable', 'url:https,http', 'max:2048'],
             'webhook_scope' => [Rule::enum(WebhookScope::class)],
             'rotate_secret' => ['boolean'],
+            'can_write' => ['boolean'],
         ]);
 
-        $apiKey->forceFill(['name' => $validated['name']])->save();
+        $apiKey->forceFill([
+            'name' => $validated['name'],
+            'can_write' => $request->boolean('can_write'),
+        ])->save();
 
         $secret = $apiKey->pointWebhookAt(
             $validated['webhook_url'] ?? null,
@@ -88,6 +95,7 @@ class ApiKeyController extends Controller
             'api_key_id' => $apiKey->id,
             'webhook_url' => $apiKey->webhook_url,
             'webhook_scope' => $apiKey->webhook_scope->value,
+            'can_write' => $apiKey->can_write,
             'secret_issued' => $secret !== null,
             'updated_by' => $request->user()?->id,
         ]);

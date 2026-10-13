@@ -3,12 +3,14 @@
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\EventTypeController;
 use App\Http\Controllers\Api\V1\HostController;
+use App\Http\Controllers\Api\V1\HostScheduleController;
 use App\Http\Controllers\Api\V1\IdentityController;
 use App\Http\Controllers\Api\V1\OrganizationBookingController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\OrganizationEventTypeController;
 use App\Http\Controllers\Api\V1\SlotController;
 use App\Http\Middleware\AuthenticateApiToken;
+use App\Http\Middleware\EnsureApiKeyCanWrite;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -39,6 +41,14 @@ Route::middleware(AuthenticateApiToken::class)->prefix('v1')->name('api.v1.')->g
     // hours each keeps, so another application can show a host their own
     // hours and an administrator who covers which part of the week.
     Route::get('pages/{page}/event-types/{eventType}/hosts', [HostController::class, 'index'])->name('hosts.index');
+
+    // The writes: another application putting its own people on a rota and
+    // keeping their hours. Only a key given write permission gets here.
+    Route::middleware([EnsureApiKeyCanWrite::class, 'throttle:30,1'])->group(function () {
+        Route::post('pages/{page}/event-types/{eventType}/hosts', [HostController::class, 'store'])->name('hosts.store');
+        Route::put('pages/{page}/event-types/{eventType}/hosts/{email}/schedule', [HostScheduleController::class, 'update'])
+            ->name('hosts.schedule.update');
+    });
 
     Route::get('bookings', [BookingController::class, 'index'])->name('bookings.index');
     Route::post('bookings', [BookingController::class, 'store'])
