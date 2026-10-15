@@ -4,6 +4,7 @@ namespace App\Http\Requests\Scheduling;
 
 use App\Enums\QuestionType;
 use App\Models\EventType;
+use App\Models\HostZone;
 use App\Models\SingleUseLink;
 use App\Services\Scheduling\BookingPageResolver;
 use App\Support\PhoneNumber;
@@ -39,6 +40,9 @@ class StoreBookingRequest extends FormRequest
             'host_id' => ['nullable', 'integer'],
             // Opaque to us: the caller that sent the invitee here reads it back.
             'reference' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_-]{1,100}$/'],
+            // Where the invitee is, as the link named it: keeps the host to
+            // those who cover it.
+            'zone' => ['nullable', 'string', 'regex:'.HostZone::PATTERN],
         ];
     }
 

@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\CalendarAccount;
 use App\Models\EventType;
 use App\Models\Group;
+use App\Models\HostZone;
 use App\Models\LeavePeriod;
 use App\Models\MeetingLimit;
 use App\Models\Team;
@@ -110,6 +111,16 @@ trait HasScheduling
     public function meetingLimits(): HasMany
     {
         return $this->hasMany(MeetingLimit::class);
+    }
+
+    /**
+     * Get the areas the user takes meetings for, across their organizations.
+     *
+     * @return HasMany<HostZone, $this>
+     */
+    public function hostZones(): HasMany
+    {
+        return $this->hasMany(HostZone::class);
     }
 
     /**

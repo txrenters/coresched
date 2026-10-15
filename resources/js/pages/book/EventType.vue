@@ -54,6 +54,7 @@ type Props = {
         email: string | null;
         phone: string | null;
         reference: string | null;
+        zone: string | null;
     } | null;
     eventType: {
         slug: string;
@@ -134,6 +135,10 @@ const form = useForm({
     // Never shown or edited: it ties the booking back to whoever sent the
     // invitee here, and goes out again in every webhook about it.
     reference: props.prefill?.reference ?? null,
+    // Where the invitee is, as the link named it. The times shown were
+    // already narrowed to the hosts covering it; posting it back keeps the
+    // booking with one of them.
+    zone: props.prefill?.zone ?? null,
 });
 
 /*

@@ -22,3 +22,6 @@ Inputs disagree on shape: the UI posts H:i (validated as date_format:H:i), Calen
 App\Concerns\NormalisesWallClockTimes is on both models and pads on write, so every writer lands H:i:s. Do not go back to per-caller `$value.':00'` concatenation — that is what the Calendly importer missed and it put 121 malformed rows in the database.
 
 Because writes are now normalised, keep describeHours strict; a lenient parser there would just hide the next bad writer.
+
+## Booking zones narrow the host pool inside schedulingHosts(), nowhere else
+A host may list zones (`host_zones`, per organization, opaque keys written by TEXRA through `PUT .../hosts/{email}/zones`). A booking link's `zone=` (prefilled, posted back, stored on `bookings.zone`, echoed in the webhook) makes `EventType::schedulingHosts($zone)` return only the pool members listing it. The engine, CreateBooking, AssignHosts, reschedules and hand-offs all pass the zone through that one method; do not filter hosts by zone anywhere else. A zone nobody in the pool lists narrows nothing (so a new area still books), and `AssignHosts` never falls back to an out-of-zone owner for a zone somebody covers: that is `SlotUnavailableException`.

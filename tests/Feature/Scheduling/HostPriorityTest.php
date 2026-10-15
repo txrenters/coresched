@@ -2,10 +2,12 @@
 
 use App\Actions\Bookings\AssignHosts;
 use App\Actions\Scheduling\SaveEventType;
+use App\Exceptions\SlotUnavailableException;
 use App\Models\AvailabilitySchedule;
 use App\Models\Booking;
 use App\Models\EventType;
 use App\Models\Group;
+use App\Models\HostZone;
 use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -172,4 +174,61 @@ test('a group host pool is offered in its own priority order', function () {
         ->handle($eventType->fresh(), [$first->id, $second->id]);
 
     expect($chosen->first()->id)->toBe($second->id);
+});
+
+test('a zone keeps the slot to the hosts covering it, in their priority order', function () {
+    $first = priorityHost();
+    $second = priorityHost();
+    $third = priorityHost();
+
+    $eventType = EventType::factory()->ownedBy($first)->roundRobin()->create();
+
+    $eventType->hosts()->attach([
+        $first->id => ['priority' => 0],
+        $second->id => ['priority' => 1],
+        $third->id => ['priority' => 2],
+    ]);
+
+    foreach ([$second, $third] as $host) {
+        HostZone::query()->create(['team_id' => $eventType->team_id, 'user_id' => $host->id, 'zone' => 'zone-a']);
+    }
+
+    $chosen = app(AssignHosts::class)
+        ->handle($eventType->fresh(), [$first->id, $second->id, $third->id], 'zone-a');
+
+    expect($chosen->first()->id)->toBe($second->id);
+});
+
+test('a zone nobody covers changes nothing', function () {
+    $first = priorityHost();
+    $second = priorityHost();
+
+    $eventType = EventType::factory()->ownedBy($first)->roundRobin()->create();
+
+    $eventType->hosts()->attach([
+        $first->id => ['priority' => 0],
+        $second->id => ['priority' => 1],
+    ]);
+
+    $chosen = app(AssignHosts::class)->handle($eventType->fresh(), [$first->id, $second->id], 'zone-z');
+
+    expect($chosen->first()->id)->toBe($first->id);
+});
+
+test('the owner is not the fallback for a zone somebody covers', function () {
+    $owner = priorityHost();
+    $covering = priorityHost();
+
+    $eventType = EventType::factory()->ownedBy($owner)->roundRobin()->create();
+
+    $eventType->hosts()->attach([
+        $owner->id => ['priority' => 0],
+        $covering->id => ['priority' => 1],
+    ]);
+
+    HostZone::query()->create(['team_id' => $eventType->team_id, 'user_id' => $covering->id, 'zone' => 'zone-a']);
+
+    // Only the owner is free, and the owner does not cover the zone.
+    expect(fn () => app(AssignHosts::class)->handle($eventType->fresh(), [$owner->id], 'zone-a'))
+        ->toThrow(SlotUnavailableException::class);
 });

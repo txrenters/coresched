@@ -221,3 +221,63 @@ test('an organization key cannot touch another organization rota', function () {
 
     ensureHost(['name' => 'Priya Patel', 'email' => 'priya@texasrenters.com'], $theirs)->assertNotFound();
 });
+
+/**
+ * @param  array<string, mixed>  $body
+ */
+function saveZones(string $email, array $body, ?string $token = null)
+{
+    return test()->putJson(route('api.v1.hosts.zones.update', [
+        'page' => test()->team->slug,
+        'eventType' => 'call-with-an-agent',
+        'email' => $email,
+    ]), $body, ['Authorization' => 'Bearer '.($token ?? test()->token)]);
+}
+
+test('a key without write permission cannot set a host\'s zones', function () {
+    saveZones('dana@texra.net', ['zones' => ['zone-a']], $this->readOnlyToken)->assertForbidden();
+});
+
+test('a host\'s zones are kept per organization and read back with their hours', function () {
+    saveZones('Dana@texra.net', ['zones' => ['zone-b', 'zone-a']])
+        ->assertOk()
+        ->assertExactJson(['zones' => ['zone-a', 'zone-b']]);
+
+    // Saving again replaces the set rather than adding to it.
+    saveZones('dana@texra.net', ['zones' => ['zone-a']])
+        ->assertOk()
+        ->assertExactJson(['zones' => ['zone-a']]);
+
+    $this->getJson(route('api.v1.hosts.index', [
+        'page' => $this->team->slug,
+        'eventType' => 'call-with-an-agent',
+        'from' => '2026-10-05',
+        'to' => '2026-10-05',
+    ]), ['Authorization' => 'Bearer '.$this->token])
+        ->assertOk()
+        ->assertJsonPath('data.0.email', 'dana@texra.net')
+        ->assertJsonPath('data.0.zones', ['zone-a']);
+});
+
+test('an empty list clears a host\'s zones', function () {
+    saveZones('dana@texra.net', ['zones' => ['zone-a']])->assertOk();
+    saveZones('dana@texra.net', ['zones' => []])->assertOk()->assertExactJson(['zones' => []]);
+});
+
+test('somebody off the rota cannot be given zones', function () {
+    saveZones('nobody@texra.net', ['zones' => ['zone-a']])->assertNotFound();
+});
+
+test('a zone is a slug', function () {
+    saveZones('dana@texra.net', ['zones' => ['Zone A']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['zones.0']);
+});
+
+test('putting a host on the rota reports the zones they already have', function () {
+    saveZones('dana@texra.net', ['zones' => ['zone-a']])->assertOk();
+
+    ensureHost(['name' => 'Dana Fields', 'email' => 'dana@texra.net'])
+        ->assertOk()
+        ->assertJsonPath('host.zones', ['zone-a']);
+});

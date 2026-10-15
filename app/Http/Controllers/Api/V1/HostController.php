@@ -6,6 +6,7 @@ use App\Actions\Teams\EnsureEventTypeHost;
 use App\Http\Controllers\Api\Concerns\ResolvesBookingPage;
 use App\Http\Controllers\Api\Concerns\SerialisesHostSchedule;
 use App\Http\Controllers\Controller;
+use App\Models\HostZone;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Scheduling\AvailabilityEngine;
@@ -71,6 +72,7 @@ class HostController extends Controller
                 'name' => $host->name,
                 'email' => $host->email,
                 'created' => $created,
+                'zones' => $this->zonesByHost($team, [$host->id])[$host->id] ?? [],
             ],
             'governs' => $this->schedules->source($type->fresh(['group']), $host),
         ], $created ? 201 : 200);
@@ -119,16 +121,19 @@ class HostController extends Controller
 
         $window = new TimeRange($from->utc(), $to->utc());
         $availability = $this->availability->hostAvailability($type, $hosts, $window);
+        $zones = $this->zonesByHost($type->team, $hosts->modelKeys());
 
         return response()->json([
             'data' => $hosts
-                ->map(function (User $host) use ($type, $availability): array {
+                ->map(function (User $host) use ($type, $availability, $zones): array {
                     $entry = $availability->get($host->id);
 
                     return [
                         'name' => $host->name,
                         'email' => $host->email,
                         'schedule' => $this->schedule($this->schedules->resolve($type, $host)),
+                        // The areas they cover, as the caller's own keys.
+                        'zones' => $zones[$host->id] ?? [],
                         'windows' => $this->ranges($entry?->windows),
                         'free' => $this->ranges($entry?->free),
                     ];
@@ -147,6 +152,29 @@ class HostController extends Controller
                 'availabilityUrl' => $owner instanceof Team ? url("/{$owner->slug}/availability") : null,
             ],
         ]);
+    }
+
+    /**
+     * The zones of each host in the organization, sorted, keyed by host id.
+     *
+     * @param  array<int, int>  $hostIds
+     * @return array<int, list<string>>
+     */
+    private function zonesByHost(Team $team, array $hostIds): array
+    {
+        $zones = [];
+
+        $rows = HostZone::query()
+            ->where('team_id', $team->id)
+            ->whereIn('user_id', $hostIds)
+            ->orderBy('zone')
+            ->get(['user_id', 'zone']);
+
+        foreach ($rows as $row) {
+            $zones[$row->user_id][] = $row->zone;
+        }
+
+        return $zones;
     }
 
     /**

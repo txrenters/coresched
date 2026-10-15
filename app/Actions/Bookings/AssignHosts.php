@@ -2,6 +2,7 @@
 
 namespace App\Actions\Bookings;
 
+use App\Exceptions\SlotUnavailableException;
 use App\Models\Booking;
 use App\Models\EventType;
 use App\Models\User;
@@ -20,16 +21,27 @@ class AssignHosts
      * A host who is busy is simply not in $availableHostIds, so the next
      * priority down picks the slot up.
      *
+     * A zone keeps the choice to the hosts covering it, the same narrowing
+     * the slots were offered with. The owner fallback is for a pool with
+     * nobody in it, never a way round the zone: with a zone somebody covers
+     * and no covering host free, the slot is not available.
+     *
      * @param  array<int, int>  $availableHostIds
      * @return Collection<int, User>
+     *
+     * @throws SlotUnavailableException
      */
-    public function handle(EventType $eventType, array $availableHostIds): Collection
+    public function handle(EventType $eventType, array $availableHostIds, ?string $zone = null): Collection
     {
-        $candidates = $eventType->hostPool()
+        $candidates = $eventType->schedulingHosts($zone)
             ->whereIn('id', $availableHostIds)
             ->values();
 
         if ($candidates->isEmpty()) {
+            if ($zone !== null && $eventType->poolCoversZone($zone)) {
+                throw SlotUnavailableException::taken();
+            }
+
             return new Collection([$eventType->owner]);
         }
 
