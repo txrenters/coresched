@@ -38,7 +38,7 @@ class HandOffBooking
             throw new SlotUnavailableException('Only a round robin meeting can be handed to another host.');
         }
 
-        $slot = $this->availability->findSlot($eventType, $startsAt, $booking->id);
+        $slot = $this->availability->findSlot($eventType, $startsAt, $booking->id, $booking->zone);
 
         $freeHostIds = array_values(array_diff($slot->hostIds ?? [], $currentHostIds));
 
@@ -46,7 +46,7 @@ class HandOffBooking
             throw new SlotUnavailableException('Nobody else who hosts this meeting is free at that time.');
         }
 
-        $host = $this->assignHosts->handle($eventType, $freeHostIds)->first();
+        $host = $this->assignHosts->handle($eventType, $freeHostIds, $booking->zone)->first();
 
         return $this->rescheduleBooking->handle($booking, $startsAt, $reason, $host, 'host');
     }

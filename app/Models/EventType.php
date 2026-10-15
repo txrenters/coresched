@@ -300,11 +300,55 @@ class EventType extends Model
     /**
      * Get the users whose calendars gate this event type's availability.
      *
+     * With a zone, only the hosts in the pool who list that zone: the
+     * invitee's link named where they are, and they should be booked with
+     * someone who covers it. A zone nobody in the pool lists narrows nothing,
+     * so a new area, or one the hosts have not set up yet, still books with
+     * the whole pool rather than with nobody. This is the one place a zone
+     * narrows the pool; everything that offers or assigns hosts comes
+     * through here.
+     *
      * @return Collection<int, User>
      */
-    public function schedulingHosts(): Collection
+    public function schedulingHosts(?string $zone = null): Collection
     {
-        return $this->hostPool();
+        $pool = $this->hostPool();
+
+        if ($zone === null || ! $this->kind->hasHostPool()) {
+            return $pool;
+        }
+
+        $inZone = $this->hostIdsInZone($zone);
+
+        if ($inZone === []) {
+            return $pool;
+        }
+
+        return $pool->filter(fn (User $host): bool => in_array($host->id, $inZone, true))->values();
+    }
+
+    /**
+     * Determine whether anybody in the host pool lists the zone.
+     */
+    public function poolCoversZone(string $zone): bool
+    {
+        return $this->hostIdsInZone($zone) !== [];
+    }
+
+    /**
+     * The hosts in the pool who list the zone.
+     *
+     * @return list<int>
+     */
+    private function hostIdsInZone(string $zone): array
+    {
+        return array_values(HostZone::query()
+            ->where('team_id', $this->team_id)
+            ->where('zone', $zone)
+            ->whereIn('user_id', $this->hostPool()->modelKeys())
+            ->pluck('user_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all());
     }
 
     /**

@@ -33,6 +33,7 @@ use Illuminate\Support\Str;
  * @property string $email
  * @property string|null $notes
  * @property string|null $reference
+ * @property string|null $zone
  * @property int $webhook_sequence
  * @property string|null $host_notes
  * @property LocationType $location_type
@@ -57,7 +58,7 @@ use Illuminate\Support\Str;
  */
 #[Fillable([
     'uid', 'event_type_id', 'team_id', 'user_id', 'status', 'starts_at', 'ends_at', 'invitee_timezone',
-    'name', 'email', 'notes', 'reference', 'webhook_sequence', 'host_notes', 'location_type', 'location_detail',
+    'name', 'email', 'notes', 'reference', 'zone', 'webhook_sequence', 'host_notes', 'location_type', 'location_detail',
     'meeting_url', 'rescheduled_from_id', 'cancellation_reason', 'canceled_by', 'canceled_at', 'no_show_at',
 ])]
 class Booking extends Model

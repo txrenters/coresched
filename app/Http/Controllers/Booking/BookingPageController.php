@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\EventType;
 use App\Models\Group;
+use App\Models\HostZone;
 use App\Models\SingleUseLink;
 use App\Models\Team;
 use App\Models\User;
@@ -188,8 +189,8 @@ class BookingPageController extends Controller
                 'name' => $chosenHost->name,
             ],
             'bookingOnBehalf' => $bookingOnBehalf,
-            'prefill' => $this->prefill($request, $type),
-            'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone, $chosenHost)),
+            'prefill' => $prefill = $this->prefill($request, $type),
+            'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone, $chosenHost, $prefill['zone'])),
         ]);
     }
 
@@ -234,8 +235,8 @@ class BookingPageController extends Controller
             'chosenHost' => null,
             'bookingOnBehalf' => false,
             'singleUseLink' => $singleUseLink->uid,
-            'prefill' => $this->prefill($request, $type),
-            'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone)),
+            'prefill' => $prefill = $this->prefill($request, $type),
+            'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone, null, $prefill['zone'])),
         ]);
     }
 
@@ -279,7 +280,11 @@ class BookingPageController extends Controller
      * type asks the invitee for one; on any other type it would land in
      * `location_detail`, which is the host's link or address there.
      *
-     * @return array{name: string|null, email: string|null, phone: string|null, reference: string|null}
+     * The zone is where the invitee is (the lead's area in TEXRA): the times
+     * offered and the host booked are kept to the hosts who cover it, and
+     * the booking carries it so a move stays in the zone.
+     *
+     * @return array{name: string|null, email: string|null, phone: string|null, reference: string|null, zone: string|null}
      */
     protected function prefill(Request $request, EventType $type): array
     {
@@ -296,6 +301,7 @@ class BookingPageController extends Controller
             'email' => $text('email', 255),
             'phone' => $type->location_type->requiresInviteeInput() ? $text('phone', 500) : null,
             'reference' => preg_match('/^[A-Za-z0-9_-]{1,100}$/', $reference) === 1 ? $reference : null,
+            'zone' => HostZone::normalise($request->string('zone')->toString()),
         ];
     }
 
@@ -304,7 +310,7 @@ class BookingPageController extends Controller
      *
      * @return array<string, array<int, array<string, mixed>>>
      */
-    protected function slotsForMonth(EventType $eventType, CarbonImmutable $month, string $timezone, ?User $host = null): array
+    protected function slotsForMonth(EventType $eventType, CarbonImmutable $month, string $timezone, ?User $host = null, ?string $zone = null): array
     {
         $window = new TimeRange(
             $month->startOfMonth()->startOfDay()->utc(),
@@ -312,7 +318,7 @@ class BookingPageController extends Controller
         );
 
         return $this->availability
-            ->slots($eventType, $window)
+            ->slots($eventType, $window, zone: $zone)
             ->when($host !== null, fn ($slots) => $slots->filter(fn ($slot) => in_array($host->id, $slot->hostIds, true)))
             ->groupBy(fn ($slot) => $slot->startsAt->setTimezone($timezone)->toDateString())
             ->map(fn ($slots) => $slots->map(fn ($slot) => [

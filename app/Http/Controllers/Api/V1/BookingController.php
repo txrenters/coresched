@@ -7,6 +7,7 @@ use App\Exceptions\SlotUnavailableException;
 use App\Http\Controllers\Api\Concerns\ResolvesBookingPage;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\HostZone;
 use App\Services\Scheduling\BookingPageResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -35,6 +36,7 @@ class BookingController extends Controller
             'email' => ['required', 'email', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'timezone' => ['nullable', 'string', 'max:64'],
+            'zone' => ['nullable', 'string', 'regex:'.HostZone::PATTERN],
         ]);
 
         $owner = $this->pageForKey($request, $this->pages, $validated['page']);
@@ -52,6 +54,7 @@ class BookingController extends Controller
                     'email' => $validated['email'],
                     'notes' => $validated['notes'] ?? null,
                     'timezone' => $validated['timezone'] ?? null,
+                    'zone' => $validated['zone'] ?? null,
                 ],
             );
         } catch (SlotUnavailableException) {

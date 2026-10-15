@@ -46,7 +46,7 @@ class RescheduleBooking
          * CreateBooking's host locks must be its first reads, see handle().
          */
         $eventType = $booking->eventType;
-        $eventType->schedulingHosts();
+        $eventType->schedulingHosts($booking->zone);
         $booking->loadMissing(['guests', 'answers', 'host', 'hosts']);
         $previousHosts = $booking->attendingHosts();
 
@@ -57,8 +57,9 @@ class RescheduleBooking
             'timezone' => $booking->invitee_timezone,
             'location_detail' => $booking->location_detail,
             'guests' => $booking->guests->pluck('email')->all(),
-            // A moved booking is still the same caller's.
+            // A moved booking is still the same caller's, in the same place.
             'reference' => $booking->reference,
+            'zone' => $booking->zone,
         ];
 
         $replacement = DB::transaction(function () use ($booking, $eventType, $startsAt, $reason, $attributes, $host, $rescheduledBy) {

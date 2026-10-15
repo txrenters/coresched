@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\EventTypeController;
 use App\Http\Controllers\Api\V1\HostController;
 use App\Http\Controllers\Api\V1\HostScheduleController;
+use App\Http\Controllers\Api\V1\HostZoneController;
 use App\Http\Controllers\Api\V1\IdentityController;
 use App\Http\Controllers\Api\V1\OrganizationBookingController;
 use App\Http\Controllers\Api\V1\OrganizationController;
@@ -48,6 +49,10 @@ Route::middleware(AuthenticateApiToken::class)->prefix('v1')->name('api.v1.')->g
         Route::post('pages/{page}/event-types/{eventType}/hosts', [HostController::class, 'store'])->name('hosts.store');
         Route::put('pages/{page}/event-types/{eventType}/hosts/{email}/schedule', [HostScheduleController::class, 'update'])
             ->name('hosts.schedule.update');
+        // The areas a host covers, so a link naming one books them and not
+        // somebody across town.
+        Route::put('pages/{page}/event-types/{eventType}/hosts/{email}/zones', [HostZoneController::class, 'update'])
+            ->name('hosts.zones.update');
     });
 
     Route::get('bookings', [BookingController::class, 'index'])->name('bookings.index');

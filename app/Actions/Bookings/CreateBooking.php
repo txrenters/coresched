@@ -33,7 +33,7 @@ class CreateBooking
     /**
      * Book a slot on an event type.
      *
-     * @param  array{name: string, email: string, notes?: string|null, timezone?: string|null, location_detail?: string|null, guests?: array<int, string>, answers?: array<int|string, mixed>, reference?: string|null}  $attributes
+     * @param  array{name: string, email: string, notes?: string|null, timezone?: string|null, location_detail?: string|null, guests?: array<int, string>, answers?: array<int|string, mixed>, reference?: string|null, zone?: string|null}  $attributes
      *
      * The host pool is resolved before the transaction opens, so that locking
      * the hosts is the first read inside it. A caller that wraps this in its
@@ -42,16 +42,21 @@ class CreateBooking
      * A chosen host skips automatic assignment, and the slot must be free for
      * that host in particular rather than for anyone in the pool.
      *
+     * A zone (from the booking link) keeps the slot and the host to those who
+     * cover it: the slot is looked up among them, so a chosen host outside
+     * the zone is refused the same way as a busy one.
+     *
      * @throws SlotUnavailableException
      */
     public function handle(EventType $eventType, CarbonImmutable $startsAt, array $attributes, ?Booking $replacing = null, ?User $host = null): Booking
     {
-        $candidateHostIds = $eventType->schedulingHosts()->modelKeys();
+        $zone = $attributes['zone'] ?? null;
+        $candidateHostIds = $eventType->schedulingHosts($zone)->modelKeys();
 
-        $booking = DB::transaction(function () use ($eventType, $startsAt, $attributes, $replacing, $host, $candidateHostIds) {
+        $booking = DB::transaction(function () use ($eventType, $startsAt, $attributes, $replacing, $host, $candidateHostIds, $zone) {
             $this->lockHosts($candidateHostIds);
 
-            $slot = $this->availability->findSlot($eventType, $startsAt, $replacing?->id);
+            $slot = $this->availability->findSlot($eventType, $startsAt, $replacing?->id, $zone);
 
             if ($slot === null || ($host !== null && ! in_array($host->id, $slot->hostIds, true))) {
                 throw SlotUnavailableException::taken();
@@ -59,7 +64,7 @@ class CreateBooking
 
             $hosts = $host !== null
                 ? new Collection([$host])
-                : $this->assignHosts->handle($eventType, $slot->hostIds);
+                : $this->assignHosts->handle($eventType, $slot->hostIds, $zone);
 
             $booking = Booking::create([
                 'event_type_id' => $eventType->id,
@@ -73,6 +78,7 @@ class CreateBooking
                 'email' => $attributes['email'],
                 'notes' => $attributes['notes'] ?? null,
                 'reference' => $attributes['reference'] ?? null,
+                'zone' => $zone,
                 'location_type' => $eventType->location_type,
                 'location_detail' => $this->locationDetail($eventType, $attributes['location_detail'] ?? null),
                 'rescheduled_from_id' => $replacing?->id,

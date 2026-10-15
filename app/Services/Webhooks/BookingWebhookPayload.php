@@ -34,6 +34,7 @@ class BookingWebhookPayload
                 'uid' => $booking->uid,
                 'status' => $booking->status->value,
                 'reference' => $booking->reference,
+                'zone' => $booking->zone,
                 'starts_at' => $booking->starts_at->copy()->utc()->toIso8601String(),
                 'ends_at' => $booking->ends_at->copy()->utc()->toIso8601String(),
                 'timezone' => $booking->invitee_timezone,

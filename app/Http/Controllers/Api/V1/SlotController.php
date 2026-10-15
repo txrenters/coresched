@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Data\AvailabilitySlot;
 use App\Http\Controllers\Api\Concerns\ResolvesBookingPage;
 use App\Http\Controllers\Controller;
+use App\Models\HostZone;
 use App\Services\Scheduling\AvailabilityEngine;
 use App\Services\Scheduling\BookingPageResolver;
 use App\Support\TimeRange;
@@ -36,6 +37,8 @@ class SlotController extends Controller
         $validated = $request->validate([
             'from' => ['required', 'date_format:Y-m-d'],
             'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
+            // Where the invitee is: only hosts covering it are offered.
+            'zone' => ['nullable', 'string', 'regex:'.HostZone::PATTERN],
         ]);
 
         $owner = $this->pageForKey($request, $this->pages, $page);
@@ -49,7 +52,7 @@ class SlotController extends Controller
 
         abort_if($from->diffInDays($to) > self::MAX_DAYS, 422, 'That window is too long.');
 
-        $slots = $this->availability->slots($type, new TimeRange($from->utc(), $to->utc()));
+        $slots = $this->availability->slots($type, new TimeRange($from->utc(), $to->utc()), zone: $validated['zone'] ?? null);
 
         return response()->json([
             'data' => $slots

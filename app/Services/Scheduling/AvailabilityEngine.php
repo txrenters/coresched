@@ -26,9 +26,13 @@ class AvailabilityEngine
     /**
      * Get every bookable slot for an event type inside the requested window.
      *
+     * A zone narrows the hosts to those who cover it (see
+     * EventType::schedulingHosts), so every slot returned can be taken by
+     * someone who works where the invitee is.
+     *
      * @return Collection<int, AvailabilitySlot>
      */
-    public function slots(EventType $eventType, TimeRange $requested, ?int $ignoringBookingId = null): Collection
+    public function slots(EventType $eventType, TimeRange $requested, ?int $ignoringBookingId = null, ?string $zone = null): Collection
     {
         $window = $this->bookableWindow($eventType)?->intersect($requested);
 
@@ -36,7 +40,7 @@ class AvailabilityEngine
             return new Collection;
         }
 
-        $hosts = $eventType->schedulingHosts();
+        $hosts = $eventType->schedulingHosts($zone);
 
         if ($hosts->isEmpty()) {
             return new Collection;
@@ -62,7 +66,7 @@ class AvailabilityEngine
         );
 
         $slots = $eventType->kind->requiresEveryHost()
-            ? $this->collectiveSlots($eventType, $freeByHost, $window, $anchors)
+            ? $this->collectiveSlots($eventType, $freeByHost, $window, $anchors, $hosts->count())
             : $this->pooledSlots($eventType, $freeByHost, $window, $anchors);
 
         $slots = $this->applyHostLimits($eventType, $slots, $expanded, $ignoringBookingId);
@@ -77,7 +81,7 @@ class AvailabilityEngine
     /**
      * Find the slot matching an exact start time, or null when it is not bookable.
      */
-    public function findSlot(EventType $eventType, CarbonImmutable $startsAt, ?int $ignoringBookingId = null): ?AvailabilitySlot
+    public function findSlot(EventType $eventType, CarbonImmutable $startsAt, ?int $ignoringBookingId = null, ?string $zone = null): ?AvailabilitySlot
     {
         $start = $startsAt->utc();
         $window = new TimeRange(
@@ -85,7 +89,7 @@ class AvailabilityEngine
             $start->addDays(2)->endOfDay(),
         );
 
-        return $this->slots($eventType, $window, $ignoringBookingId)
+        return $this->slots($eventType, $window, $ignoringBookingId, $zone)
             ->first(fn (AvailabilitySlot $slot) => $slot->startsAt->equalTo($start));
     }
 
@@ -236,9 +240,9 @@ class AvailabilityEngine
      * @param  Collection<int, TimeRange>  $anchors
      * @return Collection<int, AvailabilitySlot>
      */
-    protected function collectiveSlots(EventType $eventType, Collection $freeByHost, TimeRange $window, Collection $anchors): Collection
+    protected function collectiveSlots(EventType $eventType, Collection $freeByHost, TimeRange $window, Collection $anchors, int $hostCount): Collection
     {
-        if ($freeByHost->count() < $eventType->schedulingHosts()->count()) {
+        if ($freeByHost->count() < $hostCount) {
             return new Collection;
         }
 
