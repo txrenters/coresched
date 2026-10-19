@@ -55,6 +55,8 @@ type Props = {
         phone: string | null;
         reference: string | null;
         zone: string | null;
+        /** The host the link pinned the booking to, by email. */
+        host: string | null;
     } | null;
     eventType: {
         slug: string;
@@ -79,6 +81,8 @@ type Props = {
     reschedule?: string | null;
     chosenHost?: { id: number; name: string } | null;
     bookingOnBehalf?: boolean;
+    /** The link named one host: only their times show and nobody else takes the booking. */
+    lockedToHost?: boolean;
     singleUseLink?: string | null;
 };
 
@@ -139,6 +143,9 @@ const form = useForm({
     // already narrowed to the hosts covering it; posting it back keeps the
     // booking with one of them.
     zone: props.prefill?.zone ?? null,
+    // The host the link pinned the booking to. Posting it back keeps the
+    // booking with them: the renter is already theirs in the sending app.
+    host: props.prefill?.host ?? null,
 });
 
 /*
@@ -435,6 +442,22 @@ const submit = () => {
                                 <strong>{{ chosenHost.name }}</strong></template
                             >. Enter their details; they get the confirmation
                             email.
+                        </p>
+                    </div>
+
+                    <div
+                        v-if="lockedToHost && chosenHost"
+                        class="mt-6 flex gap-3 rounded-lg border border-primary/25 bg-accent p-3.5 text-sm text-accent-foreground"
+                        data-test="locked-to-host"
+                    >
+                        <Users
+                            class="mt-0.5 size-4 shrink-0"
+                            aria-hidden="true"
+                        />
+                        <p>
+                            Your call will be with
+                            <strong>{{ chosenHost.name }}</strong
+                            >, who is already looking after your inquiry.
                         </p>
                     </div>
 
