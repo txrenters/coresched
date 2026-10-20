@@ -32,9 +32,10 @@ read -ra _BACKGROUND_SERVICES <<< "${BACKGROUND_SERVICES-queue scheduler}"
 # with "port is already allocated". Instead there are two web services on
 # separate ports (8084 and 8085), both in the VPS nginx's upstream, recreated
 # one after the other: nginx fails over to whichever is up, so the recreate
-# costs no 502s. Order matters -- see the recreate loop below.
+# costs no 502s. Standby goes first so that on the deploy that introduces it,
+# it is up before `web` goes down.
 ROLLING_SERVICES=(app)
-RECREATE_SERVICES=(web web-standby)
+RECREATE_SERVICES=(web-standby web)
 HEALTH_TIMEOUT=120
 
 log() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
