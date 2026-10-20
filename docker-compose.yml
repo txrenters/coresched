@@ -126,6 +126,33 @@ services:
       - internal
       - edge
 
+  # A second, identical web container on its own port. The VPS's nginx lists
+  # both as one upstream, and bin/deploy.sh recreates them one at a time, so
+  # one is always accepting connections. With `web` alone, recreating it left
+  # nothing listening on 8084 for a second or two on every deploy, and nginx
+  # answered 502. Keep this block identical to `web` apart from the port.
+  web-standby:
+    build:
+      context: .
+      target: web
+      args:
+        APP_URL: https://${APP_HOST:?APP_HOST is required}
+        # Baked into the bundle as VITE_APP_NAME -- see the ARG in the Dockerfile.
+        APP_NAME: ${APP_NAME:-TR Scheduling}
+    image: ${APP_SLUG:-tx-bookings}/web:${APP_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - storage-app:/var/www/html/storage/app:ro
+    ports:
+      # Loopback only, for the same reason as `web`.
+      - '127.0.0.1:${HTTP_STANDBY_PORT:-8085}:80'
+    networks:
+      - internal
+      - edge
+
   migrate:
     build:
       context: .

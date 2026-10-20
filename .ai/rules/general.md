@@ -16,3 +16,6 @@ Never serve the app on both names. APP_URL is baked into the JS bundle at build 
 To change the hostname again, the order is: edit APP_HOST in /opt/tx-bookings/.env AND APP_URL in .env.docker (both, they must match), then certbot + nginx, then bin/deploy.sh to REBUILD. Editing the env files without a rebuild leaves the old host in the bundle.
 
 Side effects of any such change: everyone is signed out once (SESSION_DOMAIN=null means host-only cookies), and every registered passkey is invalidated because config/fortify.php derives the WebAuthn relying_party_id from APP_URL's host. There were 0 passkeys at the time of this migration; check again before the next one.
+
+## Two web services so deploys never 502
+`web` (127.0.0.1:8084) and `web-standby` (127.0.0.1:8085) are identical and both sit in the VPS nginx's `upstream tx_bookings` in /etc/nginx/sites-enabled/scheduling.texasrenters.com. bin/deploy.sh recreates them one at a time and waits for each to be healthy before touching the next. With a single `web`, every deploy left nothing on the port for ~1s and nginx returned 502 (seen 2026-10-20). Don't merge them back into one service, don't recreate both in one `compose up`, and keep the two compose blocks in step.

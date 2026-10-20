@@ -75,3 +75,7 @@ jobs:
           # A rendered page proves the database, the session store and the Vite
           # manifest as well, which is what "serving" has to mean.
           curl -fsS -o /dev/null -w 'login: %{http_code}\n' http://127.0.0.1:8084/login
+
+          # The standby web service the VPS nginx fails over to while `web` is
+          # being recreated. If it is down, the next deploy will 502 again.
+          curl -fsS -o /dev/null -w 'standby login: %{http_code}\n' http://127.0.0.1:8085/login

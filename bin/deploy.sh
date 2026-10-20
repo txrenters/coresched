@@ -27,13 +27,14 @@ COMPOSE="docker compose -f docker-compose.yml"
 # through that exec.
 read -ra _BACKGROUND_SERVICES <<< "${BACKGROUND_SERVICES-queue scheduler}"
 
-# Only `app` can be rolled by scaling. `web` publishes a fixed host port
-# (127.0.0.1:8084, which the VPS's nginx proxies to), and a second replica
-# cannot bind a port the first one already holds -- Docker fails with
-# "port is already allocated". It is recreated instead, which costs a second
-# or two of 502s.
+# Only `app` can be rolled by scaling. `web` publishes a fixed host port, and a
+# second replica cannot bind a port the first one already holds -- Docker fails
+# with "port is already allocated". Instead there are two web services on
+# separate ports (8084 and 8085), both in the VPS nginx's upstream, recreated
+# one after the other: nginx fails over to whichever is up, so the recreate
+# costs no 502s. Order matters -- see the recreate loop below.
 ROLLING_SERVICES=(app)
-RECREATE_SERVICES=(web)
+RECREATE_SERVICES=(web web-standby)
 HEALTH_TIMEOUT=120
 
 log() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
@@ -164,14 +165,11 @@ for service in "${RECREATE_SERVICES[@]}"; do
     # renders HTML referencing asset hashes only the new web image contains.
     $COMPOSE up -d --no-deps --force-recreate "$service"
 
-    # Do not report success until it is actually serving again.
-    for _ in $(seq 1 30); do
-        state=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
-            "$($COMPOSE ps -q "$service")" 2>/dev/null || echo starting)
-        [[ "$state" == "healthy" || "$state" == "running" ]] && break
-        sleep 2
-    done
-    echo "$service: $state"
+    # Must be healthy before the next one goes down, or both web services are
+    # out at once and nginx has nowhere to fail over to. Fails the deploy on
+    # timeout rather than carrying on regardless.
+    wait_for_ready "$service" 1
+    echo "$service: $(ready_count "$service") ready"
 done
 
 # The queue worker drains its in-flight job before exiting, bounded by
