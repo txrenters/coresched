@@ -298,19 +298,6 @@ class EventType extends Model
     }
 
     /**
-     * Get the users whose calendars gate this event type's availability.
-     *
-     * With a zone, only the hosts in the pool who list that zone: the
-     * invitee's link named where they are, and they should be booked with
-     * someone who covers it. A zone nobody in the pool lists narrows nothing,
-     * so a new area, or one the hosts have not set up yet, still books with
-     * the whole pool rather than with nobody. This is the one place a zone
-     * narrows the pool; everything that offers or assigns hosts comes
-     * through here.
-     *
-     * @return Collection<int, User>
-     */
-    /**
      * A host on this call's rota by the email the sending application knows
      * them by, so a link can pin a booking to them; null when nobody on the
      * rota has that address.
@@ -326,6 +313,19 @@ class EventType extends Model
         return $this->hostPool()->first(fn (User $host): bool => mb_strtolower((string) $host->email) === $email);
     }
 
+    /**
+     * Get the users whose calendars gate this event type's availability.
+     *
+     * With a zone, only the hosts in the pool who list that zone: the
+     * invitee's link named where they are, and they should be booked with
+     * someone who covers it. A zone nobody in the pool lists narrows nothing,
+     * so a new area, or one the hosts have not set up yet, still books with
+     * the whole pool rather than with nobody. This is the one place a zone
+     * narrows the pool; everything that offers or assigns hosts comes
+     * through here.
+     *
+     * @return Collection<int, User>
+     */
     public function schedulingHosts(?string $zone = null): Collection
     {
         $pool = $this->hostPool();
