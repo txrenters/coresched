@@ -168,9 +168,13 @@ class BookingPageController extends Controller
         $month = $this->resolveMonth($request, $timezone);
         $isRescheduling = $request->string('reschedule')->toString() !== '';
         $bookingOnBehalf = ! $isRescheduling && $type->canBeBookedOnBehalfBy($request->user());
-        $chosenHost = $isRescheduling
-            ? $this->rescheduleHost($request, $type)
-            : ($bookingOnBehalf ? $type->assignableHosts()->firstWhere('id', $request->integer('host')) : null);
+        $lockedHost = $isRescheduling || $bookingOnBehalf ? null : $this->lockedHost($request, $type);
+        $chosenHost = match (true) {
+            $isRescheduling => $this->rescheduleHost($request, $type),
+            $bookingOnBehalf => $type->assignableHosts()->firstWhere('id', $request->integer('host')),
+            default => $lockedHost,
+        };
+        $prefill = $this->prefill($request, $type, $lockedHost);
 
         return Inertia::render('book/EventType', [
             'page' => [
@@ -189,9 +193,24 @@ class BookingPageController extends Controller
                 'name' => $chosenHost->name,
             ],
             'bookingOnBehalf' => $bookingOnBehalf,
-            'prefill' => $prefill = $this->prefill($request, $type),
-            'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone, $chosenHost, $prefill['zone'])),
+            'lockedToHost' => $lockedHost !== null,
+            'prefill' => $prefill,
+            // A pinned host's own hours are what is on offer, zone or no zone.
+            'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone, $chosenHost, $lockedHost === null ? $prefill['zone'] : null)),
         ]);
+    }
+
+    /**
+     * The host a link pins the booking to: `host=<email>`, sent by TEXRA when
+     * the agent who already holds the lead invites the renter to book with
+     * them. Only their times are offered and nobody else can take the
+     * booking, which is the point: a lead that is one agent's must not drift
+     * to another. An email that is not on this call's rota is ignored, and
+     * the link books like any other.
+     */
+    protected function lockedHost(Request $request, EventType $type): ?User
+    {
+        return $type->hostByEmail($request->string('host')->toString());
     }
 
     /**
@@ -284,9 +303,12 @@ class BookingPageController extends Controller
      * offered and the host booked are kept to the hosts who cover it, and
      * the booking carries it so a move stays in the zone.
      *
-     * @return array{name: string|null, email: string|null, phone: string|null, reference: string|null, zone: string|null}
+     * The host is the one the link pins the booking to (lockedHost), posted
+     * back so the booking goes to them and nobody else.
+     *
+     * @return array{name: string|null, email: string|null, phone: string|null, reference: string|null, zone: string|null, host: string|null}
      */
-    protected function prefill(Request $request, EventType $type): array
+    protected function prefill(Request $request, EventType $type, ?User $lockedHost = null): array
     {
         $text = function (string $key, int $max) use ($request): ?string {
             $value = trim($request->string($key)->toString());
@@ -302,6 +324,7 @@ class BookingPageController extends Controller
             'phone' => $type->location_type->requiresInviteeInput() ? $text('phone', 500) : null,
             'reference' => preg_match('/^[A-Za-z0-9_-]{1,100}$/', $reference) === 1 ? $reference : null,
             'zone' => HostZone::normalise($request->string('zone')->toString()),
+            'host' => $lockedHost?->email,
         ];
     }
 

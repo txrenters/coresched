@@ -40,6 +40,24 @@ class PublicBookingController extends Controller
 
         abort_if($hostId !== 0 && $host === null, 403);
 
+        /*
+         * A link that pinned the booking to one host (host=<email>, see
+         * BookingPageController::lockedHost) books that host or nobody: the
+         * lead behind it already belongs to them. Their hours alone decide,
+         * so the zone is not applied on top.
+         */
+        $lockedTo = $validated['host'] ?? null;
+
+        if ($host === null && $lockedTo !== null) {
+            $host = $eventType->hostByEmail($lockedTo);
+
+            if ($host === null) {
+                throw ValidationException::withMessages([
+                    'host' => 'That agent does not take this call. Ask them for a new link.',
+                ]);
+            }
+        }
+
         try {
             $booking = $createBooking->handle(
                 $request->eventType(),
@@ -58,7 +76,7 @@ class PublicBookingController extends Controller
                     'guests' => $validated['guests'] ?? [],
                     'answers' => $validated['answers'] ?? [],
                     'reference' => $validated['reference'] ?? null,
-                    'zone' => $validated['zone'] ?? null,
+                    'zone' => $lockedTo === null ? ($validated['zone'] ?? null) : null,
                 ],
                 host: $host,
             );

@@ -298,6 +298,22 @@ class EventType extends Model
     }
 
     /**
+     * A host on this call's rota by the email the sending application knows
+     * them by, so a link can pin a booking to them; null when nobody on the
+     * rota has that address.
+     */
+    public function hostByEmail(?string $email): ?User
+    {
+        $email = mb_strtolower(trim((string) $email));
+
+        if ($email === '') {
+            return null;
+        }
+
+        return $this->hostPool()->first(fn (User $host): bool => mb_strtolower((string) $host->email) === $email);
+    }
+
+    /**
      * Get the users whose calendars gate this event type's availability.
      *
      * With a zone, only the hosts in the pool who list that zone: the

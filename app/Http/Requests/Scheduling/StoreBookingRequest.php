@@ -43,6 +43,9 @@ class StoreBookingRequest extends FormRequest
             // Where the invitee is, as the link named it: keeps the host to
             // those who cover it.
             'zone' => ['nullable', 'string', 'regex:'.HostZone::PATTERN],
+            // The host the link pinned the booking to, by the email both
+            // applications know them by. Resolved against the rota on store.
+            'host' => ['nullable', 'string', 'email', 'max:255'],
         ];
     }
 
