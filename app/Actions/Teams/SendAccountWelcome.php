@@ -5,7 +5,9 @@ namespace App\Actions\Teams;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Teams\AccountCreated;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Support\Facades\Password;
+use LogicException;
 
 class SendAccountWelcome
 {
@@ -19,7 +21,13 @@ class SendAccountWelcome
      */
     public function handle(User $user, ?Team $team = null): void
     {
-        $token = Password::broker('welcome')->createToken($user);
+        $broker = Password::broker('welcome');
+
+        if (! $broker instanceof PasswordBroker) {
+            throw new LogicException('The "welcome" password broker cannot issue tokens.');
+        }
+
+        $token = $broker->createToken($user);
 
         $user->notify(new AccountCreated($token, $team?->name));
     }
