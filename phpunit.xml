@@ -46,6 +46,7 @@
         -->
         <env name="TWILIO_SID" value=""/>
         <env name="TWILIO_AUTH_TOKEN" value=""/>
+        <env name="TEXRA_REFERENCE_URL" value=""/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

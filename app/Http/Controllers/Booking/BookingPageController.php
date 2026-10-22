@@ -12,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\Scheduling\AvailabilityEngine;
 use App\Services\Scheduling\BookingPageResolver;
+use App\Services\Texra\ReferenceGate;
 use App\Support\TimeRange;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class BookingPageController extends Controller
     public function __construct(
         protected BookingPageResolver $pages,
         protected AvailabilityEngine $availability,
+        protected ReferenceGate $references,
     ) {
         //
     }
@@ -176,6 +178,16 @@ class BookingPageController extends Controller
         };
         $prefill = $this->prefill($request, $type, $lockedHost);
 
+        /*
+         * First claim wins: once an agent holds the lead in TEXRA, its link
+         * books nobody else. A link pinned to that agent still works. Moving
+         * an existing booking and booking on someone's behalf are not new
+         * bookings from the renter's link, so they are never asked about.
+         */
+        if (! $isRescheduling && ! $bookingOnBehalf && ! $this->references->allows($prefill['reference'], $prefill['host'])) {
+            return $this->linkClosed($owner, $type);
+        }
+
         return Inertia::render('book/EventType', [
             'page' => [
                 'slug' => $page,
@@ -197,6 +209,17 @@ class BookingPageController extends Controller
             'prefill' => $prefill,
             // A pinned host's own hours are what is on offer, zone or no zone.
             'slots' => Inertia::defer(fn () => $this->slotsForMonth($type, $month, $timezone, $chosenHost, $lockedHost === null ? $prefill['zone'] : null)),
+        ]);
+    }
+
+    /**
+     * Display the page a TEXRA link shows once an agent holds the lead.
+     */
+    protected function linkClosed(User|Team $owner, EventType $type): Response
+    {
+        return Inertia::render('book/LinkClosed', [
+            'eventTypeName' => $type->name,
+            'pageName' => $this->pages->name($owner),
         ]);
     }
 

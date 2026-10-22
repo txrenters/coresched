@@ -11,6 +11,7 @@ use App\Http\Requests\Scheduling\StoreBookingRequest;
 use App\Models\Booking;
 use App\Models\SingleUseLink;
 use App\Services\Scheduling\BookingPageResolver;
+use App\Services\Texra\ReferenceGate;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,13 +29,14 @@ class PublicBookingController extends Controller
     /**
      * Book a slot.
      */
-    public function store(StoreBookingRequest $request, CreateBooking $createBooking): RedirectResponse
+    public function store(StoreBookingRequest $request, CreateBooking $createBooking, ReferenceGate $references): RedirectResponse
     {
         $validated = $request->validated();
         $eventType = $request->eventType();
+        $bookingOnBehalf = $eventType->canBeBookedOnBehalfBy($request->user());
 
         $hostId = (int) ($validated['host_id'] ?? 0);
-        $host = $eventType->canBeBookedOnBehalfBy($request->user())
+        $host = $bookingOnBehalf
             ? $eventType->assignableHosts()->firstWhere('id', $hostId)
             : null;
 
@@ -56,6 +58,22 @@ class PublicBookingController extends Controller
                     'host' => 'That agent does not take this call. Ask them for a new link.',
                 ]);
             }
+        }
+
+        /*
+         * First claim wins, asked again at the moment of booking: the renter
+         * may have opened the page before an agent took the lead. A refused
+         * link goes back to its page, which now shows it closed.
+         */
+        $reference = $validated['reference'] ?? null;
+
+        if (! $bookingOnBehalf && ! $references->allows($reference, $lockedTo)) {
+            return redirect()->route('book.event-type', array_filter([
+                'page' => $request->route('page'),
+                'eventType' => $request->route('eventType'),
+                'ref' => $reference,
+                'host' => $lockedTo,
+            ]));
         }
 
         try {
