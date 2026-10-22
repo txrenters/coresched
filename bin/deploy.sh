@@ -108,7 +108,9 @@ else
 fi
 
 log "Building images"
-$COMPOSE build
+# --pull re-checks the registry for the base images, so a rebuilt tag (an OS
+# or PHP security patch) is picked up instead of the copy cached on the box.
+$COMPOSE build --pull
 
 # Migrations run once, before the new code is serving, and must be
 # backward-compatible so the still-running old containers keep working
