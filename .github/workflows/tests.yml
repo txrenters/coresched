@@ -46,11 +46,10 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
-          # 8.4, not 8.5: this is the version the runtime image in the Dockerfile
-          # ships. Local development runs 8.5, so pinning 8.5 here would test a
-          # version that never reaches production and let an 8.5-only feature
-          # through to a container that cannot run it.
-          php-version: '8.4'
+          # 8.5, matching the runtime image in the Dockerfile and local
+          # development. Keep the two in step, so the suite runs on the same PHP
+          # that reaches production.
+          php-version: '8.5'
           tools: composer:v2
           coverage: none
 
