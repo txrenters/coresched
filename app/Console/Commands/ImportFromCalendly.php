@@ -81,7 +81,7 @@ class ImportFromCalendly extends Command
     {
         $since = $this->option('since');
 
-        return filled($since)
+        return is_string($since) && filled($since)
             ? CarbonImmutable::parse($since)->toIso8601ZuluString()
             : null;
     }
@@ -93,7 +93,7 @@ class ImportFromCalendly extends Command
     {
         $slug = $this->option('team');
 
-        if ($slug !== null) {
+        if (is_string($slug)) {
             $team = Team::query()->where('slug', $slug)->first();
 
             if ($team === null) {

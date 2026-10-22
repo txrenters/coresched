@@ -42,7 +42,11 @@ class MakeSuperAdmin extends Command
      */
     public function handle(): int
     {
-        $email = strtolower(trim((string) $this->argument('email')));
+        $email = $this->argument('email');
+        $email = is_string($email) ? strtolower(trim($email)) : '';
+        $password = $this->option('password');
+        $password = is_string($password) && filled($password) ? $password : null;
+        $name = $this->option('name');
 
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $this->components->error("\"{$email}\" is not a valid email address.");
@@ -59,15 +63,15 @@ class MakeSuperAdmin extends Command
         $generated = null;
 
         if ($user === null) {
-            $generated = $this->option('password') ?: Str::password(16, symbols: false);
+            $generated = $password ?? Str::password(16, symbols: false);
 
             $user = User::create([
-                'name' => $this->option('name') ?: Str::of($email)->before('@')->headline()->toString(),
+                'name' => is_string($name) && filled($name) ? $name : Str::of($email)->before('@')->headline()->toString(),
                 'email' => $email,
                 'password' => Hash::make($generated),
                 'email_verified_at' => now(),
             ]);
-        } elseif (filled($password = $this->option('password'))) {
+        } elseif ($password !== null) {
             $generated = $password;
             $user->forceFill(['password' => Hash::make($password)])->save();
         }
