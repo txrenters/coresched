@@ -28,6 +28,9 @@ return [
     'texra' => [
         'webhook_url' => env('TEXRA_WEBHOOK_URL'),
         'webhook_secret' => env('TEXRA_WEBHOOK_SECRET'),
+        // Asked before a TEXRA link books: is the lead already held? See App\Services\Texra\ReferenceGate.
+        'reference_url' => env('TEXRA_REFERENCE_URL'),
+        'reference_secret' => env('TEXRA_REFERENCE_SECRET', env('TEXRA_WEBHOOK_SECRET')),
     ],
 
     'postmark' => [
