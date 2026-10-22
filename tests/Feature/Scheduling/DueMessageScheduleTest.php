@@ -24,6 +24,10 @@ test('reminders and workflow emails are picked up at every minute, not every fif
 });
 
 test('a run killed mid-send stops blocking reminders and workflows after ten minutes', function (string $command) {
+    // The database store is what production runs on; the array store's lock
+    // ignores its own expiry when asked whether it is still held.
+    config(['cache.default' => 'database']);
+
     $this->travelTo(CarbonImmutable::parse('2026-09-14 08:00:00', 'UTC'));
 
     $event = scheduledCommand($command);
