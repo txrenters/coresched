@@ -11,17 +11,16 @@
 #   runtime - Alpine, because nothing compiled in the build stage ships
 #             forward. vendor/ is pure PHP and public/build is static.
 #
-# PHP is pinned to 8.4 to match the VPS and the apps already containerised on
-# it, down to the patch release: 8.4.27 is the first with the PHP2Shell fixes
-# (CVE-2026-109618, CVE-2026-109619), and a bare 8.4 tag would let a build
-# reuse an older cached base. composer.json requires ^8.3, so nothing forces a
-# newer runtime -- note that local development runs 8.5, so anything relying
-# on an 8.5-only feature will pass locally and fail here.
+# PHP is pinned to 8.5, the version local development runs, down to the patch
+# release: 8.5.12 is the first with the PHP2Shell fixes (CVE-2026-109618,
+# CVE-2026-109619), and a bare 8.5 tag would let a build reuse an older cached
+# base. The VPS host and the other apps on it still run 8.4; that does not
+# matter here, because the container brings its own PHP.
 
 # ---------------------------------------------------------------------------
 # Stage 1: dependencies and frontend assets.
 # ---------------------------------------------------------------------------
-FROM php:8.4.27-cli-bookworm AS build
+FROM php:8.5.12-cli-bookworm AS build
 
 ENV COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_NO_INTERACTION=1
@@ -118,7 +117,7 @@ RUN APP_KEY=base64:$(head -c 32 /dev/urandom | base64) php artisan log-viewer:pu
 # Stage 2: PHP-FPM runtime. Shared by the app, queue, scheduler and migrate
 # services -- they differ only in the command they run.
 # ---------------------------------------------------------------------------
-FROM php:8.4.27-fpm-alpine AS app
+FROM php:8.5.12-fpm-alpine AS app
 
 # fcgi provides cgi-fcgi, which the health check uses to ping FPM directly.
 RUN apk add --no-cache fcgi \
