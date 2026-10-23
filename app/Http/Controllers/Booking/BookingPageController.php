@@ -376,13 +376,14 @@ class BookingPageController extends Controller
     }
 
     /**
-     * Get the host a signed-in organizer chose to hand a rescheduled meeting to.
+     * Get the host a rescheduled meeting goes to: the one a signed-in
+     * organizer chose to hand it to, otherwise the host who already has it.
      */
     protected function rescheduleHost(Request $request, EventType $eventType): ?User
     {
         $uid = $request->string('reschedule')->toString();
 
-        if ($uid === '' || $request->integer('host') === 0) {
+        if ($uid === '') {
             return null;
         }
 
@@ -391,7 +392,7 @@ class BookingPageController extends Controller
             ->where('event_type_id', $eventType->id)
             ->first();
 
-        return $booking?->chosenHostFor($request->user(), $request->integer('host'));
+        return $booking?->chosenHostFor($request->user(), $request->integer('host')) ?? $booking?->keptHost();
     }
 
     /**

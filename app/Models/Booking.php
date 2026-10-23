@@ -381,6 +381,25 @@ class Booking extends Model
     }
 
     /**
+     * Get the host a rescheduled meeting stays with when nobody hands it on.
+     *
+     * A pooled meeting belongs to the host who has it: when the invitee moves
+     * it, only that host's times are offered and the replacement is theirs,
+     * rather than going back through round robin to whoever is free. Null
+     * when there is no pool to drift into, or that host has left the pool.
+     */
+    public function keptHost(): ?User
+    {
+        $hosts = $this->attendingHosts();
+
+        if ($hosts->count() !== 1) {
+            return null;
+        }
+
+        return $this->reassignableHosts()->firstWhere('id', $hosts->first()->id);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
