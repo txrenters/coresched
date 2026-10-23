@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\V1\BookingCancellationController;
 use App\Http\Controllers\Api\V1\BookingController;
+use App\Http\Controllers\Api\V1\BookingHandOffController;
+use App\Http\Controllers\Api\V1\BookingZoneController;
 use App\Http\Controllers\Api\V1\EventTypeController;
 use App\Http\Controllers\Api\V1\HostController;
 use App\Http\Controllers\Api\V1\HostScheduleController;
@@ -53,6 +56,13 @@ Route::middleware(AuthenticateApiToken::class)->prefix('v1')->name('api.v1.')->g
         // somebody across town.
         Route::put('pages/{page}/event-types/{eventType}/hosts/{email}/zones', [HostZoneController::class, 'update'])
             ->name('hosts.zones.update');
+
+        // Changes to a booking the key's organization holds, for when TEXRA
+        // hands a lead on: re-tag its zone, move it to the new host at the
+        // same time, or call it off when they are busy then.
+        Route::put('bookings/{booking}/zone', [BookingZoneController::class, 'update'])->name('bookings.zone.update');
+        Route::post('bookings/{booking}/hand-off', [BookingHandOffController::class, 'store'])->name('bookings.hand-off.store');
+        Route::post('bookings/{booking}/cancel', [BookingCancellationController::class, 'store'])->name('bookings.cancel.store');
     });
 
     Route::get('bookings', [BookingController::class, 'index'])->name('bookings.index');
