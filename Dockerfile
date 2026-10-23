@@ -38,9 +38,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # image does not, so dropping it 500s every page that resolves holidays
     # while every container still reports healthy.
     && docker-php-ext-install -j"$(nproc)" pdo_mysql pcntl calendar \
-    # Node 22 LTS. Matches the version the other apps on the VPS build with.
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
+    # Node 24 LTS. Matches the version the other apps on the VPS build with.
+    # The exact patch is pinned so a rebuild cannot reuse a cached layer from
+    # before the October 2026 Node security release (24.22.1); it may rise,
+    # never fall. Node only runs in this stage -- no runtime image ships it.
+    && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs=24.22.1-1nodesource1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
