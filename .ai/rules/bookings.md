@@ -26,3 +26,10 @@ A chosen host is passed to CreateBooking/RescheduleBooking as `host:`; the slot 
 With nobody chosen, a reschedule stays with the host who has the meeting (Booking::keptHost): the picker offers only their times and the replacement is theirs, never re-run through round robin. TEXRA's lead is held by that agent, so a renter's move must not hand the call to someone else; only an organizer choosing a host hands it on.
 RescheduleBooking sends BookingCanceled to hosts dropped from the replacement, because BookingRescheduled only reaches the new booking's hosts.
 A no-show keeps the booking Confirmed and sets no_show_at. Automation::sendAtFor queues NoShow runs only once no_show_at is set, and skips AfterEnd runs while it is set. RecordNoShow re-runs ScheduleAutomations both when marking and when undoing.
+keptHost also requires the host to be in `schedulingHosts($booking->zone)`: a booking re-tagged with a zone its host does not list (TEXRA handing a lead to the Spanish speakers, zone `spanish`) is not pinned, and the reschedule link carries `zone=` so the picker offers that zone's hosts.
+
+## TEXRA changes a booking through /api/v1/bookings/{uid}/...
+Write key + throttle, booking by uid and only the key's organization (else 404), `isChangeable()` false is 410. Each answers `{data}` in the OrganizationBookingController shape (Api\Concerns\PresentsOrganizationBooking: `uid`, `status`, `host.email`, `zone`...).
+- `PUT .../zone` `{zone}` (slug or null): plain model update, so it goes out as booking.updated.
+- `POST .../hand-off` `{email, reason?}`: RescheduleBooking to that host at the same start, as `host`. Not in assignableHosts() is 422, slot without them (busy or outside the zone) is 409, already their only host is 200 unchanged. Success is the REPLACEMENT (new uid).
+- `POST .../cancel` `{reason?}`: CancelBooking as `host`.

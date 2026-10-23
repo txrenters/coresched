@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Api\Concerns\PresentsOrganizationBooking;
 use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
 use App\Models\Booking;
-use App\Models\BookingAnswer;
 use App\Models\Team;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +13,8 @@ use Illuminate\Http\Request;
 
 class OrganizationBookingController extends Controller
 {
+    use PresentsOrganizationBooking;
+
     /**
      * Every meeting booked with an organization within a window.
      *
@@ -61,38 +63,7 @@ class OrganizationBookingController extends Controller
             ->get();
 
         return response()->json([
-            'data' => $bookings->map(fn (Booking $booking): array => [
-                'uid' => $booking->uid,
-                'status' => $booking->status->value,
-                'eventName' => $booking->eventType?->name,
-                'eventSlug' => $booking->eventType?->slug,
-                'startsAt' => $booking->starts_at->toIso8601String(),
-                'endsAt' => $booking->ends_at->toIso8601String(),
-                'invitee' => [
-                    'name' => $booking->name,
-                    'email' => $booking->email,
-                    'timezone' => $booking->invitee_timezone,
-                    'phone' => $booking->inviteePhone(),
-                ],
-                'host' => [
-                    'name' => $booking->host?->name,
-                    'email' => $booking->host?->email,
-                ],
-                'answers' => $booking->answers
-                    ->values()
-                    ->map(fn (BookingAnswer $answer, int $index): array => [
-                        'question' => $answer->label,
-                        'answer' => $answer->answer,
-                        'position' => $index,
-                    ])
-                    ->all(),
-                // What the invitee wrote in "Please share anything that will
-                // help prepare for our meeting", kept apart from the answers
-                // to the event type's own questions.
-                'notes' => $booking->notes,
-                'canceledAt' => $booking->canceled_at?->toIso8601String(),
-                'manageUrl' => route('booking.show', ['booking' => $booking]),
-            ])->values(),
+            'data' => $bookings->map(fn (Booking $booking): array => $this->presentBooking($booking))->values(),
             'meta' => [
                 'organization' => $organization->name,
                 'from' => $from->toIso8601String(),

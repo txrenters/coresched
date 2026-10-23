@@ -386,7 +386,10 @@ class Booking extends Model
      * A pooled meeting belongs to the host who has it: when the invitee moves
      * it, only that host's times are offered and the replacement is theirs,
      * rather than going back through round robin to whoever is free. Null
-     * when there is no pool to drift into, or that host has left the pool.
+     * when there is no pool to drift into, that host has left the pool, or
+     * the booking's zone no longer includes them (TEXRA handing a lead to
+     * the Spanish speakers re-tags the booking `spanish`), so the move is
+     * offered to the zone's hosts instead.
      */
     public function keptHost(): ?User
     {
@@ -396,7 +399,13 @@ class Booking extends Model
             return null;
         }
 
-        return $this->reassignableHosts()->firstWhere('id', $hosts->first()->id);
+        $hostId = $hosts->first()->id;
+
+        if ($this->eventType->schedulingHosts($this->zone)->doesntContain('id', $hostId)) {
+            return null;
+        }
+
+        return $this->reassignableHosts()->firstWhere('id', $hostId);
     }
 
     /**

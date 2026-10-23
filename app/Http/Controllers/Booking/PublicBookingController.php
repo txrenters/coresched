@@ -176,6 +176,8 @@ class PublicBookingController extends Controller
             'reschedule' => $booking->uid,
             'timezone' => $booking->invitee_timezone,
             'host' => $request->integer('host') ?: null,
+            // The picker offers the zone's hosts, as the move will book them.
+            'zone' => $booking->zone,
         ]));
 
         return redirect()->to($booking->eventType->publicUrl().'?'.$query);

@@ -5,6 +5,7 @@ use App\Enums\TeamRole;
 use App\Models\AvailabilitySchedule;
 use App\Models\Booking;
 use App\Models\EventType;
+use App\Models\HostZone;
 use App\Models\User;
 use App\Notifications\Bookings\BookingCanceled;
 use App\Notifications\Bookings\BookingRescheduled;
@@ -214,4 +215,53 @@ test('the meetings page offers the pool as hosts to reschedule to, but not for a
             ])
             ->where('meetings.1.eventTypeName', 'Intro call')
             ->where('meetings.1.reassignableHosts', []));
+});
+
+test('a booking re-tagged with a zone its host is outside is moved within the zone, not kept', function () {
+    HostZone::query()->create(['team_id' => $this->team->id, 'user_id' => $this->otherHost->id, 'zone' => 'spanish']);
+    $this->booking->update(['zone' => 'spanish']);
+
+    Booking::factory()->create([
+        'event_type_id' => $this->eventType->id,
+        'user_id' => $this->otherHost->id,
+        'team_id' => $this->eventType->team_id,
+        'starts_at' => CarbonImmutable::parse('2026-09-03 10:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-09-03 10:30:00', 'UTC'),
+    ])->hosts()->attach($this->otherHost);
+
+    expect($this->booking->refresh()->keptHost())->toBeNull();
+
+    $redirect = $this->get(route('booking.reschedule', ['booking' => $this->booking->uid]))->assertRedirect();
+
+    expect($redirect->headers->get('Location'))->toContain('zone=spanish');
+
+    // The zone's hosts are on offer: Riley is busy at 10:00, so it is gone
+    // even though Samuel, who has the meeting, is free then.
+    $this->get(route('book.event-type', [
+        'page' => 'samuel',
+        'eventType' => 'leasing',
+        'reschedule' => $this->booking->uid,
+        'zone' => 'spanish',
+        'month' => '2026-09',
+    ]))->assertInertia(fn ($page) => $page
+        ->where('chosenHost', null)
+        ->loadDeferredProps(fn ($reload) => $reload
+            ->where('slots.2026-09-03', fn ($slots) => collect($slots)->pluck('label')->doesntContain('10:00am')
+                && collect($slots)->pluck('label')->contains('10:30am'))));
+
+    $this->post(route('booking.reschedule.store', ['booking' => $this->booking->uid]), [
+        'starts_at' => CarbonImmutable::parse('2026-09-03 12:00:00', 'UTC')->toIso8601String(),
+    ])->assertRedirect();
+
+    $replacement = Booking::where('rescheduled_from_id', $this->booking->id)->firstOrFail();
+
+    expect($replacement->user_id)->toBe($this->otherHost->id)
+        ->and($replacement->zone)->toBe('spanish');
+});
+
+test('a zone the host who has the meeting covers keeps it with them', function () {
+    HostZone::query()->create(['team_id' => $this->team->id, 'user_id' => $this->host->id, 'zone' => 'spanish']);
+    $this->booking->update(['zone' => 'spanish']);
+
+    expect($this->booking->refresh()->keptHost()?->id)->toBe($this->host->id);
 });
