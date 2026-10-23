@@ -195,9 +195,9 @@ class PublicBookingController extends Controller
         ]);
 
         $hostId = (int) ($validated['host_id'] ?? 0);
-        $host = $booking->chosenHostFor($request->user(), $hostId);
+        $host = $booking->chosenHostFor($request->user(), $hostId) ?? $booking->keptHost();
 
-        abort_if($hostId !== 0 && $host === null, 403);
+        abort_if($hostId !== 0 && $host?->id !== $hostId, 403);
 
         $byHost = $request->user()?->can('cancel', $booking) ?? false;
 

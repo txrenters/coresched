@@ -95,12 +95,67 @@ test('an invitee cannot choose the host', function () {
         'eventType' => 'leasing',
         'reschedule' => $this->booking->uid,
         'host' => $this->otherHost->id,
-    ]))->assertInertia(fn ($page) => $page->where('chosenHost', null));
+    ]))->assertInertia(fn ($page) => $page->where('chosenHost.name', 'Samuel Upchurch'));
 
     $this->post(route('booking.reschedule.store', ['booking' => $this->booking->uid]), [
         'starts_at' => CarbonImmutable::parse('2026-09-02 12:00:00', 'UTC')->toIso8601String(),
         'host_id' => $this->otherHost->id,
     ])->assertForbidden();
+
+    expect($this->booking->refresh()->status)->toBe(BookingStatus::Confirmed);
+});
+
+test('an invitee moving a pooled meeting keeps the host who has it', function () {
+    $this->booking->hosts()->sync([$this->otherHost->id]);
+    $this->booking->update(['user_id' => $this->otherHost->id]);
+
+    $this->get(route('book.event-type', [
+        'page' => 'samuel',
+        'eventType' => 'leasing',
+        'reschedule' => $this->booking->uid,
+    ]))->assertInertia(fn ($page) => $page->where('chosenHost.name', 'Riley Park'));
+
+    $this->post(route('booking.reschedule.store', ['booking' => $this->booking->uid]), [
+        'starts_at' => CarbonImmutable::parse('2026-09-03 12:00:00', 'UTC')->toIso8601String(),
+    ])->assertRedirect();
+
+    $replacement = Booking::where('rescheduled_from_id', $this->booking->id)->firstOrFail();
+
+    expect($replacement->user_id)->toBe($this->otherHost->id)
+        ->and($replacement->hosts->modelKeys())->toBe([$this->otherHost->id])
+        ->and($this->booking->refresh()->canceled_by)->toBe('invitee');
+});
+
+test('an invitee may post the host the picker showed them', function () {
+    $this->post(route('booking.reschedule.store', ['booking' => $this->booking->uid]), [
+        'starts_at' => CarbonImmutable::parse('2026-09-03 12:00:00', 'UTC')->toIso8601String(),
+        'host_id' => $this->host->id,
+    ])->assertRedirect();
+
+    expect(Booking::where('rescheduled_from_id', $this->booking->id)->value('user_id'))->toBe($this->host->id);
+});
+
+test('an invitee is not moved to another host when theirs is busy', function () {
+    Booking::factory()->create([
+        'event_type_id' => $this->eventType->id,
+        'user_id' => $this->host->id,
+        'team_id' => $this->eventType->team_id,
+        'starts_at' => CarbonImmutable::parse('2026-09-03 10:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-09-03 10:30:00', 'UTC'),
+    ])->hosts()->attach($this->host);
+
+    $this->get(route('book.event-type', [
+        'page' => 'samuel',
+        'eventType' => 'leasing',
+        'reschedule' => $this->booking->uid,
+        'month' => '2026-09',
+    ]))->assertInertia(fn ($page) => $page
+        ->loadDeferredProps(fn ($reload) => $reload
+            ->where('slots.2026-09-03', fn ($slots) => collect($slots)->pluck('label')->doesntContain('10:00am'))));
+
+    $this->post(route('booking.reschedule.store', ['booking' => $this->booking->uid]), [
+        'starts_at' => CarbonImmutable::parse('2026-09-03 10:00:00', 'UTC')->toIso8601String(),
+    ])->assertSessionHasErrors('starts_at');
 
     expect($this->booking->refresh()->status)->toBe(BookingStatus::Confirmed);
 });

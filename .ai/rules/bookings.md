@@ -23,5 +23,6 @@ CreateBooking and ApproveBooking only queue runs for a CONFIRMED booking, like r
 
 ## Choosing a host and no-shows ride on the existing booking flow
 A chosen host is passed to CreateBooking/RescheduleBooking as `host:`; the slot must list that host in its hostIds, otherwise SlotUnavailableException. Who may choose is decided in one place: EventType::canBeBookedOnBehalfBy (new bookings) and Booking::chosenHostFor (reschedules, needs the cancel ability). Only EventType::assignableHosts() may be chosen: pooled and not collective.
+With nobody chosen, a reschedule stays with the host who has the meeting (Booking::keptHost): the picker offers only their times and the replacement is theirs, never re-run through round robin. TEXRA's lead is held by that agent, so a renter's move must not hand the call to someone else; only an organizer choosing a host hands it on.
 RescheduleBooking sends BookingCanceled to hosts dropped from the replacement, because BookingRescheduled only reaches the new booking's hosts.
 A no-show keeps the booking Confirmed and sets no_show_at. Automation::sendAtFor queues NoShow runs only once no_show_at is set, and skips AfterEnd runs while it is set. RecordNoShow re-runs ScheduleAutomations both when marking and when undoing.
