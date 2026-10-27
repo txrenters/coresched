@@ -19,6 +19,24 @@ class SaveTeamRequest extends FormRequest
     protected const ACCOUNT_SID_PATTERN = '/^AC[0-9a-fA-F]{32}$/';
 
     /**
+     * Determine if the user is authorized to make this request.
+     *
+     * Checked here, before validation, and not only in the controller: the
+     * rules below call Twilio with the organization's saved credentials (its
+     * numbers, a credential check), so someone without the right to change
+     * the organization must be turned away before any of that runs, or the
+     * validation errors would tell them which numbers its account owns.
+     */
+    public function authorize(): bool
+    {
+        $team = $this->team();
+
+        return $team !== null
+            ? (bool) $this->user()?->can('update', $team)
+            : (bool) $this->user()?->can('create', Team::class);
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * Everything past the name is organization branding, which only the update
