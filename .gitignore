@@ -33,3 +33,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Local code map from the graphify tool
+/graphify-out

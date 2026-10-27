@@ -27,5 +27,5 @@ The one legitimate raw colour is a user's own event-type colour, which arrives a
 The no-raw-colours rule still holds. One token pair was added: brand / brand-foreground, fixed vibrant blue in both themes (see .ai/rules/css.md). Only AuthSplitLayout's marketing panel uses it, because bg-primary now inverts to a light blue under .dark and an "always brand" panel must not flip.
 
 Two consequences of primary becoming a saturated blue rather than a dark navy:
-- The full-colour logo raster no longer reads on a primary/brand surface. AppLogoIcon on a coloured panel needs a neutral chip behind it (bg-card), which is what AuthSplitLayout does. Everywhere else it already sits on bg-card or the page background.
+- The full-colour logo mark (a brand-blue tile) does not read on a primary/brand surface. AppLogoIcon on a coloured panel needs a neutral chip behind it (bg-card), which is what AuthSplitLayout does. Everywhere else it already sits on bg-card or the page background.
 - resources/js/app.ts sets the Inertia progress colour to 'var(--primary)' rather than a hex, so the loading bar follows the theme. Inertia injects it into a normal document <style>, so the var resolves off :root — keep it a var, do not go back to a literal.
