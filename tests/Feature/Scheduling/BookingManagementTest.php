@@ -175,7 +175,7 @@ test('a reply to a canceled or declined email reaches the other party too', func
     'declined' => BookingDeclined::class,
 ]);
 
-test('a booking email is headed with the organizations name, not its logo', function () {
+test('a booking email is headed with the organizations name, not its logo, and signed with the app brand', function () {
     $this->team->forceFill(['name' => 'Acme Leasing', 'logo_path' => 'team-logos/acme.png'])->save();
     $booking = bookingFor($this->host, $this->eventType);
 
@@ -187,7 +187,8 @@ test('a booking email is headed with the organizations name, not its logo', func
         ->toMatch('/<td class="header"[^>]*>\s*<a [^>]+>\s*Acme Leasing\s*<\/a>/')
         ->not->toContain($this->team->fresh()->logoUrl())
         ->toContain('href="'.route('book.page', ['page' => $this->team->fresh()->slug]).'"')
-        ->toContain('© '.date('Y').' Acme Leasing.');
+        ->toContain('© '.date('Y').' '.config('app.name').'.')
+        ->not->toContain('© '.date('Y').' Acme Leasing.');
 });
 
 test('a booking email is styled with the app theme palette', function () {
@@ -372,6 +373,22 @@ test('the this week range lists meetings still to come first, then finished ones
         ->assertInertia(fn ($page) => $page
             ->where('meetings', fn ($meetings) => collect($meetings)->pluck('dateKey')->all() === [
                 '2026-09-03', '2026-09-04', '2026-09-03', '2026-09-02', '2026-08-31',
+            ]));
+});
+
+test('the last week range lists the latest meeting first', function () {
+    foreach (['2026-08-24 15:00', '2026-08-28 15:00', '2026-08-26 15:00'] as $start) {
+        bookingFor($this->host, $this->eventType, [
+            'starts_at' => CarbonImmutable::parse($start, 'UTC'),
+            'ends_at' => CarbonImmutable::parse($start, 'UTC')->addMinutes(30),
+        ]);
+    }
+
+    $this->actingAs($this->host)
+        ->get(route('meetings.index', ['current_team' => $this->team->slug, 'filter' => 'last_week']))
+        ->assertInertia(fn ($page) => $page
+            ->where('meetings', fn ($meetings) => collect($meetings)->pluck('dateKey')->all() === [
+                '2026-08-28', '2026-08-26', '2026-08-24',
             ]));
 });
 

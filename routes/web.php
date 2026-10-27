@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountSetupController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\BookingQrCodeController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Marketing\ContactSalesController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Settings\OrganizationDirectoryController;
 use App\Http\Controllers\Settings\UserDirectoryController;
@@ -12,6 +13,19 @@ use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+Route::inertia('pricing', 'Pricing')->name('pricing');
+Route::post('contact-sales', [ContactSalesController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('contact-sales.store');
+
+/*
+ * The marketing pages are the only indexable URLs; see NoIndexExceptMarketing.
+ * Rendered rather than a static file so the URLs follow APP_URL.
+ */
+Route::get('sitemap.xml', fn () => response()
+    ->view('sitemap')
+    ->header('Content-Type', 'application/xml'))
+    ->name('sitemap');
 
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])

@@ -1,7 +1,8 @@
 {{--
     $organization is set on booking emails (BookingMailPresenter::withSender)
-    so the header and sign-off carry the organization's own name.
-    Account emails have no organization and keep the app's name.
+    so the header carries the organization's own name. Account emails have no
+    organization and are headed with the app's name. The footer is always the
+    app's own brand.
 --}}
 @props(['organization' => null])
 <x-mail::layout>
@@ -27,7 +28,7 @@
 {{-- Footer --}}
 <x-slot:footer>
 <x-mail::footer>
-© {{ date('Y') }} {{ $organization['name'] ?? config('app.name') }}. {{ __('All rights reserved.') }}
+© {{ date('Y') }} {{ config('app.name') }}. {{ __('All rights reserved.') }}
 </x-mail::footer>
 </x-slot:footer>
 </x-mail::layout>

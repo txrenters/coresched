@@ -310,7 +310,7 @@ class MeetingController extends Controller
                     $now->subWeek()->startOfWeek()->utc(),
                     $now->subWeek()->endOfWeek()->utc(),
                 ])
-                ->orderBy('starts_at'),
+                ->orderByDesc('starts_at'),
             // A meeting is not past until it has ENDED, so one running right
             // now stays under Upcoming, where its host is looking for it,
             // rather than dropping into Past the minute it starts.

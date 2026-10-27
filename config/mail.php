@@ -136,7 +136,7 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS') ?: 'scheduling@texasrenters.com',
+        'address' => env('MAIL_FROM_ADDRESS') ?: 'notifications@coresched.com',
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
@@ -153,8 +153,20 @@ return [
     */
 
     'account_from' => [
-        'address' => env('MAIL_ACCOUNT_FROM_ADDRESS') ?: (env('MAIL_FROM_ADDRESS') ?: 'scheduling@texasrenters.com'),
+        'address' => env('MAIL_ACCOUNT_FROM_ADDRESS') ?: (env('MAIL_FROM_ADDRESS') ?: 'notifications@coresched.com'),
         'name' => env('MAIL_ACCOUNT_FROM_NAME') ?: env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sales Inbox
+    |--------------------------------------------------------------------------
+    |
+    | Where the pricing page's "Contact sales" form is delivered. Falls back to
+    | the main sender's mailbox until SALES_EMAIL names a dedicated inbox.
+    |
+    */
+
+    'sales_address' => env('SALES_EMAIL') ?: (env('MAIL_FROM_ADDRESS') ?: 'notifications@coresched.com'),
 
 ];

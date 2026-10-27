@@ -16,7 +16,7 @@ beforeEach(function () {
             'save_to_sent_items' => false,
             'send_as' => ['no-reply@texasrenters.com'],
         ],
-        'mail.from' => ['address' => 'scheduling@texasrenters.com', 'name' => 'TR Scheduling'],
+        'mail.from' => ['address' => 'scheduling@texasrenters.com', 'name' => 'CoreSched'],
     ]);
 });
 
@@ -94,7 +94,7 @@ test('the mailer keeps a sent items copy when the setting is left out', function
 test('mail from the no-reply address is sent through that mailbox', function () {
     fakeGraph();
     $body = sendThroughGraph(fn ($message) => $message
-        ->from('no-reply@texasrenters.com', 'TR Scheduling')
+        ->from('no-reply@texasrenters.com', 'CoreSched')
         ->to('someone@example.com')
         ->subject('Reset Password Notification'));
 

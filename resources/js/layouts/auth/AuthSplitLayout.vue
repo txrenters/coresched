@@ -36,8 +36,8 @@ const highlights = [
                 class="flex w-fit items-center gap-2.5 rounded-md text-lg font-bold tracking-tight focus-visible:ring-2 focus-visible:ring-brand-foreground focus-visible:ring-offset-2 focus-visible:ring-offset-brand focus-visible:outline-none"
             >
                 <!--
-                  The mark is a full-colour raster, so it needs a neutral chip
-                  to sit on rather than the brand blue itself.
+                  The mark is navy + green, so it needs a neutral chip to sit
+                  on rather than the brand blue itself.
                 -->
                 <span
                     class="flex size-9 items-center justify-center rounded-lg bg-card"
