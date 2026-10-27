@@ -12,31 +12,50 @@ use RuntimeException;
  * Talks to Twilio's REST API over plain HTTP, the way the calendar and mail
  * providers do -- no SDK, so tests fake it with Http::fake().
  *
- * The account is the installation's; each organization picks which of its
- * numbers to send from (Team::sms_from_number).
+ * Each organization texts through its own Twilio account (Team::twilio()),
+ * and picks which of that account's numbers to send from
+ * (Team::sms_from_number). There is no installation-wide account.
  */
 class TwilioClient
 {
-    protected const NUMBERS_CACHE_KEY = 'twilio.numbers';
+    public function __construct(
+        protected ?string $accountSid = null,
+        protected ?string $authToken = null,
+    ) {}
 
     /**
-     * Determine whether the installation has Twilio credentials at all.
+     * Determine whether this client has credentials at all.
      *
-     * Blank keys are the normal state before anyone has signed up for Twilio,
-     * so nothing may assume this is configured. The env file ships the keys
-     * present but empty, which is why this checks blank() rather than trusting
-     * the config to be missing.
+     * An organization that has not connected Twilio is the normal case, so
+     * nothing may assume this is configured.
      */
     public function isConfigured(): bool
     {
-        return filled(config('services.twilio.sid')) && filled(config('services.twilio.token'));
+        return filled($this->accountSid) && filled($this->authToken);
+    }
+
+    /**
+     * Check the credentials against Twilio by reading the account itself.
+     *
+     * Used when an admin saves them, so a mistyped token is refused on the
+     * settings page rather than discovered when a text fails to send.
+     */
+    public function credentialsAreValid(): bool
+    {
+        if (! $this->isConfigured()) {
+            return false;
+        }
+
+        return $this->request()->get($this->url('').'.json')->successful();
     }
 
     /**
      * Get the numbers the account can send from.
      *
-     * Cached briefly: this is read every time an admin opens the organization
-     * settings, and the list changes only when someone buys a number.
+     * Cached briefly per account: this is read every time an admin opens the
+     * organization settings, and the list changes only when someone buys a
+     * number. The key includes a hash of the token too, so replacing a wrong
+     * token is not answered from the empty list the wrong one produced.
      *
      * @return array<int, array{number: string, label: string}>
      */
@@ -46,11 +65,13 @@ class TwilioClient
             return [];
         }
 
+        $cacheKey = 'twilio.numbers.'.$this->accountSid.'.'.hash('sha256', (string) $this->authToken);
+
         if ($fresh) {
-            Cache::forget(self::NUMBERS_CACHE_KEY);
+            Cache::forget($cacheKey);
         }
 
-        return Cache::remember(self::NUMBERS_CACHE_KEY, now()->addMinutes(10), function () {
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () {
             $response = $this->request()->get($this->url('IncomingPhoneNumbers.json'), ['PageSize' => 100]);
 
             if ($response->failed()) {
@@ -98,7 +119,7 @@ class TwilioClient
         }
 
         if (! $this->isConfigured()) {
-            throw new RuntimeException('Twilio is not configured.');
+            throw new RuntimeException('This organization has not connected a Twilio account.');
         }
 
         $response = $this->request()->asForm()->post($this->url('Messages.json'), [
@@ -120,18 +141,18 @@ class TwilioClient
      */
     protected function request(): PendingRequest
     {
-        return Http::withBasicAuth(
-            (string) config('services.twilio.sid'),
-            (string) config('services.twilio.token'),
-        )->timeout(15);
+        return Http::withBasicAuth((string) $this->accountSid, (string) $this->authToken)->timeout(15);
     }
 
     /**
-     * Build the URL of an account-scoped resource.
+     * Build the URL of an account-scoped resource. An empty resource is the
+     * account itself (callers append ".json").
      */
     protected function url(string $resource): string
     {
-        return rtrim((string) config('services.twilio.base_url'), '/')
-            .'/Accounts/'.config('services.twilio.sid').'/'.$resource;
+        $account = rtrim((string) config('services.twilio.base_url'), '/')
+            .'/Accounts/'.rawurlencode((string) $this->accountSid);
+
+        return $resource === '' ? $account : $account.'/'.$resource;
     }
 }

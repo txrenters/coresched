@@ -4,8 +4,10 @@ namespace App\Models;
 
 use App\Concerns\GeneratesUniqueTeamSlugs;
 use App\Enums\TeamRole;
+use App\Services\Sms\TwilioClient;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +24,8 @@ use Illuminate\Support\Facades\Storage;
  * @property string|null $logo_path
  * @property string $timezone
  * @property string|null $sms_from_number
+ * @property string|null $twilio_account_sid
+ * @property string|null $twilio_auth_token
  * @property string|null $welcome_message
  * @property string|null $website_url
  * @property-read string|null $logo_url
@@ -36,7 +40,14 @@ use Illuminate\Support\Facades\Storage;
  * @property-read Collection<int, Automation> $automations
  * @property-read Collection<int, Booking> $bookings
  */
-#[Fillable(['name', 'slug', 'logo_path', 'timezone', 'sms_from_number', 'welcome_message', 'website_url'])]
+#[Fillable(['name', 'slug', 'logo_path', 'timezone', 'sms_from_number', 'twilio_account_sid', 'twilio_auth_token', 'welcome_message', 'website_url'])]
+/*
+ * Hidden because the signed-in user is shared with every page and carries
+ * their current organization along with it: the Twilio credentials must never
+ * reach an organization's members that way. Pages that need them build them
+ * explicitly.
+ */
+#[Hidden(['twilio_account_sid', 'twilio_auth_token'])]
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -187,7 +198,27 @@ class Team extends Model
     protected function casts(): array
     {
         return [
+            'twilio_auth_token' => 'encrypted',
         ];
+    }
+
+    /**
+     * Determine whether this organization has its own Twilio account set up.
+     *
+     * Without one its workflows cannot text anybody: there is deliberately no
+     * installation-wide account to fall back on.
+     */
+    public function hasTwilio(): bool
+    {
+        return filled($this->twilio_account_sid) && filled($this->twilio_auth_token);
+    }
+
+    /**
+     * Get a Twilio client signed in as this organization's own account.
+     */
+    public function twilio(): TwilioClient
+    {
+        return new TwilioClient($this->twilio_account_sid, $this->twilio_auth_token);
     }
 
     /**

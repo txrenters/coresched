@@ -11,7 +11,6 @@ use App\Models\Automation;
 use App\Models\EventType;
 use App\Models\Team;
 use App\Services\Automations\AutomationMessage;
-use App\Services\Sms\TwilioClient;
 use App\Support\PhoneNumber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -184,13 +183,13 @@ class AutomationController extends Controller
             'channelOptions' => AutomationChannel::options(),
             'variables' => AutomationMessage::variables(),
             /*
-             * Text messages need two things beyond the credentials: the
-             * installation's Twilio account, and a number this organization
-             * has chosen to send from. The editor says which is missing rather
-             * than letting someone build a workflow that can never send.
+             * Text messages need two things: this organization's own Twilio
+             * account, and a number it has chosen to send from. The editor
+             * says which is missing rather than letting someone build a
+             * workflow that can never send.
              */
             'sms' => [
-                'configured' => app(TwilioClient::class)->isConfigured(),
+                'configured' => $current_team->hasTwilio(),
                 'fromNumber' => $current_team->sms_from_number,
                 'settingsUrl' => route('teams.edit', ['team' => $current_team->slug]),
             ],
