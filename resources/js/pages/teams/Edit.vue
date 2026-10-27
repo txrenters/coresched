@@ -24,12 +24,14 @@ type Props = {
     permissions: TeamPermissions;
     timezones: string[];
     /**
-     * The Twilio numbers the installation owns, for an admin to choose this
-     * organization's from. Empty when Twilio is not set up, or for anyone who
-     * cannot change it.
+     * The organization's own Twilio account. The Auth Token never reaches the
+     * page; tokenHint is its last four characters. accountSid, tokenHint and
+     * numbers are null/empty for anyone who cannot change them.
      */
     sms: {
         configured: boolean;
+        accountSid: string | null;
+        tokenHint: string | null;
         numbers: Array<{ number: string; label: string }>;
     };
 };
@@ -72,6 +74,10 @@ const profileForm = useForm({
     website_url: props.team.websiteUrl ?? '',
     timezone: props.team.timezone ?? '',
     sms_from_number: props.team.smsFromNumber ?? '',
+    twilio_account_sid: props.sms.accountSid ?? '',
+    // Write-only: blank means "keep the saved token".
+    twilio_auth_token: '',
+    remove_twilio: false as boolean,
 });
 
 const logoInput = ref<HTMLInputElement | null>(null);
@@ -116,6 +122,11 @@ const clearLogo = () => {
     }
 };
 
+const disconnectTwilio = () => {
+    profileForm.remove_twilio = true;
+    submitProfile();
+};
+
 const submitProfile = () => {
     profileForm.post(update(props.team.slug).url, {
         preserveScroll: true,
@@ -127,6 +138,10 @@ const submitProfile = () => {
 
             profileForm.logo = null;
             profileForm.remove_logo = false;
+            profileForm.twilio_auth_token = '';
+            profileForm.remove_twilio = false;
+            profileForm.twilio_account_sid = props.sms.accountSid ?? '';
+            profileForm.sms_from_number = props.team.smsFromNumber ?? '';
         },
     });
 };
@@ -273,42 +288,110 @@ const submitProfile = () => {
                     <InputError :message="profileForm.errors.timezone" />
                 </div>
 
-                <div class="grid gap-2">
-                    <Label for="sms-from-number">Text messages from</Label>
-                    <Select
-                        v-if="sms.numbers.length"
-                        v-model="profileForm.sms_from_number"
-                    >
-                        <SelectTrigger
-                            id="sms-from-number"
-                            class="w-full cursor-pointer sm:max-w-sm"
-                            data-test="team-sms-number-select"
-                        >
-                            <SelectValue placeholder="Choose a number" />
-                        </SelectTrigger>
-                        <SelectContent class="max-h-72">
-                            <SelectItem
-                                v-for="number in sms.numbers"
-                                :key="number.number"
-                                :value="number.number"
+                <fieldset
+                    class="grid gap-4 rounded-lg border border-border p-4"
+                    data-test="team-twilio-settings"
+                >
+                    <legend class="px-1 text-sm font-medium">
+                        Text messages (Twilio)
+                    </legend>
+                    <p class="-mt-1 text-sm text-muted-foreground">
+                        Workflows text through this organization's own Twilio
+                        account. Find the Account SID and Auth Token on the
+                        Twilio Console's account dashboard. Without them, this
+                        organization's workflows send email only.
+                    </p>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="grid gap-2">
+                            <Label for="twilio-account-sid">Account SID</Label>
+                            <Input
+                                id="twilio-account-sid"
+                                v-model="profileForm.twilio_account_sid"
+                                autocomplete="off"
+                                spellcheck="false"
+                                placeholder="AC…"
+                                data-test="team-twilio-sid"
+                            />
+                            <InputError
+                                :message="profileForm.errors.twilio_account_sid"
+                            />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="twilio-auth-token">Auth Token</Label>
+                            <Input
+                                id="twilio-auth-token"
+                                v-model="profileForm.twilio_auth_token"
+                                type="password"
+                                autocomplete="new-password"
+                                :placeholder="
+                                    sms.tokenHint
+                                        ? `Saved, ends in ${sms.tokenHint}`
+                                        : 'Your Twilio Auth Token'
+                                "
+                                data-test="team-twilio-token"
+                            />
+                            <p
+                                v-if="sms.tokenHint"
+                                class="text-xs text-muted-foreground"
                             >
-                                {{ number.label }} — {{ number.number }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <p v-else class="text-sm text-muted-foreground">
-                        {{
-                            sms.configured
-                                ? 'No numbers were found on the Twilio account.'
-                                : 'Twilio is not set up on this installation, so there is nothing to choose from yet.'
-                        }}
-                    </p>
-                    <p class="text-sm text-muted-foreground">
-                        Workflows that send a text message send it from this
-                        number.
-                    </p>
-                    <InputError :message="profileForm.errors.sms_from_number" />
-                </div>
+                                Leave blank to keep the saved token.
+                            </p>
+                            <InputError
+                                :message="profileForm.errors.twilio_auth_token"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="grid gap-2">
+                        <Label for="sms-from-number">Text messages from</Label>
+                        <Select
+                            v-if="sms.numbers.length"
+                            v-model="profileForm.sms_from_number"
+                        >
+                            <SelectTrigger
+                                id="sms-from-number"
+                                class="w-full cursor-pointer sm:max-w-sm"
+                                data-test="team-sms-number-select"
+                            >
+                                <SelectValue placeholder="Choose a number" />
+                            </SelectTrigger>
+                            <SelectContent class="max-h-72">
+                                <SelectItem
+                                    v-for="number in sms.numbers"
+                                    :key="number.number"
+                                    :value="number.number"
+                                >
+                                    {{ number.label }} — {{ number.number }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p v-else class="text-sm text-muted-foreground">
+                            {{
+                                sms.configured
+                                    ? 'No numbers were found on this Twilio account.'
+                                    : 'Save your Twilio account first, then choose which of its numbers to text from.'
+                            }}
+                        </p>
+                        <InputError
+                            :message="profileForm.errors.sms_from_number"
+                        />
+                    </div>
+
+                    <div v-if="sms.configured">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            class="cursor-pointer"
+                            data-test="team-twilio-disconnect"
+                            :disabled="profileForm.processing"
+                            @click="disconnectTwilio"
+                        >
+                            Disconnect Twilio
+                        </Button>
+                    </div>
+                </fieldset>
 
                 <div class="flex items-center gap-4">
                     <Button

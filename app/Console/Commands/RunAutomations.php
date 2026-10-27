@@ -11,7 +11,6 @@ use App\Models\Booking;
 use App\Models\User;
 use App\Notifications\Bookings\AutomationEmail;
 use App\Services\Automations\AutomationMessage;
-use App\Services\Sms\TwilioClient;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Notification;
 use RuntimeException;
@@ -32,11 +31,6 @@ class RunAutomations extends Command
      * @var string
      */
     protected $description = 'Send the workflow emails and text messages that have come due';
-
-    public function __construct(protected TwilioClient $twilio)
-    {
-        parent::__construct();
-    }
 
     /**
      * Execute the console command.
@@ -132,16 +126,23 @@ class RunAutomations extends Command
      */
     protected function sendTextMessage(Automation $automation, Booking $booking): void
     {
-        $from = $booking->team->sms_from_number;
+        $team = $booking->team;
+        $from = $team->sms_from_number;
+
+        if (! $team->hasTwilio()) {
+            throw new RuntimeException('This organization has not connected a Twilio account.');
+        }
 
         if (blank($from)) {
             throw new RuntimeException('This organization has not chosen a number to send text messages from.');
         }
 
+        $twilio = $team->twilio();
+
         foreach ($this->textRecipients($automation, $booking) as $recipient) {
             $message = new AutomationMessage($automation, $booking, $recipient['timezone'], markdown: false);
 
-            $this->twilio->send($from, $recipient['phone'], $message->smsBody());
+            $twilio->send($from, $recipient['phone'], $message->smsBody());
         }
     }
 

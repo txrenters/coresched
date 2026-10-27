@@ -9,7 +9,6 @@ use App\Http\Requests\Teams\SaveTeamRequest;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Activity\ActivityLogger;
-use App\Services\Sms\TwilioClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -68,14 +67,13 @@ class TeamController extends Controller
             'permissions' => $user->toTeamPermissions($team),
             'timezones' => timezone_identifiers_list(),
             /*
-             * The numbers the installation's Twilio account owns, for the admin
-             * to pick this organization's from. Only fetched for someone who
-             * can actually change it -- everyone else has no use for the list.
+             * The organization's own Twilio account and the numbers it owns,
+             * for an admin to pick from. The Account SID and the numbers only
+             * go to someone who can change them. The Auth Token never leaves
+             * the server: the page gets its last four characters, enough to
+             * recognise which token is saved.
              */
-            'sms' => [
-                'configured' => app(TwilioClient::class)->isConfigured(),
-                'numbers' => $user->can('update', $team) ? app(TwilioClient::class)->numbers() : [],
-            ],
+            'sms' => $this->smsSettings($team, $user->can('update', $team)),
         ]);
     }
 
@@ -97,7 +95,7 @@ class TeamController extends Controller
                 }
             }
 
-            $attributes = [...$attributes, ...$this->resolveLogo($request, $team)];
+            $attributes = [...$attributes, ...$this->resolveTwilio($request), ...$this->resolveLogo($request, $team)];
 
             $team->update($attributes);
 
@@ -191,6 +189,50 @@ class TeamController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Organization deleted.')]);
 
         return to_route('teams.index');
+    }
+
+    /**
+     * The SMS block of the settings page.
+     *
+     * @return array{configured: bool, accountSid: ?string, tokenHint: ?string, numbers: array<int, array{number: string, label: string}>}
+     */
+    protected function smsSettings(Team $team, bool $canUpdate): array
+    {
+        $token = (string) $team->twilio_auth_token;
+
+        return [
+            'configured' => $team->hasTwilio(),
+            'accountSid' => $canUpdate ? $team->twilio_account_sid : null,
+            'tokenHint' => $canUpdate && $team->hasTwilio() ? substr($token, -4) : null,
+            'numbers' => $canUpdate && $team->hasTwilio() ? $team->twilio()->numbers() : [],
+        ];
+    }
+
+    /**
+     * Work out the Twilio columns a save should write.
+     *
+     * Disconnecting clears the chosen number too, since it belonged to that
+     * account. A blank token keeps the saved one (the page never has it).
+     *
+     * @return array<string, string|null>
+     */
+    protected function resolveTwilio(SaveTeamRequest $request): array
+    {
+        if ($request->removesTwilio()) {
+            return ['twilio_account_sid' => null, 'twilio_auth_token' => null, 'sms_from_number' => null];
+        }
+
+        $attributes = [];
+
+        if ($request->has('twilio_account_sid')) {
+            $attributes['twilio_account_sid'] = $request->validated('twilio_account_sid');
+        }
+
+        if (filled($request->validated('twilio_auth_token'))) {
+            $attributes['twilio_auth_token'] = $request->validated('twilio_auth_token');
+        }
+
+        return $attributes;
     }
 
     /**
