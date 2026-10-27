@@ -194,6 +194,27 @@ test('a microsoft event lists no attendees, so outlook sends no invite of its ow
         && ! isset($request['attendees']));
 });
 
+test('a microsoft event is written in the host timezone, so outlook shows the local time', function () {
+    $this->host->update(['timezone' => 'America/Chicago']);
+    connectedAccount($this->host, CalendarProvider::Microsoft);
+
+    $booking = Booking::factory()->create([
+        'user_id' => $this->host->id,
+        'location_type' => LocationType::Phone,
+        'starts_at' => CarbonImmutable::parse('2026-10-27 16:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-10-27 16:30:00', 'UTC'),
+    ]);
+    $booking->hosts()->attach($this->host);
+
+    Http::fake(['graph.microsoft.com/*' => Http::response(['id' => 'graph-event-4'])]);
+
+    (new SyncBookingToCalendars($booking))->handle(app(CalendarProviderManager::class));
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request['start'] === ['dateTime' => '2026-10-27T11:00:00', 'timeZone' => 'America/Chicago']
+        && $request['end'] === ['dateTime' => '2026-10-27T11:30:00', 'timeZone' => 'America/Chicago']);
+});
+
 test('a phone booking does not ask the provider for a meeting link', function () {
     connectedAccount($this->host, CalendarProvider::Microsoft);
 
