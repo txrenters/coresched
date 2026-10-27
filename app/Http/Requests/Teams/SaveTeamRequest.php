@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Teams;
 
 use App\Models\Team;
+use App\Models\User;
 use App\Rules\TeamName;
 use App\Services\Sms\TwilioClient;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -67,7 +68,33 @@ class SaveTeamRequest extends FormRequest
                 Rule::dimensions()->maxWidth(2000)->maxHeight(2000),
             ],
             'remove_logo' => ['sometimes', 'boolean'],
+            /*
+             * A super admin does not join what they create, so they name the
+             * organization's owner (its first admin) as they create it. An
+             * existing account is added; a new address gets an account and a
+             * "Set your password" email. The name is only needed for that.
+             */
+            'owner_email' => [Rule::requiredIf(fn (): bool => $this->createsAsSuperAdmin()), 'nullable', 'string', 'email', 'max:255'],
+            'owner_name' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * Determine whether this is a super admin creating an organization.
+     */
+    public function createsAsSuperAdmin(): bool
+    {
+        return $this->routeIs('teams.store') && (bool) $this->user()?->isSuperAdmin();
+    }
+
+    /**
+     * The existing account the owner email belongs to, if any.
+     */
+    public function existingOwner(): ?User
+    {
+        $email = mb_strtolower((string) $this->input('owner_email'));
+
+        return $email === '' ? null : User::query()->whereRaw('LOWER(email) = ?', [$email])->first();
     }
 
     /**
@@ -81,6 +108,19 @@ class SaveTeamRequest extends FormRequest
     public function after(): array
     {
         return [
+            function (Validator $validator): void {
+                if ($validator->errors()->isNotEmpty() || ! $this->createsAsSuperAdmin()) {
+                    return;
+                }
+
+                $owner = $this->existingOwner();
+
+                if ($owner?->isSuperAdmin()) {
+                    $validator->errors()->add('owner_email', __('A super admin cannot own an organization. Choose someone else.'));
+                } elseif ($owner === null && blank($this->input('owner_name'))) {
+                    $validator->errors()->add('owner_name', __('Enter the owner\'s name. This address has no account yet, so one will be created.'));
+                }
+            },
             function (Validator $validator): void {
                 if ($validator->errors()->isNotEmpty() || ! $this->changesTwilioCredentials()) {
                     return;

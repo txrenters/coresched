@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Teams;
 
 use App\Actions\Teams\CreateTeam;
+use App\Actions\Teams\CreateTeamUser;
+use App\Enums\TeamRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Teams\DeleteTeamRequest;
 use App\Http\Requests\Teams\SaveTeamRequest;
@@ -35,11 +37,21 @@ class TeamController extends Controller
     /**
      * Store a newly created team.
      */
-    public function store(SaveTeamRequest $request, CreateTeam $createTeam): RedirectResponse
+    public function store(SaveTeamRequest $request, CreateTeam $createTeam, CreateTeamUser $createTeamUser): RedirectResponse
     {
         Gate::authorize('create', Team::class);
 
         $team = $createTeam->handle($request->user(), $request->validated('name'));
+
+        // A super admin does not join what they create; the owner they named
+        // becomes its first admin instead.
+        if ($request->createsAsSuperAdmin()) {
+            $owner = $this->addOwner($request, $team, $createTeamUser);
+
+            Inertia::flash('toast', ['type' => 'success', 'message' => __('Organization created. :name is its admin.', ['name' => $owner->name])]);
+
+            return to_route('teams.edit', ['team' => $team->slug]);
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Organization created.')]);
 
@@ -189,6 +201,36 @@ class TeamController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Organization deleted.')]);
 
         return to_route('teams.index');
+    }
+
+    /**
+     * Make the named owner the new organization's first admin: an existing
+     * account joins, a new address gets an account and a welcome email.
+     */
+    protected function addOwner(SaveTeamRequest $request, Team $team, CreateTeamUser $createTeamUser): User
+    {
+        $owner = $request->existingOwner();
+
+        if ($owner !== null) {
+            $team->memberships()->create(['user_id' => $owner->id, 'role' => TeamRole::Admin]);
+        } else {
+            $owner = $createTeamUser->handle(
+                $team,
+                (string) $request->validated('owner_name'),
+                mb_strtolower((string) $request->validated('owner_email')),
+                TeamRole::Admin,
+            );
+        }
+
+        app(ActivityLogger::class)->record(
+            $team,
+            'member.added',
+            'Added '.$owner->name.' as '.TeamRole::Admin->label(),
+            $owner,
+            ['role' => TeamRole::Admin->value],
+        );
+
+        return $owner;
     }
 
     /**

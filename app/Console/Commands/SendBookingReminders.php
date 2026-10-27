@@ -33,12 +33,14 @@ class SendBookingReminders extends Command
 
         BookingReminder::query()
             ->due()
-            ->with(['booking.eventType', 'booking.host', 'booking.hosts', 'booking.guests'])
+            ->with(['booking.team', 'booking.eventType', 'booking.host', 'booking.hosts', 'booking.guests'])
             ->chunkById(100, function ($reminders) use (&$sent) {
                 foreach ($reminders as $reminder) {
                     $booking = $reminder->booking;
 
-                    if ($booking->status !== BookingStatus::Confirmed || $booking->starts_at->isPast()) {
+                    // A disabled organization sends nothing; dropped rather than
+                    // held, so enabling it later does not fire stale reminders.
+                    if ($booking->status !== BookingStatus::Confirmed || $booking->starts_at->isPast() || $booking->team?->isDisabled()) {
                         $reminder->delete();
 
                         continue;

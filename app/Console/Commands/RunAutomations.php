@@ -59,6 +59,15 @@ class RunAutomations extends Command
                         continue;
                     }
 
+                    // A disabled organization sends nothing. Recorded rather
+                    // than held, so enabling it later does not fire stale
+                    // messages, and the run says why it never went out.
+                    if ($booking->team?->isDisabled()) {
+                        $run->update(['sent_at' => now(), 'failure' => 'Not sent: the organization was disabled.']);
+
+                        continue;
+                    }
+
                     try {
                         $this->send($run);
                         $run->update(['sent_at' => now()]);

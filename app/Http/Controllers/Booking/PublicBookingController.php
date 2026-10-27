@@ -170,7 +170,7 @@ class PublicBookingController extends Controller
      */
     public function editSchedule(Request $request, Booking $booking): RedirectResponse
     {
-        abort_unless($booking->isChangeable() && ! $booking->eventType->trashed(), 410);
+        abort_unless($booking->isChangeable() && ! $booking->eventType->trashed() && ! $booking->team->isDisabled(), 410);
 
         $query = http_build_query(array_filter([
             'reschedule' => $booking->uid,

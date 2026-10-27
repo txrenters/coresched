@@ -3,6 +3,8 @@
 use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Teams\AccountCreated;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /**
@@ -518,4 +520,68 @@ test('a member of a single organization cannot open the switcher', function () {
     $this->actingAs($user)
         ->get(route('dashboard', ['current_team' => $user->currentTeam->slug]))
         ->assertInertia(fn (Assert $page) => $page->where('canSwitchTeams', false));
+});
+
+test('a super admin creates an organization with a new owner, without joining it', function () {
+    Notification::fake();
+    $operator = User::factory()->create(['is_super_admin' => true]);
+    $previousTeamId = $operator->current_team_id;
+
+    $this->actingAs($operator)
+        ->post(route('teams.store'), [
+            'name' => 'Fresh Org',
+            'owner_email' => 'Owner@Fresh.test',
+            'owner_name' => 'Olive Owner',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('teams.edit', ['team' => 'fresh-org']));
+
+    $team = Team::where('name', 'Fresh Org')->firstOrFail();
+    $owner = User::where('email', 'owner@fresh.test')->firstOrFail();
+
+    expect($team->members()->pluck('users.id')->all())->toBe([$owner->id])
+        ->and($owner->teamRole($team))->toBe(TeamRole::Admin)
+        ->and($operator->fresh()->current_team_id)->toBe($previousTeamId);
+
+    Notification::assertSentTo($owner, AccountCreated::class);
+});
+
+test('an existing account named as owner is added as its admin', function () {
+    Notification::fake();
+    $operator = User::factory()->create(['is_super_admin' => true]);
+    $existing = User::factory()->create(['email' => 'dana@acme.test']);
+
+    $this->actingAs($operator)
+        ->post(route('teams.store'), ['name' => 'Acme Two', 'owner_email' => 'DANA@acme.test'])
+        ->assertSessionHasNoErrors();
+
+    $team = Team::where('name', 'Acme Two')->firstOrFail();
+
+    expect($existing->teamRole($team))->toBe(TeamRole::Admin);
+    Notification::assertNothingSentTo($existing);
+});
+
+test('a super admin must name an owner, and a new one needs a name', function () {
+    $operator = User::factory()->create(['is_super_admin' => true]);
+
+    $this->actingAs($operator)
+        ->post(route('teams.store'), ['name' => 'No Owner'])
+        ->assertSessionHasErrors('owner_email');
+
+    $this->actingAs($operator)
+        ->post(route('teams.store'), ['name' => 'No Owner', 'owner_email' => 'nobody@new.test'])
+        ->assertSessionHasErrors('owner_name');
+
+    $this->assertDatabaseMissing('teams', ['name' => 'No Owner']);
+});
+
+test('another super admin cannot be made an organizations owner', function () {
+    $operator = User::factory()->create(['is_super_admin' => true]);
+    $other = User::factory()->create(['is_super_admin' => true]);
+
+    $this->actingAs($operator)
+        ->post(route('teams.store'), ['name' => 'Bad Owner', 'owner_email' => $other->email])
+        ->assertSessionHasErrors('owner_email');
+
+    $this->assertDatabaseMissing('teams', ['name' => 'Bad Owner']);
 });

@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Concerns\GeneratesUniqueTeamSlugs;
+use App\Enums\TeamPlan;
 use App\Enums\TeamRole;
 use App\Services\Sms\TwilioClient;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +30,11 @@ use Illuminate\Support\Facades\Storage;
  * @property string|null $twilio_auth_token
  * @property string|null $welcome_message
  * @property string|null $website_url
+ * @property TeamPlan|null $plan
+ * @property string|null $plan_note
+ * @property string|null $mail_from_address
+ * @property Carbon|null $disabled_at
+ * @property string|null $disabled_reason
  * @property-read string|null $logo_url
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -40,14 +47,14 @@ use Illuminate\Support\Facades\Storage;
  * @property-read Collection<int, Automation> $automations
  * @property-read Collection<int, Booking> $bookings
  */
-#[Fillable(['name', 'slug', 'logo_path', 'timezone', 'sms_from_number', 'twilio_account_sid', 'twilio_auth_token', 'welcome_message', 'website_url'])]
+#[Fillable(['name', 'slug', 'logo_path', 'timezone', 'sms_from_number', 'twilio_account_sid', 'twilio_auth_token', 'welcome_message', 'website_url', 'plan', 'plan_note', 'mail_from_address', 'disabled_at', 'disabled_reason'])]
 /*
  * Hidden because the signed-in user is shared with every page and carries
- * their current organization along with it: the Twilio credentials must never
- * reach an organization's members that way. Pages that need them build them
- * explicitly.
+ * their current organization along with it: Twilio credentials and the super
+ * admin's plan, note and sender choice must never reach an organization's
+ * members that way. Pages that need them build them explicitly.
  */
-#[Hidden(['twilio_account_sid', 'twilio_auth_token'])]
+#[Hidden(['twilio_account_sid', 'twilio_auth_token', 'plan', 'plan_note', 'mail_from_address', 'disabled_reason'])]
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -199,7 +206,27 @@ class Team extends Model
     {
         return [
             'twilio_auth_token' => 'encrypted',
+            'plan' => TeamPlan::class,
+            'disabled_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Determine whether a super admin has disabled the organization.
+     */
+    public function isDisabled(): bool
+    {
+        return $this->disabled_at !== null;
+    }
+
+    /**
+     * Scope to organizations that are not disabled.
+     *
+     * @param  Builder<Team>  $query
+     */
+    public function scopeActive(Builder $query): void
+    {
+        $query->whereNull('disabled_at');
     }
 
     /**
@@ -211,6 +238,25 @@ class Team extends Model
     public function hasTwilio(): bool
     {
         return filled($this->twilio_account_sid) && filled($this->twilio_auth_token);
+    }
+
+    /**
+     * The address this organization's booking mail is sent from.
+     *
+     * Its own sender only while that address is still in mail.org_senders:
+     * removing one from the list puts every organization using it back on the
+     * platform address, rather than sending through a mailbox the mailer is no
+     * longer allowed to use.
+     */
+    public function bookingMailFrom(): string
+    {
+        $senders = (array) config('mail.org_senders');
+
+        if (filled($this->mail_from_address) && in_array($this->mail_from_address, $senders, true)) {
+            return $this->mail_from_address;
+        }
+
+        return (string) config('mail.from.address');
     }
 
     /**

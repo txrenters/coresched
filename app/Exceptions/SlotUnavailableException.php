@@ -13,4 +13,12 @@ class SlotUnavailableException extends RuntimeException
     {
         return new self('That time is no longer available.');
     }
+
+    /**
+     * Create an exception for an organization a super admin has disabled.
+     */
+    public static function organizationDisabled(): self
+    {
+        return new self('This organization is not taking bookings right now.');
+    }
 }

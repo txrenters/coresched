@@ -182,14 +182,24 @@ test('a plain member sees no account details and cannot change them', function (
     expect($this->team->fresh()->hasTwilio())->toBeTrue();
 });
 
-test('twilio credentials are never serialized with the organization', function () {
-    $this->team->update(['twilio_account_sid' => VALID_SID, 'twilio_auth_token' => 'secret-token-1234']);
+test('twilio credentials and the super admins plan details are never serialized with the organization', function () {
+    $this->team->update([
+        'twilio_account_sid' => VALID_SID,
+        'twilio_auth_token' => 'secret-token-1234',
+        'plan' => 'enterprise',
+        'plan_note' => 'Internal only',
+        'mail_from_address' => 'scheduling@texasrenters.com',
+    ]);
 
-    expect($this->team->fresh()->toArray())->not->toHaveKeys(['twilio_account_sid', 'twilio_auth_token']);
+    expect($this->team->fresh()->toArray())->not->toHaveKeys([
+        'twilio_account_sid', 'twilio_auth_token', 'plan', 'plan_note', 'mail_from_address',
+    ]);
 
     // The signed-in user is shared with every page and carries their current
     // organization along, so this is the path that would leak it.
     $response = $this->actingAs($this->admin)->get(route('teams.edit', ['team' => $this->team->slug]));
 
-    expect($response->getContent())->not->toContain('secret-token-1234');
+    expect($response->getContent())
+        ->not->toContain('secret-token-1234')
+        ->not->toContain('Internal only');
 });

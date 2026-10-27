@@ -73,14 +73,18 @@ const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
 
 <template>
     <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
-        <template v-if="isOrganizationPage">
+        <!--
+          An organization's own page, so it is titled with its name. The column
+          is centred: it is the main page for the organization (where creating
+          one lands), not a side panel next to a menu.
+        -->
+        <div
+            v-if="isOrganizationPage"
+            class="mx-auto flex w-full max-w-3xl flex-col gap-6"
+        >
             <PageHeader
-                title="Settings"
-                :description="
-                    organization
-                        ? `Manage ${organization.name}, its members and its API keys.`
-                        : 'Manage your organization.'
-                "
+                :title="organization?.name ?? 'Organization'"
+                description="Its settings, members and API keys."
             />
 
             <nav
@@ -102,12 +106,10 @@ const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
                 </Link>
             </nav>
 
-            <div class="md:max-w-2xl">
-                <section class="max-w-xl space-y-12">
-                    <slot />
-                </section>
-            </div>
-        </template>
+            <section class="space-y-12">
+                <slot />
+            </section>
+        </div>
 
         <template v-else>
             <PageHeader

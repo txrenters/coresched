@@ -228,7 +228,7 @@ class BookingMailPresenter
      */
     public function withSender(MailMessage $message): MailMessage
     {
-        $message->from(config('mail.from.address'), $this->booking->team->name);
+        $message->from($this->booking->team->bookingMailFrom(), $this->booking->team->name);
 
         foreach ($this->replyToAddresses() as $replyTo) {
             $message->replyTo($replyTo['address'], $replyTo['name']);

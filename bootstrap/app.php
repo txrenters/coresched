@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Middleware\EnsureActiveOrganization;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\NoIndexExceptMarketing;
+use App\Http\Middleware\RestrictWhileImpersonating;
 use App\Http\Middleware\SetTeamUrlDefaults;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -38,6 +40,8 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             SetTeamUrlDefaults::class,
+            RestrictWhileImpersonating::class,
+            EnsureActiveOrganization::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

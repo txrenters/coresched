@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\AccountSetupController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\Admin\ImpersonationController;
+use App\Http\Controllers\Admin\OrganizationConsoleController;
+use App\Http\Controllers\Admin\SalesInquiryController;
 use App\Http\Controllers\BookingQrCodeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Marketing\ContactSalesController;
@@ -84,6 +87,27 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('users/{user}/organizations/{team}', [UserDirectoryController::class, 'removeFromTeam'])
         ->name('users.organizations.destroy');
     Route::delete('users/{user}', [UserDirectoryController::class, 'destroy'])->name('users.destroy');
+
+    /*
+     * The super admin console: every organization's plan and setup, and
+     * signing in as one of its members. The gate is checked again inside each
+     * action; the route middleware keeps everyone else from even loading it.
+     */
+    Route::middleware('can:accessAdminConsole')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/', [OrganizationConsoleController::class, 'index'])->name('organizations.index');
+        Route::patch('organizations/{team}/plan', [OrganizationConsoleController::class, 'updatePlan'])
+            ->name('organizations.plan');
+        Route::patch('organizations/{team}/status', [OrganizationConsoleController::class, 'updateStatus'])
+            ->name('organizations.status');
+        Route::post('organizations/{team}/impersonate/{user}', [ImpersonationController::class, 'store'])
+            ->name('impersonation.store');
+        Route::get('inquiries', [SalesInquiryController::class, 'index'])->name('inquiries.index');
+        Route::patch('inquiries/{salesInquiry}', [SalesInquiryController::class, 'update'])->name('inquiries.update');
+    });
+
+    // Outside the console group: the account signed in now is the member, not
+    // the super admin. The controller checks the session for who to return to.
+    Route::delete('impersonation', [ImpersonationController::class, 'destroy'])->name('impersonation.destroy');
 
     Route::get('qr-code', BookingQrCodeController::class)->name('booking-qr-code');
 

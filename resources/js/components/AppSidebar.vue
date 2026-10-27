@@ -7,8 +7,10 @@ import {
     Clock,
     ExternalLink,
     History,
+    Inbox,
     LayoutGrid,
     ScrollText,
+    ShieldCheck,
     Settings,
     Users,
     UsersRound,
@@ -31,6 +33,8 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as activityIndex } from '@/routes/activity';
+import { index as inquiriesIndex } from '@/routes/admin/inquiries';
+import { index as adminConsoleIndex } from '@/routes/admin/organizations';
 import { index as automationsIndex } from '@/routes/automations';
 import { index as availabilityIndex } from '@/routes/availability';
 import { page as bookingPage } from '@/routes/book';
@@ -47,9 +51,21 @@ const page = usePage();
 
 const teamSlug = computed(() => page.props.currentTeam?.slug ?? '');
 
-const dashboardUrl = computed(() =>
-    page.props.currentTeam ? dashboard(page.props.currentTeam.slug).url : '/',
-);
+/*
+  Every workspace page lives under an organization. A super admin belongs to
+  none and may not have picked one yet, so until they do, Dashboard opens the
+  admin console and the organization-only links stay hidden rather than
+  pointing at a URL with no organization in it.
+*/
+const hasTeam = computed(() => Boolean(page.props.currentTeam));
+
+const dashboardUrl = computed(() => {
+    if (page.props.currentTeam) {
+        return dashboard(page.props.currentTeam.slug).url;
+    }
+
+    return page.props.isSuperAdmin ? adminConsoleIndex().url : '/';
+});
 
 const workspaceNavItems = computed<NavItem[]>(() => [
     {
@@ -57,6 +73,10 @@ const workspaceNavItems = computed<NavItem[]>(() => [
         href: dashboardUrl.value,
         icon: LayoutGrid,
     },
+    ...(hasTeam.value ? teamWorkspaceItems.value : []),
+]);
+
+const teamWorkspaceItems = computed<NavItem[]>(() => [
     {
         title: 'Scheduling',
         href: schedulingIndex(teamSlug.value),
@@ -74,27 +94,36 @@ const workspaceNavItems = computed<NavItem[]>(() => [
     },
 ]);
 
-const teamNavItems = computed<NavItem[]>(() => [
-    {
-        title: 'Teams',
-        href: groupsIndex(teamSlug.value),
-        icon: Users,
-    },
-]);
+const teamNavItems = computed<NavItem[]>(() =>
+    hasTeam.value
+        ? [
+              {
+                  title: 'Teams',
+                  href: groupsIndex(teamSlug.value),
+                  icon: Users,
+              },
+          ]
+        : [],
+);
 
 const otherNavItems = computed<NavItem[]>(() => [
-    {
-        title: 'Workflows',
-        href: automationsIndex(teamSlug.value),
-        icon: Workflow,
-    },
-    {
-        title: 'Activity',
-        href: activityIndex(teamSlug.value),
-        icon: History,
-    },
+    ...(hasTeam.value
+        ? [
+              {
+                  title: 'Workflows',
+                  href: automationsIndex(teamSlug.value),
+                  icon: Workflow,
+              },
+              {
+                  title: 'Activity',
+                  href: activityIndex(teamSlug.value),
+                  icon: History,
+              },
+          ]
+        : []),
     // The organization's settings; personal ones live in the user menu.
-    ...(page.props.canManageOrganization || page.props.canManageApiKeys
+    ...(hasTeam.value &&
+    (page.props.canManageOrganization || page.props.canManageApiKeys)
         ? [
               {
                   title: 'Settings',
@@ -121,6 +150,11 @@ const adminNavItems = computed<NavItem[]>(() => [
     ...(page.props.isSuperAdmin
         ? [
               {
+                  title: 'Admin console',
+                  href: adminConsoleIndex(),
+                  icon: ShieldCheck,
+              },
+              {
                   title: 'Logs',
                   href: logsIndex(),
                   icon: ScrollText,
@@ -140,6 +174,30 @@ const adminNavItems = computed<NavItem[]>(() => [
               },
           ]
         : []),
+]);
+
+/*
+  A super admin runs the platform rather than working inside an organization:
+  their sidebar is the platform's own, with no workspace and no organization
+  switcher. They see an organization's workspace only by signing in as one of
+  its members from the admin console, and while they do, the signed-in user
+  is that member, so this is false and the normal sidebar shows.
+*/
+const platformMode = computed(() => Boolean(page.props.isSuperAdmin));
+
+const platformNavItems = computed<NavItem[]>(() => [
+    { title: 'Dashboard', href: adminConsoleIndex(), icon: LayoutGrid },
+    { title: 'Organizations', href: organizationsIndex(), icon: Building2 },
+    { title: 'Users', href: usersIndex(), icon: UsersRound },
+    { title: 'Sales inquiries', href: inquiriesIndex(), icon: Inbox },
+    {
+        title: 'Logs',
+        href: logsIndex(),
+        icon: ScrollText,
+        // opcodesio/log-viewer serves its own Blade page, so this leaves
+        // Inertia and opens in a tab of its own.
+        external: true,
+    },
 ]);
 
 /**
@@ -167,32 +225,53 @@ const footerNavItems = computed<NavItem[]>(() => {
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
-                        <Link :href="dashboardUrl">
+                        <Link
+                            :href="
+                                platformMode
+                                    ? adminConsoleIndex()
+                                    : dashboardUrl
+                            "
+                        >
                             <AppLogo />
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>
-            <SidebarMenu>
+            <SidebarMenu v-if="!platformMode">
                 <SidebarMenuItem>
                     <TeamSwitcher />
                 </SidebarMenuItem>
             </SidebarMenu>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent v-if="platformMode">
+            <NavMain :items="platformNavItems" label="Platform" />
+        </SidebarContent>
+
+        <SidebarContent v-else>
             <NavMain :items="workspaceNavItems" label="Workspace" />
-            <NavMain :items="teamNavItems" label="Team" />
-            <NavMain :items="otherNavItems" label="Other" />
+            <NavMain
+                v-if="teamNavItems.length"
+                :items="teamNavItems"
+                label="Team"
+            />
+            <NavMain
+                v-if="otherNavItems.length"
+                :items="otherNavItems"
+                label="Other"
+            />
         </SidebarContent>
 
         <SidebarFooter>
             <NavMain
-                v-if="adminNavItems.length"
+                v-if="!platformMode && adminNavItems.length"
                 :items="adminNavItems"
                 label="Admin"
             />
-            <NavFooter v-if="footerNavItems.length" :items="footerNavItems" />
+            <NavFooter
+                v-if="!platformMode && footerNavItems.length"
+                :items="footerNavItems"
+            />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

@@ -202,7 +202,10 @@ class EventType extends Model
      */
     public function scopeBookable(Builder $query): void
     {
-        $query->where('is_active', true);
+        // A disabled organization takes no bookings anywhere: its own page,
+        // its members' personal pages, single-use links and the API.
+        $query->where('is_active', true)
+            ->whereHas('team', fn (Builder $query) => $query->whereNull('disabled_at'));
     }
 
     /**

@@ -44,6 +44,12 @@ test('a sales inquiry is emailed to the sales inbox with reply-to set to the vis
             && $mail->replyTo === [['dana@northwind.test', 'Dana Lee']]
             && str_contains($mail->subject, 'Northwind');
     });
+
+    $this->assertDatabaseHas('sales_inquiries', [
+        'email' => 'dana@northwind.test',
+        'company' => 'Northwind',
+        'status' => 'new',
+    ]);
 });
 
 test('a sales inquiry needs a name, a valid email, a company and a known team size', function () {
@@ -64,6 +70,7 @@ test('a filled honeypot looks like success but sends nothing', function () {
         ->assertSessionHasNoErrors();
 
     Notification::assertNothingSent();
+    $this->assertDatabaseCount('sales_inquiries', 0);
 });
 
 test('sales inquiries are rate limited', function () {

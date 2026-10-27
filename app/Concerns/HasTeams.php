@@ -103,7 +103,8 @@ trait HasTeams
         // A super admin can switch into any organization, so list them all.
         $teams = $this->isSuperAdmin()
             ? Team::query()->orderBy('name')->get()
-            : $this->teams()->get();
+            // A disabled organization is out of reach, so it is not offered.
+            : $this->teams()->whereNull('teams.disabled_at')->get();
 
         return $teams
             ->map(fn (Team $team) => ! $includeCurrent && $this->isCurrentTeam($team) ? null : $this->toUserTeam($team))
@@ -162,9 +163,25 @@ trait HasTeams
         );
     }
 
+    /**
+     * Determine whether every organization this user belongs to is disabled.
+     */
+    public function hasOnlyDisabledOrganizations(): bool
+    {
+        // Somebody in no organization at all (a fresh account, a super admin)
+        // is not shut out by this; only having every one disabled is.
+        return ! $this->isSuperAdmin()
+            && $this->teams()->exists()
+            && ! $this->teams()->whereNull('teams.disabled_at')->exists();
+    }
+
+    /**
+     * Get the first active organization to fall back to, by name.
+     */
     public function fallbackTeam(?Team $excluding = null): ?Team
     {
         return $this->teams()
+            ->whereNull('teams.disabled_at')
             ->when($excluding, fn ($query) => $query->where('teams.id', '!=', $excluding->id))
             ->orderByRaw('LOWER(teams.name)')
             ->first();

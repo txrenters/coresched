@@ -38,6 +38,10 @@ class BookingPageController extends Controller
 
         abort_if($owner === null, 404);
 
+        if ($this->isDisabled($owner)) {
+            return $this->unavailable($owner);
+        }
+
         $eventTypes = $this->pages->eventTypes($owner);
 
         return Inertia::render('book/Page', [
@@ -66,6 +70,10 @@ class BookingPageController extends Controller
         $owner = $this->pages->resolve($page);
 
         abort_if($owner === null, 404);
+
+        if ($this->isDisabled($owner)) {
+            return $this->unavailable($owner);
+        }
 
         $department = $this->pages->departmentPage($owner, $departmentPage);
 
@@ -150,6 +158,10 @@ class BookingPageController extends Controller
 
         abort_if($owner === null, 404);
 
+        if ($this->isDisabled($owner)) {
+            return $this->unavailable($owner);
+        }
+
         $type = $this->pages->eventType($owner, $eventType);
 
         /*
@@ -213,6 +225,26 @@ class BookingPageController extends Controller
     }
 
     /**
+     * Determine whether the page belongs to an organization a super admin has
+     * disabled. A personal page is never refused outright: EventType::bookable
+     * already leaves the disabled organization's events off it.
+     */
+    protected function isDisabled(User|Team $owner): bool
+    {
+        return $owner instanceof Team && $owner->isDisabled();
+    }
+
+    /**
+     * Display the page a disabled organization's booking links show.
+     */
+    protected function unavailable(User|Team $owner): Response
+    {
+        return Inertia::render('book/Unavailable', [
+            'pageName' => $this->pages->name($owner),
+        ]);
+    }
+
+    /**
      * Display the page a TEXRA link shows once an agent holds the lead.
      */
     protected function linkClosed(User|Team $owner, EventType $type): Response
@@ -250,6 +282,10 @@ class BookingPageController extends Controller
 
         $owner = $type->kind->hasHostPool() || blank($type->owner->booking_slug) ? $type->team : $type->owner;
         $pageSlug = $owner instanceof Team ? $owner->slug : $owner->booking_slug;
+
+        if ($type->team?->isDisabled()) {
+            return $this->unavailable($owner);
+        }
 
         if ($singleUseLink->used_at !== null) {
             return Inertia::render('book/LinkUsed', [

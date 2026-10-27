@@ -2,6 +2,7 @@
 paths:
   - app/Models/EventType.php
   - 'app/Models/Availability*.php'
+  - app/Models/Team.php
 ---
 
 # Models
@@ -25,3 +26,6 @@ Because writes are now normalised, keep describeHours strict; a lenient parser t
 
 ## Booking zones narrow the host pool inside schedulingHosts(), nowhere else
 A host may list zones (`host_zones`, per organization, opaque keys written by TEXRA through `PUT .../hosts/{email}/zones`). A booking link's `zone=` (prefilled, posted back, stored on `bookings.zone`, echoed in the webhook) makes `EventType::schedulingHosts($zone)` return only the pool members listing it. The engine, CreateBooking, AssignHosts, reschedules and hand-offs all pass the zone through that one method; do not filter hosts by zone anywhere else. A zone nobody in the pool lists narrows nothing (so a new area still books), and `AssignHosts` never falls back to an out-of-zone owner for a zone somebody covers: that is `SlotUnavailableException`.
+
+## Team hides its private columns because the current team rides along on auth.user
+HandleInertiaRequests shares `auth.user`, and once anything touches `$user->currentTeam` that relation is serialized with it onto EVERY page for every member. Team therefore has #[Hidden] on twilio_account_sid, twilio_auth_token, plan, plan_note and mail_from_address. Any new column an organization's members must not see (credentials, billing, super-admin notes) must be added to that list; pages that need such values build them explicitly (TeamController::smsSettings, OrganizationSummary). TwilioSettingsTest asserts none of them reach the rendered page.
