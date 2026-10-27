@@ -326,7 +326,7 @@ test('a number the account does not own is refused', function () {
         ->assertSessionHasErrors('sms_from_number');
 });
 
-test('a plain member cannot choose the organizations number', function () {
+test('a plain member cannot choose the organizations number, and twilio is never asked', function () {
     // A number the account really owns, so it is the policy that turns this
     // away rather than the validator.
     Http::fake([
@@ -351,6 +351,10 @@ test('a plain member cannot choose the organizations number', function () {
             'sms_from_number' => '+15125550001',
         ])
         ->assertForbidden();
+
+    // Refused before validation, so the organization's credentials were never
+    // used and nothing about its account leaked through a validation error.
+    Http::assertNotSent(fn (Request $request) => str_contains($request->url(), '/Accounts/'));
 });
 
 test('a phone number on the profile is stored the way twilio dials it', function () {
