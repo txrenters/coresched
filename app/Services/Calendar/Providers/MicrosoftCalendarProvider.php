@@ -241,11 +241,13 @@ class MicrosoftCalendarProvider implements CalendarProviderContract, DetectsLeav
      */
     public function createEvent(CalendarAccount $account, string $calendarId, Booking $booking, bool $withOnlineMeeting): ExternalEvent
     {
+        $timezone = $this->eventTimezone($account);
+
         $payload = [
             'subject' => $this->ics->title($booking),
             'body' => ['contentType' => 'text', 'content' => $this->ics->description($booking)],
-            'start' => ['dateTime' => $booking->starts_at->format('Y-m-d\TH:i:s'), 'timeZone' => 'UTC'],
-            'end' => ['dateTime' => $booking->ends_at->format('Y-m-d\TH:i:s'), 'timeZone' => 'UTC'],
+            'start' => ['dateTime' => $booking->starts_at->setTimezone($timezone)->format('Y-m-d\TH:i:s'), 'timeZone' => $timezone],
+            'end' => ['dateTime' => $booking->ends_at->setTimezone($timezone)->format('Y-m-d\TH:i:s'), 'timeZone' => $timezone],
         ];
 
         if ($withOnlineMeeting) {
@@ -286,6 +288,18 @@ class MicrosoftCalendarProvider implements CalendarProviderContract, DetectsLeav
     protected function request(CalendarAccount $account): PendingRequest
     {
         return Http::withToken($account->access_token)->acceptJson();
+    }
+
+    /**
+     * Get the timezone an event is written in.
+     *
+     * Outlook shows an opened event in the timezone it was created in, so an
+     * event written in UTC reads five or six hours off to a host in Texas even
+     * though the calendar grid places it correctly. Graph accepts IANA names.
+     */
+    protected function eventTimezone(CalendarAccount $account): string
+    {
+        return $account->user?->timezone ?: config('scheduling.default_timezone');
     }
 
     /**
