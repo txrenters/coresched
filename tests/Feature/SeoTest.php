@@ -10,7 +10,7 @@ test('the marketing pages are indexable and carry their search and share tags', 
         ->assertSee('<meta name="description"', false)
         ->assertSee('<link rel="canonical" href="'.route($routeName).'">', false)
         ->assertSee('<meta property="og:image" content="'.asset('og-image.png').'">', false);
-})->with(['home', 'pricing']);
+})->with(['home', 'pricing', 'terms', 'privacy']);
 
 test('the home page describes the product as software', function () {
     $this->get(route('home'))->assertSee('"@type":"SoftwareApplication"', false);
@@ -42,5 +42,5 @@ test('the sitemap lists only the marketing pages', function () {
 
     $urls = array_map(fn ($url) => (string) $url->loc, iterator_to_array($xml->url, false));
 
-    expect($urls)->toBe([route('home'), route('pricing')]);
+    expect($urls)->toBe([route('home'), route('pricing'), route('terms'), route('privacy')]);
 });

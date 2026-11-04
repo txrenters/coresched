@@ -13,6 +13,8 @@ createInertiaApp({
         switch (true) {
             case name === 'Welcome':
             case name === 'Pricing':
+            case name === 'Terms':
+            case name === 'Privacy':
             case name === 'Error':
             case name.startsWith('book/'):
                 return null;
