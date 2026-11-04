@@ -37,4 +37,21 @@ class ContactSalesRequest extends FormRequest
             'website' => ['nullable', 'string'],
         ];
     }
+
+    /**
+     * Get the inquiry as submitted, without the honeypot field.
+     *
+     * @return array{name: string, email: string, company: string, team_size: string, plan: string|null, message: string|null}
+     */
+    public function inquiry(): array
+    {
+        return [
+            'name' => $this->string('name')->toString(),
+            'email' => $this->string('email')->toString(),
+            'company' => $this->string('company')->toString(),
+            'team_size' => $this->string('team_size')->toString(),
+            'plan' => $this->filled('plan') ? $this->string('plan')->toString() : null,
+            'message' => $this->filled('message') ? $this->string('message')->toString() : null,
+        ];
+    }
 }

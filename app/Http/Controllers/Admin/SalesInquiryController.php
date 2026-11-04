@@ -48,7 +48,7 @@ class SalesInquiryController extends Controller
         return Inertia::render('admin/SalesInquiries', [
             'inquiries' => $inquiries,
             'statuses' => SalesInquiryStatus::options(),
-            'filters' => ['status' => $status?->value ?? ''],
+            'filters' => ['status' => $status->value ?? ''],
         ]);
     }
 

@@ -72,7 +72,7 @@ class ImpersonationController extends Controller
         abort_if($admin === null, 403);
 
         $member = $request->user();
-        $team = Team::find($request->session()->get(Impersonation::TEAM_KEY));
+        $team = Team::query()->whereKey($request->session()->get(Impersonation::TEAM_KEY))->first();
 
         if ($team !== null) {
             $activity->record(

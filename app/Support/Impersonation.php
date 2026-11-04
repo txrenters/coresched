@@ -39,7 +39,7 @@ class Impersonation
             return null;
         }
 
-        $user = User::find($request->session()->get(self::IMPERSONATOR_KEY));
+        $user = User::query()->whereKey($request->session()->get(self::IMPERSONATOR_KEY))->first();
 
         return $user?->isSuperAdmin() ? $user : null;
     }

@@ -18,7 +18,7 @@ class ContactSalesController extends Controller
     public function store(ContactSalesRequest $request): RedirectResponse
     {
         if (blank($request->validated('website'))) {
-            $inquiry = $request->safe()->except('website');
+            $inquiry = $request->inquiry();
 
             SalesInquiry::create($inquiry);
 

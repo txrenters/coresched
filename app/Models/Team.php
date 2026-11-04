@@ -36,6 +36,8 @@ use Illuminate\Support\Facades\Storage;
  * @property Carbon|null $disabled_at
  * @property string|null $disabled_reason
  * @property-read string|null $logo_url
+ * @property-read int|null $calendar_members_count From OrganizationSummary::withCounts().
+ * @property-read string|null $bookings_max_created_at From OrganizationSummary::withCounts().
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at

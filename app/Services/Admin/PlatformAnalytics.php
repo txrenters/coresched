@@ -76,16 +76,14 @@ class PlatformAnalytics
         $start = $this->now->startOfWeek()->subWeeks($weeks - 1);
         $perDay = $this->countPerDay(Booking::query(), $start);
 
-        return collect(range(0, $weeks - 1))
-            ->map(function (int $offset) use ($start, $perDay) {
-                $weekStart = $start->addWeeks($offset);
+        return array_map(function (int $offset) use ($start, $perDay) {
+            $weekStart = $start->addWeeks($offset);
 
-                return [
-                    'label' => $weekStart->format('M j'),
-                    'value' => $this->sumBetween($perDay, $weekStart, $weekStart->addWeek()),
-                ];
-            })
-            ->all();
+            return [
+                'label' => $weekStart->format('M j'),
+                'value' => $this->sumBetween($perDay, $weekStart, $weekStart->addWeek()),
+            ];
+        }, range(0, $weeks - 1));
     }
 
     /**
@@ -98,16 +96,14 @@ class PlatformAnalytics
         $start = $this->now->startOfMonth()->subMonths($months - 1);
         $perDay = $this->countPerDay(Team::query(), $start);
 
-        return collect(range(0, $months - 1))
-            ->map(function (int $offset) use ($start, $perDay) {
-                $monthStart = $start->addMonths($offset);
+        return array_map(function (int $offset) use ($start, $perDay) {
+            $monthStart = $start->addMonths($offset);
 
-                return [
-                    'label' => $monthStart->format('M y'),
-                    'value' => $this->sumBetween($perDay, $monthStart, $monthStart->addMonth()),
-                ];
-            })
-            ->all();
+            return [
+                'label' => $monthStart->format('M y'),
+                'value' => $this->sumBetween($perDay, $monthStart, $monthStart->addMonth()),
+            ];
+        }, range(0, $months - 1));
     }
 
     /**
@@ -158,7 +154,9 @@ class PlatformAnalytics
     /**
      * Count rows per calendar day from a date onwards.
      *
-     * @param  Builder<Model>  $query
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
      * @return Collection<string, int>
      */
     protected function countPerDay(Builder $query, CarbonImmutable $start): Collection
