@@ -30,6 +30,8 @@ declare module '@inertiajs/core' {
             canManageOrganization: boolean;
             /** Set while a super admin is signed in as this user. */
             impersonator: { name: string } | null;
+            /** Set while a visitor is exploring the shared public demo. */
+            isDemo: boolean;
             [key: string]: unknown;
         };
     }

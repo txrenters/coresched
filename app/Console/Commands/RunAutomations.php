@@ -11,6 +11,7 @@ use App\Models\Booking;
 use App\Models\User;
 use App\Notifications\Bookings\AutomationEmail;
 use App\Services\Automations\AutomationMessage;
+use App\Support\Demo;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Notification;
 use RuntimeException;
@@ -97,6 +98,11 @@ class RunAutomations extends Command
     protected function send(AutomationRun $run): void
     {
         $automation = $run->automation;
+
+        // The public demo's workflows run on screen only; nothing goes out.
+        if (Demo::isDemoTeam($run->booking->team_id)) {
+            return;
+        }
 
         if ($automation->sends(AutomationChannel::Email)) {
             $this->sendEmail($automation, $run->booking);

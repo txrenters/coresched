@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Team;
+use App\Support\Demo;
 use App\Support\Impersonation;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -52,6 +53,8 @@ class HandleInertiaRequests extends Middleware
             'unreadNotifications' => fn () => $user?->unreadNotifications()->count() ?? 0,
             // Gates the Logs nav entry; the controller enforces it as well.
             'isSuperAdmin' => (bool) $user?->isSuperAdmin(),
+            // Shows the demo banner and hides nothing else: RestrictInDemo enforces.
+            'isDemo' => Demo::isDemoUser($user),
             // Set while a super admin is signed in as this user; drives the
             // "Return to your account" banner.
             'impersonator' => fn () => ($impersonator = Impersonation::impersonator($request))

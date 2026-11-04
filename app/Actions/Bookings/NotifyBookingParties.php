@@ -11,6 +11,7 @@ use App\Notifications\Bookings\BookingConfirmed;
 use App\Notifications\Bookings\BookingDeclined;
 use App\Notifications\Bookings\BookingPendingApproval;
 use App\Notifications\Bookings\BookingRescheduled;
+use App\Support\Demo;
 use Illuminate\Support\Facades\Notification;
 
 class NotifyBookingParties
@@ -165,10 +166,17 @@ class NotifyBookingParties
      * different secrets. A key taking every booking is a different listener
      * and does not displace it.
      *
+     * The public demo has no receivers at all: its bookings are made by
+     * strangers and must never reach a real system.
+     *
      * @return list<?ApiKey>
      */
     private function receivers(Booking $booking): array
     {
+        if (Demo::isDemoTeam($booking->team_id)) {
+            return [];
+        }
+
         $keys = ApiKey::query()->receivingWebhooksFor($booking->team_id)->get();
 
         $receivers = array_values($keys
