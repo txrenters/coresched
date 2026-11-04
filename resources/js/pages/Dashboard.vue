@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, setLayoutProps } from '@inertiajs/vue3';
+import { Head, Link, router, setLayoutProps } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CalendarClock,
@@ -18,6 +18,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import PageHeader from '@/components/PageHeader.vue';
 import PendingInvitationsModal from '@/components/PendingInvitationsModal.vue';
 import BookingQrCodeDialog from '@/components/scheduling/BookingQrCodeDialog.vue';
+import ScopePicker from '@/components/scheduling/ScopePicker.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,9 +31,12 @@ import { index as schedulingIndex } from '@/routes/scheduling';
 import { edit as teamSettings } from '@/routes/teams';
 import type { DashboardInvitation } from '@/types';
 
+type ScopeOption = { value: string; label: string; initial: string | null };
+
 type UpcomingMeeting = {
     uid: string;
     name: string;
+    hostName: string | null;
     eventTypeName: string | null;
     color: string | null;
     startsAt: string;
@@ -50,6 +54,13 @@ const props = defineProps<{
     pendingInvitations?: DashboardInvitation[];
     greetingName: string;
     bookingUrl: string | null;
+    scope: string;
+    scopeOptions: {
+        primary: ScopeOption[];
+        groups: ScopeOption[];
+        users: ScopeOption[];
+    };
+    showsOthers: boolean;
     stats?: { upcoming: number; thisWeek: number; eventTypes: number };
     upcoming?: UpcomingMeeting[];
 }>();
@@ -64,6 +75,21 @@ setLayoutProps({
         },
     ],
 });
+
+/** Only owners and admins get more than "My CoreSched" to choose from. */
+const canChooseScope = computed(() => props.scopeOptions.primary.length > 1);
+
+const changeScope = (scope: string) => {
+    if (!teamSlug.value) {
+        return;
+    }
+
+    router.get(
+        dashboard(teamSlug.value).url,
+        { scope },
+        { preserveScroll: true, preserveState: true },
+    );
+};
 
 const greeting = computed(() => {
     const hour = new Date().getHours();
@@ -224,7 +250,11 @@ const quickActions = computed(() =>
 
     <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
         <PageHeader
-            description="Here's what's happening with your schedule today."
+            :description="
+                showsOthers
+                    ? 'Here\'s what\'s happening across your organization today.'
+                    : 'Here\'s what\'s happening with your schedule today.'
+            "
         >
             <template #title>
                 {{ greeting }}, {{ greetingName }}
@@ -243,6 +273,14 @@ const quickActions = computed(() =>
                 </Button>
             </template>
         </PageHeader>
+
+        <div v-if="canChooseScope" class="flex flex-wrap items-center gap-2">
+            <ScopePicker
+                :model-value="scope"
+                :options="scopeOptions"
+                @update:model-value="changeScope"
+            />
+        </div>
 
         <div class="grid gap-6 lg:grid-cols-3">
             <!-- Main column: what's next, then the rest of today. -->
@@ -313,6 +351,11 @@ const quickActions = computed(() =>
                         <p class="mt-1 pl-2 text-sm text-muted-foreground">
                             with {{ heroMeeting.name }} ·
                             {{ heroMeeting.durationMinutes }} min
+                            <template
+                                v-if="showsOthers && heroMeeting.hostName"
+                            >
+                                · Host {{ heroMeeting.hostName }}
+                            </template>
                         </p>
                         <div class="mt-5 flex flex-wrap gap-2 pl-2">
                             <Button
@@ -453,6 +496,11 @@ const quickActions = computed(() =>
                                 >
                                     {{ meeting.name }} ·
                                     {{ meeting.durationMinutes }} min
+                                    <template
+                                        v-if="showsOthers && meeting.hostName"
+                                    >
+                                        · {{ meeting.hostName }}
+                                    </template>
                                 </span>
                             </span>
                             <Badge
