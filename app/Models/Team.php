@@ -233,6 +233,16 @@ class Team extends Model
     }
 
     /**
+     * Scope to real organizations, leaving out the public demo.
+     *
+     * @param  Builder<Team>  $query
+     */
+    public function scopeExcludingDemo(Builder $query): void
+    {
+        $query->where('is_demo', false);
+    }
+
+    /**
      * Determine whether this organization has its own Twilio account set up.
      *
      * Without one its workflows cannot text anybody: there is deliberately no

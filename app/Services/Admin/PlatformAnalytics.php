@@ -16,6 +16,9 @@ use Illuminate\Support\Collection;
 /**
  * The numbers behind the super admin dashboard, across every organization.
  *
+ * The public demo is left out of every figure: its organization, its sample
+ * people and the bookings visitors make in it are not anyone's real use.
+ *
  * Time series are grouped by calendar day in SQL (portable across databases)
  * and rolled up into weeks or months here, so a period with nothing in it
  * still appears as a zero rather than going missing from the chart.
@@ -53,13 +56,13 @@ class PlatformAnalytics
         $since = $this->now->subDays(30);
 
         return [
-            'organizations' => Team::query()->count(),
-            'activeOrganizations' => Team::query()
+            'organizations' => Team::query()->excludingDemo()->count(),
+            'activeOrganizations' => Team::query()->excludingDemo()
                 ->whereHas('bookings', fn (Builder $query) => $query->where('created_at', '>=', $since))
                 ->count(),
-            'users' => User::query()->where('is_super_admin', false)->count(),
-            'bookingsLast30Days' => Booking::query()->where('created_at', '>=', $since)->count(),
-            'bookingsPrevious30Days' => Booking::query()
+            'users' => $this->realUsers()->count(),
+            'bookingsLast30Days' => $this->realBookings()->where('created_at', '>=', $since)->count(),
+            'bookingsPrevious30Days' => $this->realBookings()
                 ->whereBetween('created_at', [$this->now->subDays(60), $since])
                 ->count(),
             'newInquiries' => SalesInquiry::query()->where('status', SalesInquiryStatus::New)->count(),
@@ -74,7 +77,7 @@ class PlatformAnalytics
     public function bookingsByWeek(int $weeks = 12): array
     {
         $start = $this->now->startOfWeek()->subWeeks($weeks - 1);
-        $perDay = $this->countPerDay(Booking::query(), $start);
+        $perDay = $this->countPerDay($this->realBookings(), $start);
 
         return array_map(function (int $offset) use ($start, $perDay) {
             $weekStart = $start->addWeeks($offset);
@@ -94,7 +97,7 @@ class PlatformAnalytics
     public function organizationsByMonth(int $months = 12): array
     {
         $start = $this->now->startOfMonth()->subMonths($months - 1);
-        $perDay = $this->countPerDay(Team::query(), $start);
+        $perDay = $this->countPerDay(Team::query()->excludingDemo(), $start);
 
         return array_map(function (int $offset) use ($start, $perDay) {
             $monthStart = $start->addMonths($offset);
@@ -113,7 +116,7 @@ class PlatformAnalytics
      */
     public function planMix(): array
     {
-        $counts = Team::query()
+        $counts = Team::query()->excludingDemo()
             ->selectRaw('plan, COUNT(*) as aggregate')
             ->groupBy('plan')
             ->pluck('aggregate', 'plan');
@@ -134,7 +137,7 @@ class PlatformAnalytics
      */
     public function setupFunnel(): array
     {
-        $teams = Team::query()
+        $teams = Team::query()->excludingDemo()
             ->withCount([
                 'eventTypes',
                 'bookings',
@@ -149,6 +152,33 @@ class PlatformAnalytics
             ['label' => 'SMS number', 'value' => $teams->filter(fn (Team $team) => filled($team->sms_from_number))->count()],
             ['label' => 'First booking', 'value' => $teams->where('bookings_count', '>', 0)->count()],
         ];
+    }
+
+    /**
+     * Bookings in real organizations, leaving out the public demo's.
+     *
+     * @return Builder<Booking>
+     */
+    protected function realBookings(): Builder
+    {
+        // Only the demo is taken out: bookings of a deleted real organization
+        // still count, as they always have.
+        return Booking::query()->whereNotIn('team_id', Team::withTrashed()->where('is_demo', true)->select('id'));
+    }
+
+    /**
+     * People other than super admins, leaving out the demo's sample people.
+     * Someone in no organization at all still counts.
+     *
+     * @return Builder<User>
+     */
+    protected function realUsers(): Builder
+    {
+        return User::query()
+            ->where('is_super_admin', false)
+            ->where(fn (Builder $query) => $query
+                ->whereDoesntHave('teams')
+                ->orWhereHas('teams', fn (Builder $teams) => $teams->where('is_demo', false)));
     }
 
     /**

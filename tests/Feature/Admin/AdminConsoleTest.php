@@ -1,11 +1,13 @@
 <?php
 
+use App\Actions\Teams\ResetDemoOrganization;
 use App\Enums\TeamPlan;
 use App\Enums\TeamRole;
 use App\Models\Booking;
 use App\Models\EventType;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Admin\PlatformAnalytics;
 use Carbon\CarbonImmutable;
 
 function consoleOperator(): User
@@ -199,4 +201,21 @@ test('an organization admin cannot filter by plan to learn other organizations p
         ->assertInertia(fn ($page) => $page
             ->has('organizations', 1)
             ->where('organizations.0.id', $admin->currentTeam->id));
+});
+
+test('the dashboard leaves the public demo out of every figure', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-28 12:00', 'UTC'));
+
+    $host = User::factory()->create();
+    Booking::factory()->create([
+        'event_type_id' => EventType::factory()->ownedBy($host)->create()->id,
+        'created_at' => CarbonImmutable::parse('2026-10-27 09:00', 'UTC'),
+    ]);
+
+    $withoutDemo = app(PlatformAnalytics::class)->summary();
+
+    // Five sample people, an Enterprise plan, event types and twenty bookings.
+    app(ResetDemoOrganization::class)->handle();
+
+    expect(app(PlatformAnalytics::class)->summary())->toBe($withoutDemo);
 });
