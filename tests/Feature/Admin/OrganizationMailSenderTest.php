@@ -95,14 +95,38 @@ test('an organization admin cannot choose their own sender', function () {
 });
 
 test('every approved sender is also one the mailer may send through as itself', function () {
-    putenv('MAIL_ORG_SENDERS=scheduling@texasrenters.com, other@example.com');
-    putenv('MAIL_ACCOUNT_FROM_ADDRESS=noreply@coresched.com');
+    // env() reads $_ENV and $_SERVER before getenv(), so a .env that defines
+    // these keys (CI copies .env.example) would hide a putenv() alone.
+    $overrides = [
+        'MAIL_ORG_SENDERS' => 'scheduling@texasrenters.com, other@example.com',
+        'MAIL_ACCOUNT_FROM_ADDRESS' => 'noreply@coresched.com',
+    ];
+    $original = [];
+
+    foreach ($overrides as $key => $value) {
+        $original[$key] = [$_ENV[$key] ?? null, $_SERVER[$key] ?? null, getenv($key)];
+        $_ENV[$key] = $_SERVER[$key] = $value;
+        putenv("{$key}={$value}");
+    }
 
     try {
         $config = require config_path('mail.php');
     } finally {
-        putenv('MAIL_ORG_SENDERS');
-        putenv('MAIL_ACCOUNT_FROM_ADDRESS');
+        foreach ($original as $key => [$env, $server, $getenv]) {
+            if ($env === null) {
+                unset($_ENV[$key]);
+            } else {
+                $_ENV[$key] = $env;
+            }
+
+            if ($server === null) {
+                unset($_SERVER[$key]);
+            } else {
+                $_SERVER[$key] = $server;
+            }
+
+            putenv($getenv === false ? $key : "{$key}={$getenv}");
+        }
     }
 
     expect($config['org_senders'])->toBe(['scheduling@texasrenters.com', 'other@example.com'])
