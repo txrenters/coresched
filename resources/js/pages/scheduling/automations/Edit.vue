@@ -721,8 +721,15 @@ setLayoutProps({
                                     class="mt-0.5 size-4 shrink-0 text-destructive"
                                 />
                                 <span v-if="!sms.configured">
-                                    Twilio is not set up on this installation,
-                                    so nothing can be texted yet.
+                                    This organization has not connected a Twilio
+                                    account, so nothing can be texted yet.
+                                    <a
+                                        :href="sms.settingsUrl"
+                                        class="underline underline-offset-4"
+                                    >
+                                        Connect one in the organization
+                                        settings.
+                                    </a>
                                 </span>
                                 <span v-else>
                                     This organization has not chosen a number to

@@ -14,19 +14,30 @@ defineProps<Props>();
 
 <template>
     <!--
-      The brand mark ships as a full-colour raster in public/, so it is never
-      recoloured by the theme. Callers size the box; object-contain keeps the
-      472x528 ratio inside whatever square they pick. Decorative by default —
-      every caller renders the product name alongside it.
+      The CoreSched mark ships as two fixed-colour SVGs in public/: logo.svg
+      (navy + green) for light surfaces and logo-dark.svg (white + green) for
+      dark ones. An <img> cannot be recoloured by the theme, so both are
+      rendered and the .dark variant picks one. Callers size the box;
+      object-contain keeps the mark's 218x226 ratio inside whatever square
+      they pick. Decorative by default — every caller renders the product
+      name alongside it.
     -->
-    <img
-        src="/logo.png"
-        alt=""
-        width="472"
-        height="528"
-        decoding="async"
-        class="object-contain"
-        :class="className"
-        v-bind="$attrs"
-    />
+    <span class="inline-block shrink-0" :class="className" v-bind="$attrs">
+        <img
+            src="/logo.svg"
+            alt=""
+            width="218"
+            height="226"
+            decoding="async"
+            class="size-full object-contain dark:hidden"
+        />
+        <img
+            src="/logo-dark.svg"
+            alt=""
+            width="218"
+            height="226"
+            decoding="async"
+            class="hidden size-full object-contain dark:block"
+        />
+    </span>
 </template>

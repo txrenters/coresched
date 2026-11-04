@@ -13,8 +13,8 @@ use Illuminate\Support\Collection;
 beforeEach(function () {
     config([
         'mail.default' => 'array',
-        'mail.from' => ['address' => 'scheduling@texasrenters.com', 'name' => 'TR Scheduling'],
-        'mail.account_from' => ['address' => 'no-reply@texasrenters.com', 'name' => 'TR Scheduling'],
+        'mail.from' => ['address' => 'scheduling@texasrenters.com', 'name' => 'CoreSched'],
+        'mail.account_from' => ['address' => 'no-reply@texasrenters.com', 'name' => 'CoreSched'],
     ]);
 });
 

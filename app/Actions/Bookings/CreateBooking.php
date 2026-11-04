@@ -50,6 +50,12 @@ class CreateBooking
      */
     public function handle(EventType $eventType, CarbonImmutable $startsAt, array $attributes, ?Booking $replacing = null, ?User $host = null): Booking
     {
+        // The last line of defence for a disabled organization: every new
+        // booking and every reschedule (which creates one) comes through here.
+        if ($eventType->team?->isDisabled()) {
+            throw SlotUnavailableException::organizationDisabled();
+        }
+
         $zone = $attributes['zone'] ?? null;
         $candidateHostIds = $eventType->schedulingHosts($zone)->modelKeys();
 

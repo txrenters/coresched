@@ -28,6 +28,8 @@ declare module '@inertiajs/core' {
             canViewOrganizations: boolean;
             canManageApiKeys: boolean;
             canManageOrganization: boolean;
+            /** Set while a super admin is signed in as this user. */
+            impersonator: { name: string } | null;
             [key: string]: unknown;
         };
     }

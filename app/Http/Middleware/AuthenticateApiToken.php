@@ -23,6 +23,9 @@ class AuthenticateApiToken
 
         abort_if($key === null, 401, 'Unauthorized.');
 
+        // A key belongs to its organization: disabling the one disables the other.
+        abort_if($key->team?->isDisabled(), 403, 'This organization has been disabled.');
+
         // Written without touching updated_at: this is a usage note, not a
         // change to the key itself.
         $key->forceFill(['last_used_at' => now()])->saveQuietly();

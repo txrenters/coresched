@@ -69,8 +69,12 @@ return [
             'client_id' => env('MAIL_GRAPH_CLIENT_ID') ?: env('MICROSOFT_CLIENT_ID'),
             'client_secret' => env('MAIL_GRAPH_CLIENT_SECRET') ?: env('MICROSOFT_CLIENT_SECRET'),
             'mailbox' => env('MAIL_GRAPH_MAILBOX') ?: env('MAIL_FROM_ADDRESS'),
-            // Also sent through as themselves when a message is from them.
-            'send_as' => array_values(array_filter([env('MAIL_ACCOUNT_FROM_ADDRESS')])),
+            // Also sent through as themselves when a message is from them:
+            // the account mail address and every per-organization sender.
+            'send_as' => array_values(array_filter([
+                env('MAIL_ACCOUNT_FROM_ADDRESS'),
+                ...array_map('trim', explode(',', (string) env('MAIL_ORG_SENDERS', ''))),
+            ])),
             'save_to_sent_items' => env('MAIL_GRAPH_SAVE_TO_SENT_ITEMS', true),
         ],
 
@@ -136,7 +140,7 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS') ?: 'scheduling@texasrenters.com',
+        'address' => env('MAIL_FROM_ADDRESS') ?: 'notifications@coresched.com',
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
@@ -153,8 +157,38 @@ return [
     */
 
     'account_from' => [
-        'address' => env('MAIL_ACCOUNT_FROM_ADDRESS') ?: (env('MAIL_FROM_ADDRESS') ?: 'scheduling@texasrenters.com'),
+        'address' => env('MAIL_ACCOUNT_FROM_ADDRESS') ?: (env('MAIL_FROM_ADDRESS') ?: 'notifications@coresched.com'),
         'name' => env('MAIL_ACCOUNT_FROM_NAME') ?: env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sales Inbox
+    |--------------------------------------------------------------------------
+    |
+    | Where the pricing page's "Contact sales" form is delivered. Falls back to
+    | the main sender's mailbox until SALES_EMAIL names a dedicated inbox.
+    |
+    */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Per-Organization Booking Senders
+    |--------------------------------------------------------------------------
+    |
+    | Addresses a super admin may give an organization so its booking mail is
+    | sent from its own domain instead of MAIL_FROM_ADDRESS (for example the
+    | organizations that predate CoreSched). Comma separated. Each one must be
+    | a mailbox the Exchange application access policy covers; listing it here
+    | also adds it to the Graph mailer's send_as.
+    |
+    */
+
+    'org_senders' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('MAIL_ORG_SENDERS', '')),
+    ))),
+
+    'sales_address' => env('SALES_EMAIL') ?: (env('MAIL_FROM_ADDRESS') ?: 'notifications@coresched.com'),
 
 ];

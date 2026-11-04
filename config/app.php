@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'TR Scheduling'),
+    'name' => env('APP_NAME', 'CoreSched'),
 
     /*
     |--------------------------------------------------------------------------

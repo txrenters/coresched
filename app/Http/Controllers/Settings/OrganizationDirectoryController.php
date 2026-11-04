@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Actions\Teams\CreateTeamUser;
+use App\Enums\TeamPlan;
 use App\Enums\TeamRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Teams\AddOrganizationMemberRequest;
@@ -10,6 +11,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Policies\TeamPolicy;
 use App\Services\Activity\ActivityLogger;
+use App\Services\Admin\OrganizationSummary;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -31,23 +33,41 @@ class OrganizationDirectoryController extends Controller
         Gate::authorize('viewOrganizations');
 
         $viewer = $request->user();
+        $isSuperAdmin = $viewer->isSuperAdmin();
         $search = $request->string('search')->toString();
+        $planFilter = $isSuperAdmin ? $request->string('plan')->toString() : '';
+        $plan = TeamPlan::tryFrom($planFilter);
 
         $organizations = Team::query()
-            ->unless($viewer->isSuperAdmin(), fn ($query) => $query->whereIn(
+            ->unless($isSuperAdmin, fn ($query) => $query->whereIn(
                 'id',
                 $viewer->teams()->wherePivot('role', TeamRole::Admin->value)->pluck('teams.id'),
             ))
-            ->with(['members:id,name,email'])
+            ->with(['members:id,name,email,is_super_admin'])
             ->withCount(['eventTypes', 'bookings', 'groups'])
+            ->when($isSuperAdmin, fn ($query) => OrganizationSummary::withCounts($query))
             ->when(filled($search), fn ($query) => $query->where('name', 'like', "%{$search}%"))
+            ->when($planFilter === 'none', fn ($query) => $query->whereNull('plan'))
+            ->when($plan !== null, fn ($query) => $query->where('plan', $plan))
             ->orderBy('name')
             ->get();
 
         return Inertia::render('organizations/Index', [
-            'organizations' => $organizations->map(fn (Team $team) => $this->toPayload($team)),
+            'organizations' => $organizations->map(fn (Team $team) => [
+                ...$this->toPayload($team),
+                // Plan, sender, setup and "Open as": super admins only.
+                'admin' => $isSuperAdmin ? OrganizationSummary::for($team) : null,
+            ]),
             'search' => $search,
             'roles' => TeamRole::assignable(),
+            'consoleOptions' => $isSuperAdmin ? [
+                'plans' => TeamPlan::options(),
+                'planFilter' => $planFilter,
+                'senders' => [
+                    'default' => config('mail.from.address'),
+                    'organization' => (array) config('mail.org_senders'),
+                ],
+            ] : null,
         ]);
     }
 

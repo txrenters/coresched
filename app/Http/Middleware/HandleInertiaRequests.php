@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Team;
+use App\Support\Impersonation;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -51,6 +52,11 @@ class HandleInertiaRequests extends Middleware
             'unreadNotifications' => fn () => $user?->unreadNotifications()->count() ?? 0,
             // Gates the Logs nav entry; the controller enforces it as well.
             'isSuperAdmin' => (bool) $user?->isSuperAdmin(),
+            // Set while a super admin is signed in as this user; drives the
+            // "Return to your account" banner.
+            'impersonator' => fn () => ($impersonator = Impersonation::impersonator($request))
+                ? ['name' => $impersonator->name]
+                : null,
             // Hides "New organization" in the switcher; TeamPolicy enforces it.
             'canCreateTeam' => (bool) $user?->can('create', Team::class),
             // Opens the switcher menu: a super admin reaches every organization, anyone else only once they belong to more than one.

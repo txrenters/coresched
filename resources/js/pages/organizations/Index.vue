@@ -2,7 +2,10 @@
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Building2,
+    Ban,
     ChevronDown,
+    CircleCheck,
+    Pencil,
     Plus,
     Search,
     Settings2,
@@ -10,10 +13,22 @@ import {
     UserPlus,
 } from '@lucide/vue';
 import { computed, onUnmounted, ref, watch } from 'vue';
+import OpenAsButton from '@/components/admin/OpenAsButton.vue';
+import OrganizationPlanDialog from '@/components/admin/OrganizationPlanDialog.vue';
+import OrganizationStatusDialog from '@/components/admin/OrganizationStatusDialog.vue';
+import SetupChecklist from '@/components/admin/SetupChecklist.vue';
 import CreateTeamModal from '@/components/CreateTeamModal.vue';
 import InputError from '@/components/InputError.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -29,6 +44,7 @@ import {
     store as storeMember,
     update as updateMemberRole,
 } from '@/routes/organizations/members';
+import type { ConsoleOptions, OrganizationAdminSummary } from '@/types/admin';
 
 type Member = {
     id: number;
@@ -49,12 +65,16 @@ type Organization = {
     createdAt: string | null;
     settingsUrl: string;
     members: Member[];
+    /** Plan, sender, setup and "Open as"; present for super admins only. */
+    admin: OrganizationAdminSummary | null;
 };
 
 const props = defineProps<{
     organizations: Organization[];
     search: string;
     roles: Array<{ value: string; label: string }>;
+    /** Plans and senders for the super admin's controls; null for anyone else. */
+    consoleOptions: ConsoleOptions | null;
 }>();
 
 const page = usePage();
@@ -66,6 +86,17 @@ const description = computed(() =>
 );
 
 const searchTerm = ref(props.search);
+const planFilter = ref(props.consoleOptions?.planFilter ?? '');
+
+const reload = () =>
+    router.get(
+        organizationsIndex().url,
+        {
+            search: searchTerm.value,
+            ...(props.consoleOptions ? { plan: planFilter.value } : {}),
+        },
+        { preserveState: true, preserveScroll: true, replace: true },
+    );
 
 let debounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -81,16 +112,23 @@ watch(searchTerm, () => {
         clearTimeout(debounce);
     }
 
-    debounce = setTimeout(
-        () =>
-            router.get(
-                organizationsIndex().url,
-                { search: searchTerm.value },
-                { preserveState: true, preserveScroll: true, replace: true },
-            ),
-        300,
-    );
+    debounce = setTimeout(reload, 300);
 });
+
+watch(planFilter, reload);
+
+/** The organization whose plan and sender are being edited. */
+const editingPlan = ref<Organization | null>(null);
+
+const planDialogOrganization = computed(() =>
+    editingPlan.value?.admin
+        ? {
+              name: editingPlan.value.name,
+              slug: editingPlan.value.slug,
+              admin: editingPlan.value.admin,
+          }
+        : null,
+);
 
 /** The organization currently having someone added to it. */
 const adding = ref<Organization | null>(null);
@@ -98,10 +136,23 @@ const adding = ref<Organization | null>(null);
 const form = useForm({ name: '', email: '', role: 'admin' });
 
 const openAdd = (organization: Organization) => {
-    adding.value = adding.value?.id === organization.id ? null : organization;
+    adding.value = organization;
     form.reset();
     form.clearErrors();
 };
+
+/** The organization being disabled or enabled. */
+const switchingStatus = ref<Organization | null>(null);
+
+const statusDialogOrganization = computed(() =>
+    switchingStatus.value
+        ? {
+              name: switchingStatus.value.name,
+              slug: switchingStatus.value.slug,
+              disabled: Boolean(switchingStatus.value.admin?.disabledAt),
+          }
+        : null,
+);
 
 const submitMember = () => {
     if (!adding.value) {
@@ -156,18 +207,37 @@ defineOptions({
             </template>
         </PageHeader>
 
-        <div class="relative max-w-md">
-            <Search
-                class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden="true"
-            />
-            <Input
-                v-model="searchTerm"
-                class="pl-9"
-                placeholder="Search organizations"
-                aria-label="Search organizations"
-                data-test="organization-search"
-            />
+        <div class="flex flex-col gap-3 sm:flex-row">
+            <div class="relative max-w-md flex-1">
+                <Search
+                    class="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                />
+                <Input
+                    v-model="searchTerm"
+                    class="pl-9"
+                    placeholder="Search organizations"
+                    aria-label="Search organizations"
+                    data-test="organization-search"
+                />
+            </div>
+            <select
+                v-if="consoleOptions"
+                v-model="planFilter"
+                class="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+                aria-label="Filter by plan"
+                data-test="organization-plan-filter"
+            >
+                <option value="">All plans</option>
+                <option value="none">No plan</option>
+                <option
+                    v-for="plan in consoleOptions.plans"
+                    :key="plan.value"
+                    :value="plan.value"
+                >
+                    {{ plan.label }}
+                </option>
+            </select>
         </div>
 
         <div v-if="organizations.length" class="flex flex-col gap-4">
@@ -197,19 +267,78 @@ defineOptions({
                             />
                         </span>
                         <div>
-                            <p class="flex items-center gap-2 font-medium">
+                            <p
+                                class="flex flex-wrap items-center gap-2 font-medium"
+                            >
                                 {{ organization.name }}
+                                <span
+                                    v-if="organization.admin"
+                                    :class="[
+                                        'rounded-full px-2 py-0.5 text-xs font-semibold',
+                                        organization.admin.plan
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'bg-muted text-muted-foreground',
+                                    ]"
+                                    data-test="organization-plan"
+                                >
+                                    {{
+                                        organization.admin.planLabel ??
+                                        'No plan'
+                                    }}
+                                </span>
+                                <span
+                                    v-if="organization.admin?.disabledAt"
+                                    class="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive"
+                                    data-test="organization-disabled"
+                                >
+                                    Disabled
+                                </span>
                             </p>
                             <p class="text-sm text-muted-foreground">
                                 {{ organization.members.length }} members ·
                                 {{ organization.eventTypeCount }} event types ·
                                 {{ organization.bookingCount }} bookings ·
                                 {{ organization.groupCount }} teams
+                                <template
+                                    v-if="organization.admin?.lastBookedAt"
+                                >
+                                    · last booked
+                                    {{ organization.admin.lastBookedAt }}
+                                </template>
+                                <template
+                                    v-if="
+                                        organization.admin &&
+                                        consoleOptions &&
+                                        organization.admin.bookingMailFrom !==
+                                            consoleOptions.senders.default
+                                    "
+                                >
+                                    · emails from
+                                    {{ organization.admin.bookingMailFrom }}
+                                </template>
                             </p>
                         </div>
                     </div>
 
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2">
+                        <OpenAsButton
+                            v-if="
+                                organization.admin &&
+                                !organization.admin.disabledAt
+                            "
+                            :organization-id="organization.id"
+                            :slug="organization.slug"
+                            :members="organization.admin.openAs"
+                        />
+                        <Button
+                            v-if="organization.admin"
+                            variant="outline"
+                            size="sm"
+                            :data-test="`edit-plan-${organization.id}`"
+                            @click="editingPlan = organization"
+                        >
+                            <Pencil class="size-3.5" /> Plan &amp; email
+                        </Button>
                         <Button
                             variant="outline"
                             size="sm"
@@ -223,65 +352,54 @@ defineOptions({
                                 <Settings2 class="size-3.5" /> Settings
                             </a>
                         </Button>
+                        <Button
+                            v-if="organization.admin"
+                            variant="ghost"
+                            size="sm"
+                            :class="
+                                organization.admin.disabledAt
+                                    ? ''
+                                    : 'text-destructive hover:text-destructive'
+                            "
+                            :data-test="`toggle-status-${organization.id}`"
+                            @click="switchingStatus = organization"
+                        >
+                            <template v-if="organization.admin.disabledAt">
+                                <CircleCheck class="size-3.5" /> Enable
+                            </template>
+                            <template v-else>
+                                <Ban class="size-3.5" /> Disable
+                            </template>
+                        </Button>
                     </div>
                 </header>
 
-                <form
-                    v-if="adding?.id === organization.id"
-                    class="flex flex-wrap items-end gap-3 border-b border-border bg-muted/40 p-5"
-                    @submit.prevent="submitMember"
+                <p
+                    v-if="organization.admin?.disabledAt"
+                    class="border-b border-border bg-destructive/5 px-5 py-3 text-sm text-destructive"
                 >
-                    <div class="min-w-56 flex-1">
-                        <Label :for="`email-${organization.id}`">Email</Label>
-                        <Input
-                            :id="`email-${organization.id}`"
-                            v-model="form.email"
-                            type="email"
-                            placeholder="person@texasrenters.com"
-                            data-test="member-email"
-                        />
-                        <InputError :message="form.errors.email" />
-                    </div>
-                    <div class="min-w-48 flex-1">
-                        <Label :for="`name-${organization.id}`">
-                            Name
-                            <span class="text-muted-foreground">
-                                (new accounts only)
-                            </span>
-                        </Label>
-                        <Input
-                            :id="`name-${organization.id}`"
-                            v-model="form.name"
-                            data-test="member-name"
-                        />
-                        <InputError :message="form.errors.name" />
-                    </div>
-                    <div>
-                        <Label :for="`role-${organization.id}`">Role</Label>
-                        <select
-                            :id="`role-${organization.id}`"
-                            v-model="form.role"
-                            class="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                            data-test="member-role"
-                        >
-                            <option
-                                v-for="role in roles"
-                                :key="role.value"
-                                :value="role.value"
-                            >
-                                {{ role.label }}
-                            </option>
-                        </select>
-                        <InputError :message="form.errors.role" />
-                    </div>
-                    <Button
-                        type="submit"
-                        :disabled="form.processing"
-                        data-test="submit-member"
+                    Disabled since {{ organization.admin.disabledAt }}. Its
+                    members cannot use it and its booking pages are paused.
+                    <template v-if="organization.admin.disabledReason">
+                        Reason: {{ organization.admin.disabledReason }}
+                    </template>
+                </p>
+
+                <div
+                    v-if="organization.admin"
+                    class="border-b border-border px-5 py-3"
+                >
+                    <SetupChecklist
+                        :organization-id="organization.id"
+                        :setup="organization.admin.setup"
+                    />
+                    <p
+                        v-if="organization.admin.planNote"
+                        class="pt-2 text-sm text-muted-foreground"
                     >
-                        Add
-                    </Button>
-                </form>
+                        Note: {{ organization.admin.planNote }}
+                    </p>
+                </div>
 
                 <ul class="divide-y divide-border">
                     <li
@@ -359,5 +477,103 @@ defineOptions({
             <Building2 class="mx-auto mb-3 size-6" aria-hidden="true" />
             <p>No organizations match that search.</p>
         </div>
+
+        <Dialog
+            :open="adding !== null"
+            @update:open="(open) => !open && (adding = null)"
+        >
+            <DialogContent>
+                <form class="grid gap-5" @submit.prevent="submitMember">
+                    <DialogHeader>
+                        <DialogTitle
+                            >Add a member to {{ adding?.name }}</DialogTitle
+                        >
+                        <DialogDescription>
+                            A new address gets an account and an email to set
+                            their password.
+                            <template v-if="page.props.isSuperAdmin">
+                                An existing account is added straight in.
+                            </template>
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div class="grid gap-2">
+                        <Label for="member-email">Email</Label>
+                        <Input
+                            id="member-email"
+                            v-model="form.email"
+                            type="email"
+                            placeholder="person@company.com"
+                            data-test="member-email"
+                            required
+                        />
+                        <InputError :message="form.errors.email" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="member-name">
+                            Name
+                            <span class="font-normal text-muted-foreground">
+                                (new accounts only)
+                            </span>
+                        </Label>
+                        <Input
+                            id="member-name"
+                            v-model="form.name"
+                            data-test="member-name"
+                        />
+                        <InputError :message="form.errors.name" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="member-role">Role</Label>
+                        <select
+                            id="member-role"
+                            v-model="form.role"
+                            class="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                            data-test="member-role"
+                        >
+                            <option
+                                v-for="role in roles"
+                                :key="role.value"
+                                :value="role.value"
+                            >
+                                {{ role.label }}
+                            </option>
+                        </select>
+                        <InputError :message="form.errors.role" />
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            @click="adding = null"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            :disabled="form.processing"
+                            data-test="submit-member"
+                        >
+                            Add member
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+
+        <OrganizationStatusDialog
+            v-if="consoleOptions"
+            :organization="statusDialogOrganization"
+            @close="switchingStatus = null"
+        />
+
+        <OrganizationPlanDialog
+            v-if="consoleOptions"
+            :organization="planDialogOrganization"
+            :plans="consoleOptions.plans"
+            :senders="consoleOptions.senders"
+            @close="editingPlan = null"
+        />
     </div>
 </template>

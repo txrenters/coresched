@@ -41,6 +41,17 @@ class AppServiceProvider extends ServiceProvider
         $this->restrictUserDirectoryToSuperAdmins();
         $this->letAdminsOpenTheirOrganizations();
         $this->letAdminsViewTheirPeople();
+        $this->restrictAdminConsoleToSuperAdmins();
+    }
+
+    /**
+     * Keep the admin console (every organization's plan and setup, and
+     * signing in as their members) to super admins. Gate::before already lets
+     * super admins through, so this exists to DENY everyone else.
+     */
+    protected function restrictAdminConsoleToSuperAdmins(): void
+    {
+        Gate::define('accessAdminConsole', fn (User $user): bool => $user->isSuperAdmin());
     }
 
     /**

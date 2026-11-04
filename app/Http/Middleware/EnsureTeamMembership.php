@@ -26,6 +26,9 @@ class EnsureTeamMembership
         if (! $user->isSuperAdmin()) {
             abort_if(! $user->belongsToTeam($team), 403);
 
+            // Disabled by a super admin: its members are kept out entirely.
+            abort_if($team->isDisabled(), 403, __('This organization has been disabled.'));
+
             $this->ensureTeamMemberHasRequiredRole($user, $team, $minimumRole);
         }
 

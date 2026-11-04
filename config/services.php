@@ -60,9 +60,10 @@ return [
     ],
 
     /*
-     * Twilio sends the workflow text messages. Each organization chooses which
-     * of the account's numbers its texts come from -- see Team::sms_from_number
-     * -- so only the account credentials live here.
+     * Twilio sends the workflow text messages. Each organization connects its
+     * own account in its settings (Team::twilio()); there is no installation-
+     * wide account. sid/token are read ONLY by the 2026_10_27 migration, which
+     * hands this account to every organization that existed at deploy time.
      */
     'twilio' => [
         'sid' => env('TWILIO_SID'),

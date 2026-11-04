@@ -4,17 +4,21 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Middleware\EnsureActiveOrganization;
 use App\Http\Responses\LoginResponse;
 use App\Http\Responses\PasskeyLoginResponse;
 use App\Http\Responses\RegisterResponse;
 use App\Http\Responses\TwoFactorLoginResponse;
 use App\Http\Responses\VerifyEmailResponse;
 use App\Models\TeamInvitation;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
@@ -55,6 +59,28 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
+
+        /*
+         * Fortify's own credential check, plus one refusal: someone whose
+         * every organization a super admin has disabled is told so here
+         * rather than being let in and signed straight back out.
+         * EnsureActiveOrganization still covers passkeys and live sessions.
+         */
+        Fortify::authenticateUsing(function (Request $request): ?User {
+            $provider = Auth::guard('web')->getProvider();
+            $credentials = [Fortify::username() => $request->input(Fortify::username()), 'password' => $request->input('password')];
+            $user = $provider->retrieveByCredentials($credentials);
+
+            if (! $user instanceof User || ! $provider->validateCredentials($user, $credentials)) {
+                return null;
+            }
+
+            if ($user->hasOnlyDisabledOrganizations()) {
+                throw ValidationException::withMessages([Fortify::username() => EnsureActiveOrganization::MESSAGE]);
+            }
+
+            return $user;
+        });
     }
 
     /**

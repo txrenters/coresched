@@ -19,9 +19,6 @@ use Illuminate\Support\Facades\Notification;
 beforeEach(function () {
     Cache::flush();
 
-    config()->set('services.twilio.sid', 'AC00000000000000000000000000000001');
-    config()->set('services.twilio.token', 'test-token');
-
     $this->host = User::factory()->create([
         'name' => 'Dana Reed',
         'timezone' => 'UTC',
@@ -29,7 +26,12 @@ beforeEach(function () {
     ]);
 
     $this->team = $this->host->currentTeam;
-    $this->team->update(['sms_from_number' => '+15125550000', 'timezone' => 'UTC']);
+    $this->team->update([
+        'sms_from_number' => '+15125550000',
+        'timezone' => 'UTC',
+        'twilio_account_sid' => 'AC00000000000000000000000000000001',
+        'twilio_auth_token' => 'test-token',
+    ]);
 
     $this->eventType = EventType::factory()->ownedBy($this->host)->create(['name' => 'Leasing Team Meeting']);
 
@@ -65,19 +67,16 @@ test('the account numbers are read from twilio', function () {
         ]),
     ]);
 
-    expect(app(TwilioClient::class)->numbers())->toBe([
+    expect($this->team->twilio()->numbers())->toBe([
         ['number' => '+15125550000', 'label' => 'Leasing line'],
         ['number' => '+15125550001', 'label' => 'Maintenance line'],
     ]);
 });
 
 test('nothing is asked of twilio when there are no credentials', function () {
-    config()->set('services.twilio.sid', '');
-    config()->set('services.twilio.token', '');
-
     Http::fake();
 
-    $client = app(TwilioClient::class);
+    $client = new TwilioClient;
 
     expect($client->isConfigured())->toBeFalse()
         ->and($client->numbers())->toBe([]);
@@ -88,7 +87,7 @@ test('nothing is asked of twilio when there are no credentials', function () {
 test('a text message is posted to twilio with the number dialled properly', function () {
     Http::fake(['*/Messages.json' => Http::response(['sid' => 'SM1'])]);
 
-    app(TwilioClient::class)->send('+15125550000', '(512) 555-0100', 'Sam booked a meeting.');
+    $this->team->twilio()->send('+15125550000', '(512) 555-0100', 'Sam booked a meeting.');
 
     Http::assertSent(fn (Request $request) => str_contains($request->url(), '/Messages.json')
         && $request['From'] === '+15125550000'
@@ -99,7 +98,7 @@ test('a text message is posted to twilio with the number dialled properly', func
 test('a number twilio could never dial is refused before it is sent', function (string $number) {
     Http::fake();
 
-    expect(fn () => app(TwilioClient::class)->send('+15125550000', $number, 'Hello'))
+    expect(fn () => $this->team->twilio()->send('+15125550000', $number, 'Hello'))
         ->toThrow(RuntimeException::class);
 
     Http::assertNothingSent();
@@ -111,7 +110,7 @@ test('a number twilio could never dial is refused before it is sent', function (
 test('twilio refusing the message is reported rather than swallowed', function () {
     Http::fake(['*/Messages.json' => Http::response(['message' => 'The From number is not valid'], 400)]);
 
-    expect(fn () => app(TwilioClient::class)->send('+15125550000', '+15125550100', 'Hello'))
+    expect(fn () => $this->team->twilio()->send('+15125550000', '+15125550100', 'Hello'))
         ->toThrow(RuntimeException::class, 'The From number is not valid');
 });
 
@@ -269,6 +268,23 @@ test('an organization with no number chosen records why nothing was texted', fun
         ->toContain('has not chosen a number');
 });
 
+test('an organization without its own twilio account records why nothing was texted', function () {
+    Http::fake();
+
+    $this->team->update(['twilio_account_sid' => null, 'twilio_auth_token' => null]);
+
+    $automation = Automation::factory()->byText()->create(['team_id' => $this->team->id]);
+
+    queueRunFor($automation, $this->booking);
+
+    $this->artisan('automations:run')->assertSuccessful();
+
+    Http::assertNothingSent();
+
+    expect($this->booking->automationRuns()->first()->failure)
+        ->toContain('has not connected a Twilio account');
+});
+
 test('an invitee phone question beats the call me location', function () {
     $this->booking->update([
         'location_type' => LocationType::Phone,
@@ -310,7 +326,7 @@ test('a number the account does not own is refused', function () {
         ->assertSessionHasErrors('sms_from_number');
 });
 
-test('a plain member cannot choose the organizations number', function () {
+test('a plain member cannot choose the organizations number, and twilio is never asked', function () {
     // A number the account really owns, so it is the policy that turns this
     // away rather than the validator.
     Http::fake([
@@ -321,7 +337,10 @@ test('a plain member cannot choose the organizations number', function () {
         ]),
     ]);
 
-    $team = Team::factory()->create();
+    $team = Team::factory()->create([
+        'twilio_account_sid' => 'AC00000000000000000000000000000002',
+        'twilio_auth_token' => 'other-token',
+    ]);
     $member = User::factory()->create();
     $team->members()->attach($member, ['role' => TeamRole::Member->value]);
     $member->switchTeam($team);
@@ -332,6 +351,10 @@ test('a plain member cannot choose the organizations number', function () {
             'sms_from_number' => '+15125550001',
         ])
         ->assertForbidden();
+
+    // Refused before validation, so the organization's credentials were never
+    // used and nothing about its account leaked through a validation error.
+    Http::assertNotSent(fn (Request $request) => str_contains($request->url(), '/Accounts/'));
 });
 
 test('a phone number on the profile is stored the way twilio dials it', function () {

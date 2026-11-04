@@ -18,7 +18,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/lib/** | .ai/rules/lib.md |
 | config/log-viewer.php, app/Providers/AppServiceProvider.php | .ai/rules/logs.md |
 | app/Services/Mail/** | .ai/rules/mail.md |
-| app/Models/EventType.php, app/Models/Availability*.php | .ai/rules/models.md |
+| app/Models/EventType.php, app/Models/Availability*.php, app/Models/Team.php | .ai/rules/models.md |
 | app/Notifications/Bookings/** | .ai/rules/notifications-bookings.md |
 | app/Policies/** | .ai/rules/policies.md |
 | routes/booking.php | .ai/rules/routes.md |
