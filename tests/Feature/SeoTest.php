@@ -44,3 +44,13 @@ test('the sitemap lists only the marketing pages', function () {
 
     expect($urls)->toBe([route('home'), route('pricing'), route('terms'), route('privacy')]);
 });
+
+/*
+ * Under PHP-FPM with short_open_tag on, a "<?" in the template is parsed as
+ * PHP and the sitemap 500s. The CLI runs with it off, so this cannot be
+ * reproduced in a request test; keep the declaration in the route instead.
+ */
+test('the sitemap starts with its XML declaration and its template holds no PHP open tag', function () {
+    expect($this->get(route('sitemap'))->getContent())->toStartWith('<?xml version="1.0" encoding="UTF-8"?>')
+        ->and(file_get_contents(resource_path('views/sitemap.blade.php')))->not->toContain('<?');
+});
