@@ -6,6 +6,8 @@ use App\Models\Booking;
 use App\Models\EventType;
 use App\Models\Team;
 use App\Models\TeamInvitation;
+use App\Models\User;
+use App\Services\Scheduling\ScopeFilter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -22,9 +24,20 @@ class DashboardController extends Controller
      */
     protected int $upcomingLimit = 8;
 
-    public function __invoke(Request $request, Team $current_team): Response
+    public function __invoke(Request $request, Team $current_team, ScopeFilter $scopes): Response
     {
         $user = $request->user();
+
+        // Owners and admins land on the whole organization; a member's scope
+        // always resolves to themselves, whatever ?scope= asks for.
+        $defaultScope = $scopes->defaultScope($current_team, $user);
+        $scope = $request->string('scope', $defaultScope)->toString();
+
+        if (! $scopes->validValues($current_team, $user)->contains($scope)) {
+            $scope = $defaultScope;
+        }
+
+        $hostIds = $scopes->userIds($scope, $current_team, $user);
         $email = strtolower($user->email);
 
         $pendingInvitations = TeamInvitation::query()
@@ -51,25 +64,29 @@ class DashboardController extends Controller
             'bookingUrl' => $user->booking_slug
                 ? route('book.page', ['page' => $user->booking_slug])
                 : null,
+            'scope' => $scope,
+            'scopeOptions' => $scopes->options($current_team, $user),
+            'showsOthers' => $hostIds !== [$user->id],
             // Both need aggregate queries, so the shell paints first and these
             // stream in behind their skeletons.
-            'stats' => Inertia::defer(fn () => $this->stats($user, $current_team)),
-            'upcoming' => Inertia::defer(fn () => $this->upcoming($user, $current_team)),
+            'stats' => Inertia::defer(fn () => $this->stats($current_team, $scopes, $hostIds)),
+            'upcoming' => Inertia::defer(fn () => $this->upcoming($user, $current_team, $scopes, $hostIds)),
         ]);
     }
 
     /**
      * Build the headline counters.
      *
+     * @param  array<int, int>|null  $hostIds
      * @return array{upcoming: int, thisWeek: int, eventTypes: int}
      */
-    protected function stats(mixed $user, Team $team): array
+    protected function stats(Team $team, ScopeFilter $scopes, ?array $hostIds): array
     {
         $now = CarbonImmutable::now();
 
         return [
-            'upcoming' => $this->hosted($user, $team)->active()->upcoming()->count(),
-            'thisWeek' => $this->hosted($user, $team)
+            'upcoming' => $this->hosted($team, $scopes, $hostIds)->active()->upcoming()->count(),
+            'thisWeek' => $this->hosted($team, $scopes, $hostIds)
                 ->active()
                 ->whereBetween('starts_at', [$now->startOfWeek(), $now->endOfWeek()])
                 ->count(),
@@ -81,24 +98,26 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get the next few meetings the user is hosting.
+     * Get the next few meetings in the chosen scope.
      *
+     * @param  array<int, int>|null  $hostIds
      * @return array<int, array<string, mixed>>
      */
-    protected function upcoming(mixed $user, Team $team): array
+    protected function upcoming(User $user, Team $team, ScopeFilter $scopes, ?array $hostIds): array
     {
         $timezone = $user->timezone ?: config('scheduling.default_timezone');
 
-        return $this->hosted($user, $team)
+        return $this->hosted($team, $scopes, $hostIds)
             ->active()
             ->upcoming()
-            ->with(['eventType:id,name,color'])
+            ->with(['eventType:id,name,color', 'host:id,name'])
             ->orderBy('starts_at')
             ->limit($this->upcomingLimit)
             ->get()
             ->map(fn (Booking $booking) => [
                 'uid' => $booking->uid,
                 'name' => $booking->name,
+                'hostName' => $booking->host?->name,
                 'eventTypeName' => $booking->eventType?->name,
                 'color' => $booking->eventType?->color,
                 'startsAt' => $booking->starts_at->toIso8601String(),
@@ -115,14 +134,20 @@ class DashboardController extends Controller
     }
 
     /**
-     * Scope bookings to the ones this user hosts on the given team.
+     * Scope the team's bookings to the hosts the chosen scope resolves to.
      *
+     * Null means everyone, which ScopeFilter only returns to a viewer allowed
+     * to manage the organization's bookings.
+     *
+     * @param  array<int, int>|null  $hostIds
      * @return Builder<Booking>
      */
-    protected function hosted(mixed $user, Team $team): Builder
+    protected function hosted(Team $team, ScopeFilter $scopes, ?array $hostIds): Builder
     {
-        return Booking::query()
-            ->where('team_id', $team->id)
-            ->hostedBy($user);
+        return $scopes->applyToHosts(
+            Booking::query()->where('team_id', $team->id),
+            $hostIds,
+            'hosts',
+        );
     }
 }
