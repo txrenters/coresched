@@ -6,6 +6,7 @@ import {
     CalendarX,
     Check,
     Hourglass,
+    Megaphone,
     RefreshCw,
     TriangleAlert,
     X,
@@ -62,6 +63,10 @@ const badgeLabel = computed(() =>
 );
 
 const iconFor = (type: string) => {
+    if (type === 'announcement') {
+        return Megaphone;
+    }
+
     if (type === 'booking.pending') {
         return Hourglass;
     }

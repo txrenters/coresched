@@ -60,7 +60,7 @@ class PlatformAnalytics
             'activeOrganizations' => Team::query()->excludingDemo()
                 ->whereHas('bookings', fn (Builder $query) => $query->where('created_at', '>=', $since))
                 ->count(),
-            'users' => $this->realUsers()->count(),
+            'users' => User::query()->realUsers()->count(),
             'bookingsLast30Days' => $this->realBookings()->where('created_at', '>=', $since)->count(),
             'bookingsPrevious30Days' => $this->realBookings()
                 ->whereBetween('created_at', [$this->now->subDays(60), $since])
@@ -164,21 +164,6 @@ class PlatformAnalytics
         // Only the demo is taken out: bookings of a deleted real organization
         // still count, as they always have.
         return Booking::query()->whereNotIn('team_id', Team::withTrashed()->where('is_demo', true)->select('id'));
-    }
-
-    /**
-     * People other than super admins, leaving out the demo's sample people.
-     * Someone in no organization at all still counts.
-     *
-     * @return Builder<User>
-     */
-    protected function realUsers(): Builder
-    {
-        return User::query()
-            ->where('is_super_admin', false)
-            ->where(fn (Builder $query) => $query
-                ->whereDoesntHave('teams')
-                ->orWhereHas('teams', fn (Builder $teams) => $teams->where('is_demo', false)));
     }
 
     /**

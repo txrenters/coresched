@@ -9,6 +9,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\Pivot;
@@ -114,6 +115,21 @@ class User extends Authenticatable implements PasskeyUser
     public function getAvatarAttribute(): ?string
     {
         return $this->avatarUrl();
+    }
+
+    /**
+     * Scope to people who use the platform for real: not super admins, and
+     * not the public demo's sample people. Someone in no organization at
+     * all still counts.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeRealUsers(Builder $query): void
+    {
+        $query->where('is_super_admin', false)
+            ->where(fn (Builder $query) => $query
+                ->whereDoesntHave('teams')
+                ->orWhereHas('teams', fn (Builder $teams) => $teams->where('is_demo', false)));
     }
 
     public function isSuperAdmin(): bool

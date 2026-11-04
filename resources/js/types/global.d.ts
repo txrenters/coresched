@@ -32,6 +32,8 @@ declare module '@inertiajs/core' {
             impersonator: { name: string } | null;
             /** Set while a visitor is exploring the shared public demo. */
             isDemo: boolean;
+            /** The newest announcement whose banner is still up. */
+            announcement: { id: number; title: string; body: string } | null;
             /** Set on the public demo's booking pages. */
             isDemoBookingPage: boolean;
             [key: string]: unknown;
