@@ -55,6 +55,7 @@ class HandleInertiaRequests extends Middleware
             'isSuperAdmin' => (bool) $user?->isSuperAdmin(),
             // Shows the demo banner and hides nothing else: RestrictInDemo enforces.
             'isDemo' => Demo::isDemoUser($user),
+            'isDemoBookingPage' => fn () => Demo::isDemoBookingPage($request),
             // Set while a super admin is signed in as this user; drives the
             // "Return to your account" banner.
             'impersonator' => fn () => ($impersonator = Impersonation::impersonator($request))

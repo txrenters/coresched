@@ -106,3 +106,40 @@ test('a real organization still gets its booking email', function () {
 
     expect(sentMailCount())->toBeGreaterThan(0);
 });
+
+test('the demo admin cannot accept an invitation into a real organization', function () {
+    app(ResetDemoOrganization::class)->handle();
+    $realTeam = Team::factory()->create();
+    $invitation = TeamInvitation::factory()->create(['team_id' => $realTeam->id, 'email' => Demo::ADMIN_EMAIL]);
+
+    $this->actingAs(Demo::admin())
+        ->from(route('dashboard', ['current_team' => Demo::TEAM_SLUG]))
+        ->post(route('invitations.accept', $invitation))
+        ->assertRedirect(route('dashboard', ['current_team' => Demo::TEAM_SLUG]));
+
+    expect(Demo::admin()->belongsToTeam($realTeam))->toBeFalse();
+});
+
+test('the demo will not open while its account belongs to a real organization, and the reset removes it', function () {
+    app(ResetDemoOrganization::class)->handle();
+    $realTeam = Team::factory()->create();
+    $realTeam->members()->attach(Demo::admin(), ['role' => 'member']);
+
+    $this->from(route('home'))->post(route('demo.store'))->assertRedirect(route('home'));
+    $this->assertGuest();
+
+    app(ResetDemoOrganization::class)->handle();
+
+    expect($realTeam->members()->where('email', Demo::ADMIN_EMAIL)->exists())->toBeFalse();
+});
+
+test('the demo booking pages warn visitors and real booking pages do not', function () {
+    app(ResetDemoOrganization::class)->handle();
+    $realTeam = Team::factory()->create();
+
+    $this->get(route('book.page', ['page' => Demo::TEAM_SLUG]))
+        ->assertInertia(fn ($page) => $page->where('isDemoBookingPage', true));
+
+    $this->get(route('book.page', ['page' => $realTeam->slug]))
+        ->assertInertia(fn ($page) => $page->where('isDemoBookingPage', false));
+});

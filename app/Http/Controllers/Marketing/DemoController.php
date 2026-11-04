@@ -23,7 +23,11 @@ class DemoController extends Controller
         $admin = Demo::admin();
         $team = $admin?->currentTeam;
 
-        if ($team === null || ! Demo::isDemoTeam($team) || $team->isDisabled()) {
+        // Refused if the shared account was ever added to a real organization:
+        // every visitor would land inside it.
+        $belongsOutsideDemo = (bool) $admin?->teams()->where('is_demo', false)->exists();
+
+        if ($team === null || ! Demo::isDemoTeam($team) || $team->isDisabled() || $belongsOutsideDemo) {
             Inertia::flash('toast', ['type' => 'error', 'message' => __('The demo is not available right now. Please try again later.')]);
 
             return back();

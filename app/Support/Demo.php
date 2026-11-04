@@ -2,8 +2,11 @@
 
 namespace App\Support;
 
+use App\Models\Booking;
+use App\Models\SingleUseLink;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Http\Request;
 
 /**
  * The public demo: one shared organization (teams.is_demo) that anyone can
@@ -71,5 +74,42 @@ class Demo
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
+    }
+
+    /**
+     * Determine whether the request is for one of the demo's public pages: a
+     * booking page, or a booking made on one.
+     *
+     * Visitors can write whatever they like into the demo's event types, so
+     * these pages carry a notice saying so, and warning anyone booking that
+     * every other demo visitor can see what they enter.
+     */
+    public static function isDemoBookingPage(Request $request): bool
+    {
+        if (! $request->routeIs('book.*', 'booking.*')) {
+            return false;
+        }
+
+        $teamIds = self::teamIds();
+
+        if ($teamIds === []) {
+            return false;
+        }
+
+        $booking = $request->route('booking');
+        $link = $request->route('singleUseLink');
+        $page = $request->route('page');
+
+        return match (true) {
+            $booking instanceof Booking => in_array($booking->team_id, $teamIds, true),
+            is_string($booking) => Booking::query()->where('uid', $booking)->whereIn('team_id', $teamIds)->exists(),
+            $link instanceof SingleUseLink => in_array($link->team_id, $teamIds, true),
+            is_string($link) => SingleUseLink::query()->where('uid', $link)->whereIn('team_id', $teamIds)->exists(),
+            is_string($page) => Team::query()->whereKey($teamIds)->where('slug', $page)->exists()
+                || User::query()->where('booking_slug', $page)
+                    ->whereHas('teams', fn ($teams) => $teams->whereKey($teamIds))
+                    ->exists(),
+            default => false,
+        };
     }
 }

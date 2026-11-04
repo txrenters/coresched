@@ -96,10 +96,14 @@ class ResetDemoOrganization
                 ->each(fn (User $user) => $user->delete());
         });
 
+        // The shared admin goes whatever else it was added to, so the demo
+        // account can never carry visitors into a real organization.
         User::query()
             ->where('email', Demo::ADMIN_EMAIL)
-            ->whereDoesntHave('teams')
-            ->each(fn (User $user) => $user->delete());
+            ->each(function (User $user) {
+                $user->teams()->detach();
+                $user->delete();
+            });
     }
 
     /**

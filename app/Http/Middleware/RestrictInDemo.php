@@ -22,6 +22,10 @@ class RestrictInDemo
      * slug, Twilio account and sender, members, or creating new ones outside
      * the demo).
      *
+     * Accepting an invitation and switching organizations are locked too:
+     * the shared account must never end up inside a real organization, where
+     * every visitor would follow it.
+     *
      * Matched by route name, including Fortify's and the passkey package's.
      *
      * @var list<string>
@@ -48,6 +52,8 @@ class RestrictInDemo
         'teams.leave',
         'teams.members.*',
         'teams.invitations.*',
+        'teams.switch',
+        'invitations.*',
         'organizations.members.*',
         'users.store',
         'users.destroy',

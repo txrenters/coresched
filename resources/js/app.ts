@@ -2,6 +2,7 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import { initializeTheme } from '@/composables/useAppearance';
 import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
+import PublicBookingLayout from '@/layouts/PublicBookingLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
 
@@ -16,8 +17,9 @@ createInertiaApp({
             case name === 'Terms':
             case name === 'Privacy':
             case name === 'Error':
-            case name.startsWith('book/'):
                 return null;
+            case name.startsWith('book/'):
+                return PublicBookingLayout;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):
