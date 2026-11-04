@@ -31,3 +31,13 @@ Schedule::command('calendars:sync')
     ->hourly()
     ->withoutOverlapping()
     ->description('Refresh cached busy times from connected calendars');
+
+/*
+ * The public demo is shared by every visitor, so it starts each day clean.
+ * Runs at night Central time, when nobody is likely to be mid-demo.
+ */
+Schedule::command('demo:reset')
+    ->dailyAt('03:00')
+    ->timezone('America/Chicago')
+    ->withoutOverlapping()
+    ->description('Rebuild the public demo organization');

@@ -5,6 +5,7 @@ import AppearanceToggle from '@/components/AppearanceToggle.vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { Button } from '@/components/ui/button';
 import { dashboard, home, login, pricing } from '@/routes';
+import { store as startDemo } from '@/routes/demo';
 
 const page = usePage();
 
@@ -59,6 +60,19 @@ const links = [
                         as-child
                     >
                         <Link :href="login()">Log in</Link>
+                    </Button>
+                    <Button
+                        variant="outline"
+                        class="hidden cursor-pointer font-semibold md:inline-flex"
+                        as-child
+                    >
+                        <Link
+                            :href="startDemo()"
+                            as="button"
+                            data-test="try-demo"
+                        >
+                            Try the demo
+                        </Link>
                     </Button>
                     <Button class="cursor-pointer font-semibold" as-child>
                         <Link :href="`${pricing().url}#contact`">

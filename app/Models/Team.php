@@ -210,6 +210,7 @@ class Team extends Model
             'twilio_auth_token' => 'encrypted',
             'plan' => TeamPlan::class,
             'disabled_at' => 'datetime',
+            'is_demo' => 'boolean',
         ];
     }
 

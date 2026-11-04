@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\SalesInquiryController;
 use App\Http\Controllers\BookingQrCodeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Marketing\ContactSalesController;
+use App\Http\Controllers\Marketing\DemoController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Settings\OrganizationDirectoryController;
 use App\Http\Controllers\Settings\UserDirectoryController;
@@ -22,6 +23,9 @@ Route::inertia('privacy', 'Privacy')->name('privacy');
 Route::post('contact-sales', [ContactSalesController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('contact-sales.store');
+Route::post('demo', [DemoController::class, 'store'])
+    ->middleware(['guest', 'throttle:10,1'])
+    ->name('demo.store');
 
 /*
  * The marketing pages are the only indexable URLs; see NoIndexExceptMarketing.

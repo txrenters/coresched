@@ -33,6 +33,7 @@ import WorkflowPreview from '@/components/marketing/WorkflowPreview.vue';
 import { Button } from '@/components/ui/button';
 import { vReveal } from '@/lib/reveal';
 import { pricing } from '@/routes';
+import { store as startDemo } from '@/routes/demo';
 
 const contactUrl = `${pricing().url}#contact`;
 
@@ -222,7 +223,13 @@ const faqs = [
                                 class="cursor-pointer font-semibold"
                                 as-child
                             >
-                                <Link :href="pricing()">See plans</Link>
+                                <Link
+                                    :href="startDemo()"
+                                    as="button"
+                                    data-test="hero-try-demo"
+                                >
+                                    Try the demo
+                                </Link>
                             </Button>
                         </div>
 
