@@ -14,7 +14,7 @@ class NoIndexExceptMarketing
      *
      * @var list<string>
      */
-    public const INDEXABLE_ROUTES = ['home', 'pricing'];
+    public const INDEXABLE_ROUTES = ['home', 'pricing', 'terms', 'privacy'];
 
     /**
      * Keep every response except the marketing pages out of search indexes.

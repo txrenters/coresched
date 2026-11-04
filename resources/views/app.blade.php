@@ -52,6 +52,14 @@
                     'title' => 'Pricing - '.config('app.name'),
                     'description' => 'Compare '.config('app.name').' plans for teams, growing businesses and enterprises, and contact sales for a quote.',
                 ],
+                request()->routeIs('terms') => [
+                    'title' => 'Terms of Service - '.config('app.name'),
+                    'description' => 'The terms that govern using '.config('app.name').', including accounts, bookings, acceptable use and connected services.',
+                ],
+                request()->routeIs('privacy') => [
+                    'title' => 'Privacy Policy - '.config('app.name'),
+                    'description' => 'How '.config('app.name').' collects, uses and protects account, booking and calendar information.',
+                ],
                 default => null,
             };
         @endphp
