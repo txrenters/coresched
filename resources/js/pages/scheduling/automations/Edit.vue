@@ -553,7 +553,7 @@ setLayoutProps({
                                         v-model="emailDraft"
                                         type="email"
                                         inputmode="email"
-                                        placeholder="leasing@texasrenters.com"
+                                        placeholder="leasing@example.com"
                                         data-test="automation-email"
                                         @keydown.enter.prevent="addEmail"
                                     />
