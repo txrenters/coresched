@@ -31,10 +31,16 @@ Route::post('demo', [DemoController::class, 'store'])
  * The marketing pages are the only indexable URLs; see NoIndexExceptMarketing.
  * Rendered rather than a static file so the URLs follow APP_URL.
  */
-Route::get('sitemap.xml', fn () => response()
-    ->view('sitemap')
-    ->header('Content-Type', 'application/xml'))
-    ->name('sitemap');
+/*
+ * The XML declaration is added here, not in the view: Blade leaves a line
+ * holding "<?" uncompiled, and with short_open_tag on (as under PHP-FPM in
+ * production) PHP then parses "<?xml" as code and the sitemap is a 500.
+ */
+Route::get('sitemap.xml', fn () => response(
+    '<?xml version="1.0" encoding="UTF-8"?>'.PHP_EOL.view('sitemap')->render(),
+    200,
+    ['Content-Type' => 'application/xml'],
+))->name('sitemap');
 
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])
