@@ -88,14 +88,32 @@ test('an event type can be created from the quick create panel', function () {
         ->and($eventType->kind)->toBe(EventTypeKind::OneOnOne);
 });
 
-test('an event type cannot be given a minimum notice', function () {
+test('an event type saves the minimum notice it is given', function () {
     $this->actingAs($this->user)
         ->post(route('scheduling.store', ['current_team' => $this->team->slug]), eventTypePayload([
             'minimum_notice_minutes' => 240,
         ]))
         ->assertRedirect(route('scheduling.index', ['current_team' => $this->team->slug]));
 
-    expect(EventType::first()->minimum_notice_minutes)->toBe(0);
+    expect(EventType::first()->minimum_notice_minutes)->toBe(240);
+});
+
+test('an event type made without a minimum notice gets the fifteen minute floor', function () {
+    $this->actingAs($this->user)
+        ->post(route('scheduling.store', ['current_team' => $this->team->slug]), eventTypePayload())
+        ->assertSessionHasNoErrors();
+
+    expect(EventType::first()->minimum_notice_minutes)->toBe(15);
+});
+
+test('a minimum notice below fifteen minutes is refused', function () {
+    $this->actingAs($this->user)
+        ->post(route('scheduling.store', ['current_team' => $this->team->slug]), eventTypePayload([
+            'minimum_notice_minutes' => 5,
+        ]))
+        ->assertSessionHasErrors('minimum_notice_minutes');
+
+    expect(EventType::count())->toBe(0);
 });
 
 test('the slug must be unique within the team', function () {

@@ -40,6 +40,7 @@ class SaveEventTypeRequest extends FormRequest
             'color' => ['nullable', 'string', 'max:20'],
             'duration_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
             'slot_interval_minutes' => ['nullable', 'integer', 'min:5', 'max:1440'],
+            'minimum_notice_minutes' => ['sometimes', 'integer', 'min:'.config('scheduling.minimum_notice_floor_minutes'), 'max:43200'],
             'buffer_before_minutes' => ['required', 'integer', 'min:0', 'max:720'],
             'buffer_after_minutes' => ['required', 'integer', 'min:0', 'max:720'],
             'daily_booking_limit' => ['nullable', 'integer', 'min:1', 'max:100'],

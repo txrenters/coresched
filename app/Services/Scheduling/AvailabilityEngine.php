@@ -100,7 +100,7 @@ class AvailabilityEngine
     {
         $now ??= CarbonImmutable::now('UTC');
 
-        $start = $now->addMinutes($eventType->minimum_notice_minutes);
+        $start = $now->addMinutes($eventType->effectiveMinimumNoticeMinutes());
 
         $end = match ($eventType->date_range_type) {
             DateRangeType::RollingDays => $now->addDays(max(1, $eventType->rolling_days))->endOfDay(),
