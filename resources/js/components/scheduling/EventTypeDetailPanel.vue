@@ -43,6 +43,7 @@ type EventType = {
     upcomingBookings: number;
     hosts: Array<{ id: number; name: string; initial: string }>;
     publicUrl: string;
+    minimumNoticeMinutes: number;
     bufferBeforeMinutes: number;
     bufferAfterMinutes: number;
     slotIntervalMinutes: number | null;
@@ -311,6 +312,16 @@ const displayUrl = (url: string) => url.replace(/^https?:\/\//, '');
                             Schedule:
                             <span class="text-foreground">
                                 {{ eventType.scheduleName }}
+                            </span>
+                        </div>
+                        <div>
+                            Minimum notice:
+                            <span class="text-foreground">
+                                {{
+                                    describeMinutes(
+                                        eventType.minimumNoticeMinutes,
+                                    )
+                                }}
                             </span>
                         </div>
                         <div v-if="eventType.bufferBeforeMinutes">

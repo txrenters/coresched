@@ -53,6 +53,42 @@ const props = withDefaults(defineProps<Props>(), { isEditing: false });
  */
 const fields = props.form;
 
+/**
+ * The notice choices. Fifteen minutes is the floor the server enforces
+ * (scheduling.minimum_notice_floor_minutes); a value saved before these
+ * presets existed is kept as an extra choice so it is not silently changed.
+ */
+const noticePresets = [15, 30, 45, 60, 120, 240, 480, 1440, 2880, 10080];
+
+const noticeOptions = computed(() => {
+    const current = Number(fields.minimum_notice_minutes);
+    const values =
+        Number.isFinite(current) && !noticePresets.includes(current)
+            ? [...noticePresets, current].sort((a, b) => a - b)
+            : noticePresets;
+
+    return values.map((minutes) => ({
+        value: minutes,
+        label: describeNotice(minutes),
+    }));
+});
+
+function describeNotice(minutes: number): string {
+    if (minutes % 1440 === 0) {
+        const days = minutes / 1440;
+
+        return days === 1 ? '1 day' : `${days} days`;
+    }
+
+    if (minutes % 60 === 0) {
+        const hours = minutes / 60;
+
+        return hours === 1 ? '1 hour' : `${hours} hours`;
+    }
+
+    return `${minutes} minutes`;
+}
+
 const selectedKind = computed(() =>
     props.kinds.find((kind) => kind.value === fields.kind),
 );
@@ -387,6 +423,34 @@ const removeOption = (question: Record<string, any>, index: number) => {
                     </Select>
                     <InputError
                         :message="fields.errors.availability_schedule_id"
+                    />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="minimum_notice">Minimum notice</Label>
+                    <Select v-model="fields.minimum_notice_minutes">
+                        <SelectTrigger
+                            id="minimum_notice"
+                            class="w-full"
+                            data-test="minimum-notice"
+                        >
+                            <SelectValue placeholder="Choose notice" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="option in noticeOptions"
+                                :key="option.value"
+                                :value="option.value"
+                            >
+                                {{ option.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <p class="text-xs text-muted-foreground">
+                        Times starting sooner than this are not offered.
+                    </p>
+                    <InputError
+                        :message="fields.errors.minimum_notice_minutes"
                     />
                 </div>
 

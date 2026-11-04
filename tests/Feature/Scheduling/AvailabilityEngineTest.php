@@ -229,6 +229,21 @@ test('minimum notice hides slots that are too soon', function () {
         ->and($starts)->toContain('13:00:00');
 });
 
+test('a slot five minutes away is not offered, even on an event type saved with no notice', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-09-02 09:55:00', 'UTC'));
+
+    $host = scheduledHost();
+    $eventType = EventType::factory()->ownedBy($host)->create(['duration_minutes' => 30]);
+    // A row from before the floor, when every event type was set to 0.
+    $eventType->forceFill(['minimum_notice_minutes' => 0])->saveQuietly();
+
+    $starts = engine()->slots($eventType->fresh(), wednesday())
+        ->map(fn ($slot) => $slot->startsAt->toTimeString());
+
+    expect($starts)->not->toContain('10:00:00')
+        ->and($starts->first())->toBe('10:30:00');
+});
+
 test('the rest of today is bookable straight away from the host hours', function () {
     $this->travelTo(CarbonImmutable::parse('2026-09-02 10:10:00', 'UTC'));
 

@@ -95,6 +95,7 @@ type EventTypeRow = {
     groupName: string | null;
     hosts: Array<{ id: number; name: string; initial: string }>;
     publicUrl: string;
+    minimumNoticeMinutes: number;
     bufferBeforeMinutes: number;
     bufferAfterMinutes: number;
     slotIntervalMinutes: number | null;

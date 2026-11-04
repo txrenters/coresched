@@ -80,7 +80,7 @@ class EventType extends Model
         'duration_minutes' => 30,
         'buffer_before_minutes' => 0,
         'buffer_after_minutes' => 0,
-        'minimum_notice_minutes' => 0,
+        'minimum_notice_minutes' => 15,
         'seats_per_slot' => 1,
         'date_range_type' => 'rolling_days',
         'rolling_days' => 60,
@@ -435,5 +435,14 @@ class EventType extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /**
+     * Get the notice a booking needs, never less than the platform floor
+     * (scheduling.minimum_notice_floor_minutes).
+     */
+    public function effectiveMinimumNoticeMinutes(): int
+    {
+        return max((int) config('scheduling.minimum_notice_floor_minutes', 15), (int) $this->minimum_notice_minutes);
     }
 }

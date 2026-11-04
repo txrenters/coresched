@@ -82,6 +82,7 @@ const form = useForm({
     color: '#0f766e',
     duration_minutes: 30,
     slot_interval_minutes: null as number | null,
+    minimum_notice_minutes: 15,
     buffer_before_minutes: 0,
     buffer_after_minutes: 0,
     daily_booking_limit: null as number | null,

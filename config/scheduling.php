@@ -41,4 +41,17 @@ return [
 
     'reminder_lead_times' => [24 * 60, 60],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Minimum Notice Floor
+    |--------------------------------------------------------------------------
+    |
+    | The least notice, in minutes, any booking can be made with. An event
+    | type may ask for more, never less: a slot starting sooner than this is
+    | not offered, so a host is never booked for a meeting minutes away.
+    |
+    */
+
+    'minimum_notice_floor_minutes' => 15,
+
 ];
