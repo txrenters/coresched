@@ -82,7 +82,7 @@ class SendBookingWebhook implements ShouldQueue
 
         $response = Http::withHeaders([
             'Accept' => 'application/json',
-            'User-Agent' => 'TexasRenters-Bookings',
+            'User-Agent' => 'CoreSched',
             'X-Bookings-Signature' => 'sha256='.hash_hmac('sha256', $timestamp.'.'.$body, $secret),
             'X-Bookings-Timestamp' => $timestamp,
             'X-Bookings-Delivery' => $this->deliveryId,

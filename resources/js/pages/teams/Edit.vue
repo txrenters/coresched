@@ -258,7 +258,7 @@ const submitProfile = () => {
                         v-model="profileForm.website_url"
                         type="url"
                         inputmode="url"
-                        placeholder="https://texasrenters.com"
+                        placeholder="https://example.com"
                         data-test="team-website-input"
                         :aria-invalid="Boolean(profileForm.errors.website_url)"
                     />

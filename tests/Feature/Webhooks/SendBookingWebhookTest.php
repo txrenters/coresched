@@ -44,6 +44,7 @@ test('posts a payload signed over the timestamp and body that the receiver can v
         return $request->url() === 'https://texra.example.com/api/bookings/webhook'
             && $request->header('X-Bookings-Signature')[0] === $expected
             && $request->header('X-Bookings-Delivery')[0] === $job->deliveryId
+            && $request->header('User-Agent')[0] === 'CoreSched'
             && $timestamp === (string) now()->getTimestamp()
             && $payload['id'] === $job->deliveryId
             && $payload['event'] === 'booking.confirmed'
