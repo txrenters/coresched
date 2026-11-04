@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountSetupController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\Admin\AnnouncementController;
 use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\Admin\OrganizationConsoleController;
 use App\Http\Controllers\Admin\SalesInquiryController;
@@ -115,6 +116,12 @@ Route::middleware(['auth'])->group(function () {
             ->name('impersonation.store');
         Route::get('inquiries', [SalesInquiryController::class, 'index'])->name('inquiries.index');
         Route::patch('inquiries/{salesInquiry}', [SalesInquiryController::class, 'update'])->name('inquiries.update');
+        Route::get('announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
+        Route::post('announcements', [AnnouncementController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('announcements.store');
+        Route::patch('announcements/{announcement}/banner', [AnnouncementController::class, 'endBanner'])
+            ->name('announcements.end-banner');
     });
 
     // Outside the console group: the account signed in now is the member, not

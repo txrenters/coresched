@@ -8,6 +8,7 @@ import {
     ExternalLink,
     History,
     Inbox,
+    Megaphone,
     LayoutGrid,
     ScrollText,
     ShieldCheck,
@@ -33,6 +34,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as activityIndex } from '@/routes/activity';
+import { index as announcementsIndex } from '@/routes/admin/announcements';
 import { index as inquiriesIndex } from '@/routes/admin/inquiries';
 import { index as adminConsoleIndex } from '@/routes/admin/organizations';
 import { index as automationsIndex } from '@/routes/automations';
@@ -190,6 +192,7 @@ const platformNavItems = computed<NavItem[]>(() => [
     { title: 'Organizations', href: organizationsIndex(), icon: Building2 },
     { title: 'Users', href: usersIndex(), icon: UsersRound },
     { title: 'Sales inquiries', href: inquiriesIndex(), icon: Inbox },
+    { title: 'Announcements', href: announcementsIndex(), icon: Megaphone },
     {
         title: 'Logs',
         href: logsIndex(),

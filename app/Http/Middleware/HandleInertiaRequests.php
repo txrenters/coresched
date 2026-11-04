@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Announcement;
 use App\Models\Team;
 use App\Support\Demo;
 use App\Support\Impersonation;
@@ -55,6 +56,11 @@ class HandleInertiaRequests extends Middleware
             'isSuperAdmin' => (bool) $user?->isSuperAdmin(),
             // Shows the demo banner and hides nothing else: RestrictInDemo enforces.
             'isDemo' => Demo::isDemoUser($user),
+            // The newest announcement whose banner is still up, for signed-in
+            // people only; the demo is left out so it stays about the product.
+            'announcement' => fn () => $user !== null && ! Demo::isDemoUser($user)
+                ? Announcement::query()->withLiveBanner()->latest()->first(['id', 'title', 'body'])?->only(['id', 'title', 'body'])
+                : null,
             'isDemoBookingPage' => fn () => Demo::isDemoBookingPage($request),
             // Set while a super admin is signed in as this user; drives the
             // "Return to your account" banner.
