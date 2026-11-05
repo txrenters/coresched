@@ -64,8 +64,8 @@ class HandleInertiaRequests extends Middleware
             'isDemoBookingPage' => fn () => Demo::isDemoBookingPage($request),
             // Visitor analytics for the public marketing pages; signed-in
             // people are never counted. Only the marketing pages act on it.
-            'analytics' => fn () => $user === null && filled(config('services.umami.script_url')) && filled(config('services.umami.website_id'))
-                ? ['scriptUrl' => config('services.umami.script_url'), 'websiteId' => config('services.umami.website_id')]
+            'analytics' => fn () => $user === null && filled(config('services.cloudflare_analytics.token'))
+                ? ['token' => config('services.cloudflare_analytics.token')]
                 : null,
             // Set while a super admin is signed in as this user; drives the
             // "Return to your account" banner.

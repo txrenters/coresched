@@ -72,13 +72,13 @@ return [
     ],
 
     /*
-     * Self-hosted Umami counts visits to the public marketing pages only
-     * (home, pricing, legal). It is cookieless, so no consent banner. Blank
-     * either key and nothing is loaded. See usePublicAnalytics.ts.
+     * Cloudflare Web Analytics counts visits to the public marketing pages
+     * only (home, pricing, legal). It is cookieless, so no consent banner, and
+     * works without Cloudflare DNS. Blank token = nothing is loaded. See
+     * usePublicAnalytics.ts.
      */
-    'umami' => [
-        'script_url' => env('UMAMI_SCRIPT_URL'),
-        'website_id' => env('UMAMI_WEBSITE_ID'),
+    'cloudflare_analytics' => [
+        'token' => env('CLOUDFLARE_ANALYTICS_TOKEN'),
     ],
 
     'microsoft' => [

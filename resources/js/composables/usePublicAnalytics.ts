@@ -1,21 +1,16 @@
 import { usePage } from '@inertiajs/vue3';
 import { onMounted } from 'vue';
 
-declare global {
-    interface Window {
-        umami?: { track: () => void };
-    }
-}
-
-const SCRIPT_ID = 'umami-analytics';
+const SCRIPT_ID = 'cf-web-analytics';
 
 /**
- * Count a page view on a public marketing page.
+ * Load Cloudflare Web Analytics on a public marketing page.
  *
- * The script loads with auto-tracking off: this is an Inertia SPA, so Umami's
- * own history tracking would keep counting after the visitor clicks through to
- * sign in. Only components that call this record a view. The server shares
- * `analytics` only for signed-out visitors and only when Umami is configured.
+ * The beacon runs with `spa: false`, so it counts the page the visitor landed
+ * on and does not follow Inertia's client-side navigation -- otherwise it
+ * would keep counting after the visitor clicks through to sign in. Only
+ * components that call this load it, and the server shares `analytics` only
+ * for signed-out visitors when a token is configured.
  */
 export function usePublicAnalytics(): void {
     const page = usePage();
@@ -23,28 +18,18 @@ export function usePublicAnalytics(): void {
     onMounted(() => {
         const analytics = page.props.analytics;
 
-        if (!analytics) {
-            return;
-        }
-
-        if (window.umami) {
-            window.umami.track();
-
-            return;
-        }
-
-        if (document.getElementById(SCRIPT_ID)) {
+        if (!analytics || document.getElementById(SCRIPT_ID)) {
             return;
         }
 
         const script = document.createElement('script');
         script.id = SCRIPT_ID;
         script.defer = true;
-        script.src = analytics.scriptUrl;
-        script.dataset.websiteId = analytics.websiteId;
-        script.dataset.autoTrack = 'false';
-        script.dataset.doNotTrack = 'true';
-        script.addEventListener('load', () => window.umami?.track());
+        script.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+        script.dataset.cfBeacon = JSON.stringify({
+            token: analytics.token,
+            spa: false,
+        });
         document.head.appendChild(script);
     });
 }

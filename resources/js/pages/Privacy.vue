@@ -174,10 +174,9 @@ const name = usePage().props.name;
             </p>
             <p>
                 On our public website pages (not booking pages or the app after
-                you sign in) we count visits with Umami, a privacy-friendly
-                analytics tool we host ourselves. It sets no cookies, does not
-                identify you, honours your browser's Do Not Track setting and
-                shares nothing with third parties.
+                you sign in) we count visits with Cloudflare Web Analytics. It
+                sets no cookies, does not build a profile of you and is not used
+                for advertising.
             </p>
         </section>
 

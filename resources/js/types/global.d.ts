@@ -36,8 +36,8 @@ declare module '@inertiajs/core' {
             announcement: { id: number; title: string; body: string } | null;
             /** Set on the public demo's booking pages. */
             isDemoBookingPage: boolean;
-            /** Umami settings, for signed-out visitors when configured. */
-            analytics: { scriptUrl: string; websiteId: string } | null;
+            /** Cloudflare Web Analytics token, for signed-out visitors when configured. */
+            analytics: { token: string } | null;
             [key: string]: unknown;
         };
     }
