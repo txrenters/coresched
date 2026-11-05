@@ -4,10 +4,14 @@ import { computed } from 'vue';
 import AppearanceToggle from '@/components/AppearanceToggle.vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { Button } from '@/components/ui/button';
+import { usePublicAnalytics } from '@/composables/usePublicAnalytics';
 import { dashboard, home, login, pricing } from '@/routes';
 import { store as startDemo } from '@/routes/demo';
 
 const page = usePage();
+
+// Every public marketing page has this header, so this is where visits are counted.
+usePublicAnalytics();
 
 const name = page.props.name;
 

@@ -71,6 +71,16 @@ return [
         'base_url' => env('TWILIO_API_URL', 'https://api.twilio.com/2010-04-01'),
     ],
 
+    /*
+     * Self-hosted Umami counts visits to the public marketing pages only
+     * (home, pricing, legal). It is cookieless, so no consent banner. Blank
+     * either key and nothing is loaded. See usePublicAnalytics.ts.
+     */
+    'umami' => [
+        'script_url' => env('UMAMI_SCRIPT_URL'),
+        'website_id' => env('UMAMI_WEBSITE_ID'),
+    ],
+
     'microsoft' => [
         'client_id' => env('MICROSOFT_CLIENT_ID'),
         'client_secret' => env('MICROSOFT_CLIENT_SECRET'),

@@ -9,7 +9,7 @@ const name = usePage().props.name;
 <template>
     <Head title="Privacy Policy" />
 
-    <LegalDocument title="Privacy Policy" updated="November 4, 2026">
+    <LegalDocument title="Privacy Policy" updated="November 6, 2026">
         <section>
             <p>
                 This Privacy Policy explains what information {{ name }}
@@ -171,6 +171,13 @@ const name = usePage().props.name;
                 forms against forgery and remember settings such as light or
                 dark mode. We do not use advertising or cross-site tracking
                 cookies.
+            </p>
+            <p>
+                On our public website pages (not booking pages or the app after
+                you sign in) we count visits with Umami, a privacy-friendly
+                analytics tool we host ourselves. It sets no cookies, does not
+                identify you, honours your browser's Do Not Track setting and
+                shares nothing with third parties.
             </p>
         </section>
 
