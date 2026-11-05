@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\PageVisit;
 use App\Models\TeamInvitation;
 use Illuminate\Support\Facades\Schedule;
 
@@ -41,3 +42,11 @@ Schedule::command('demo:reset')
     ->timezone('America/Chicago')
     ->withoutOverlapping()
     ->description('Rebuild the public demo organization');
+
+/*
+ * Website traffic counts are kept 13 months (PageVisit::prunable), enough
+ * for a year-on-year look at the admin dashboard.
+ */
+Schedule::command('model:prune', ['--model' => [PageVisit::class]])
+    ->daily()
+    ->description('Prune old website traffic counts');
