@@ -225,19 +225,25 @@ class PlatformAnalytics
      */
     protected function ranked(Builder $query, string $column, ?callable $label = null): array
     {
-        return $query
-            ->selectRaw("{$column} as name, COUNT(*) as aggregate")
-            ->groupBy('name')
+        $counts = $query->toBase()
+            ->select($column)
+            ->selectRaw('COUNT(*) as aggregate')
+            ->groupBy($column)
             ->orderByDesc('aggregate')
-            ->orderBy('name')
+            ->orderBy($column)
             ->limit(5)
-            ->get()
-            ->map(fn ($row) => [
-                'label' => $label ? $label((string) $row->name) : (string) $row->name,
-                'value' => (int) $row->aggregate,
-            ])
-            ->values()
-            ->all();
+            ->pluck('aggregate', $column);
+
+        $rows = [];
+
+        foreach ($counts as $name => $count) {
+            $rows[] = [
+                'label' => $label ? $label((string) $name) : (string) $name,
+                'value' => (int) $count,
+            ];
+        }
+
+        return $rows;
     }
 
     /**
