@@ -56,3 +56,13 @@ test('booking mail keeps the scheduling address', function () {
 
     expect(sentFromAddresses()->all())->toBe(['scheduling@texasrenters.com']);
 });
+
+test('an account email is headed with the app icon and name', function () {
+    $user = User::factory()->create();
+
+    $html = (string) (new ResetPassword('token'))->toMail($user)->render();
+
+    expect($html)
+        ->toContain('<img src="'.asset('apple-touch-icon.png').'"')
+        ->toMatch('/<td class="header"[^>]*>\s*<a [^>]+>\s*<img [^>]+><span[^>]*>'.preg_quote(config('app.name'), '/').'<\/span>/');
+});
