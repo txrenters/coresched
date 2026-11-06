@@ -147,6 +147,7 @@ trait HasTeams
                 canRemoveMember: true,
                 canCreateInvitation: true,
                 canCancelInvitation: true,
+                canManageApiKeys: true,
             );
         }
 
@@ -160,6 +161,7 @@ trait HasTeams
             canRemoveMember: $role?->hasPermission(TeamPermission::RemoveMember) ?? false,
             canCreateInvitation: $role?->hasPermission(TeamPermission::CreateInvitation) ?? false,
             canCancelInvitation: $role?->hasPermission(TeamPermission::CancelInvitation) ?? false,
+            canManageApiKeys: $role?->hasPermission(TeamPermission::ManageApiKeys) ?? false,
         );
     }
 

@@ -129,6 +129,10 @@ class TeamController extends Controller
 
     /**
      * Switch the user's current team.
+     *
+     * Goes back to where they were, unless they asked for the organization's
+     * API keys, which only ever show the current organization. The destination
+     * is a fixed name rather than a URL, so it cannot redirect anywhere else.
      */
     public function switch(Request $request, Team $team): RedirectResponse
     {
@@ -139,7 +143,7 @@ class TeamController extends Controller
 
         $request->user()->switchTeam($team);
 
-        return back();
+        return $request->query('to') === 'api-keys' ? to_route('api-keys.index') : back();
     }
 
     /**

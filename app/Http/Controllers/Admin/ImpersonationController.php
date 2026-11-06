@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\User;
-use App\Services\Activity\ActivityLogger;
 use App\Support\Impersonation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,16 +16,16 @@ use Inertia\Inertia;
  * Lets a super admin see the app exactly as one of an organization's members
  * does, and return to their own account afterwards.
  *
- * Both ends are written to the organization's activity log, under the super
- * admin's name. While it lasts, RestrictWhileImpersonating keeps the member's
- * own account security (password, email, 2FA, passkeys, API keys) out of reach.
+ * Neither end is written to the organization's activity log. While it lasts,
+ * RestrictWhileImpersonating keeps the member's own account security (password,
+ * email, 2FA, passkeys, changing API keys) out of reach.
  */
 class ImpersonationController extends Controller
 {
     /**
      * Sign in as a member of the organization.
      */
-    public function store(Request $request, Team $team, User $user, ActivityLogger $activity): RedirectResponse
+    public function store(Request $request, Team $team, User $user): RedirectResponse
     {
         Gate::authorize('accessAdminConsole');
 
@@ -45,14 +44,6 @@ class ImpersonationController extends Controller
 
         abort_if($user->isSuperAdmin() || $user->is($admin), 403);
 
-        $activity->record(
-            $team,
-            'impersonation.started',
-            __(':admin signed in as :member', ['admin' => $admin->name, 'member' => $user->name]),
-            $user,
-            actor: $admin,
-        );
-
         Auth::guard('web')->login($user);
 
         $request->session()->regenerate();
@@ -65,24 +56,11 @@ class ImpersonationController extends Controller
     /**
      * Return to the super admin's own account.
      */
-    public function destroy(Request $request, ActivityLogger $activity): RedirectResponse
+    public function destroy(Request $request): RedirectResponse
     {
         $admin = Impersonation::impersonator($request);
 
         abort_if($admin === null, 403);
-
-        $member = $request->user();
-        $team = Team::query()->whereKey($request->session()->get(Impersonation::TEAM_KEY))->first();
-
-        if ($team !== null) {
-            $activity->record(
-                $team,
-                'impersonation.ended',
-                __(':admin stopped signing in as :member', ['admin' => $admin->name, 'member' => $member->name]),
-                $member,
-                actor: $admin,
-            );
-        }
 
         Auth::guard('web')->login($admin);
 

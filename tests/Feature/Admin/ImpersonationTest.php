@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\TeamRole;
+use App\Models\ApiKey;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\Impersonation;
@@ -25,11 +26,7 @@ test('a super admin signs in as a member and lands in that organization', functi
     $this->assertAuthenticatedAs($this->member);
     expect(session(Impersonation::IMPERSONATOR_KEY))->toBe($this->operator->id);
 
-    $this->assertDatabaseHas('activity_logs', [
-        'team_id' => $this->team->id,
-        'event' => 'impersonation.started',
-        'user_id' => $this->operator->id,
-    ]);
+    $this->assertDatabaseMissing('activity_logs', ['team_id' => $this->team->id, 'event' => 'impersonation.started']);
 });
 
 test('the banner knows who to return to', function () {
@@ -47,7 +44,7 @@ test('returning puts the super admin back in their own account', function () {
 
     $this->assertAuthenticatedAs($this->operator);
     expect(session()->has(Impersonation::IMPERSONATOR_KEY))->toBeFalse();
-    $this->assertDatabaseHas('activity_logs', ['team_id' => $this->team->id, 'event' => 'impersonation.ended']);
+    $this->assertDatabaseMissing('activity_logs', ['team_id' => $this->team->id, 'event' => 'impersonation.ended']);
 });
 
 test('a session that is not an impersonation cannot return anywhere', function () {
@@ -100,6 +97,32 @@ test('the members account security is locked while signed in as them', function 
     'account deletion' => ['delete', 'profile.destroy'],
     'two-factor' => ['post', 'two-factor.enable'],
     'api keys' => ['post', 'api-keys.store'],
+]);
+
+test('their organization API keys can be viewed while signed in as them', function () {
+    ApiKey::issue('Client portal', $this->member, $this->team);
+    $this->member->switchTeam($this->team);
+    startImpersonating($this);
+
+    $this->get(route('api-keys.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('keys', 1)->where('keys.0.name', 'Client portal'));
+});
+
+test('their organization API keys cannot be changed while signed in as them', function (string $method, string $routeName) {
+    ['key' => $key] = ApiKey::issue('Client portal', $this->member, $this->team);
+    $this->member->switchTeam($this->team);
+    startImpersonating($this);
+
+    $this->{$method}(route($routeName, $key), ['name' => 'Renamed'])->assertForbidden();
+
+    expect($key->fresh())
+        ->name->toBe('Client portal')
+        ->revoked_at->toBeNull();
+})->with([
+    'edit' => ['patch', 'api-keys.update'],
+    'revoke' => ['delete', 'api-keys.destroy'],
+    'delete' => ['delete', 'api-keys.forget'],
 ]);
 
 test('their password is untouched when a change is attempted', function () {
