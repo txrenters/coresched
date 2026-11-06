@@ -69,15 +69,20 @@ class ActivityLogger
      */
     private function attributeToImpersonator(ActivityLog $entry): void
     {
-        $impersonator = Impersonation::impersonator(Request::instance());
+        $request = Request::instance();
 
-        if ($impersonator === null) {
+        if (! Impersonation::active($request)) {
             return;
         }
 
+        // Written even if they have since lost super admin: that is exactly
+        // the session whose actions most need a name against them.
+        $impersonator = Impersonation::impersonator($request);
+
         Log::channel('impersonation')->info('A super admin acted while signed in as a member.', [
-            'admin_id' => $impersonator->id,
-            'admin_name' => $impersonator->name,
+            'admin_id' => $request->session()->get(Impersonation::IMPERSONATOR_KEY),
+            'admin_name' => $impersonator?->name,
+            'admin_still_super_admin' => $impersonator !== null,
             'member_id' => $entry->user_id,
             'member_name' => $entry->actor_name,
             'team_id' => $entry->team_id,

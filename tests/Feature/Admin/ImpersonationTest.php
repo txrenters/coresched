@@ -99,6 +99,23 @@ test('an action taken while signed in as a member names the super admin only in 
         ->and($log)->toContain('"activity_log_id":'.$entry->id);
 });
 
+test('an action is still attributed after the super admin loses that role mid-session', function () {
+    $logPath = captureImpersonationLog();
+    $this->member->switchTeam($this->team);
+    startImpersonating($this);
+    $this->operator->forceFill(['is_super_admin' => false])->save();
+
+    createEventType($this);
+
+    $log = file_get_contents($logPath);
+    unlink($logPath);
+
+    expect($log)
+        ->toContain('A super admin acted while signed in as a member.')
+        ->toContain('"admin_id":'.$this->operator->id)
+        ->toContain('"admin_still_super_admin":false');
+});
+
 test('a member acting for themselves is not written to the impersonation log', function () {
     $logPath = captureImpersonationLog();
     $this->member->switchTeam($this->team);
