@@ -37,7 +37,7 @@ services:
     image: ${APP_SLUG:-tx-bookings}/app:${APP_VERSION:-latest}
     restart: unless-stopped
     # Named .env.docker rather than .env so it cannot be confused with the
-    # compose interpolation file that sits beside it in /opt/coresched.
+    # compose interpolation file that sits beside it in /opt/tx-bookings.
     env_file: .env.docker
     extra_hosts:
       # Reaches host services from the container. Required on Linux, where

@@ -13,6 +13,6 @@ Migrated 2026-09-22 from bookings.texasrenters.com. The old vhost on the VPS is 
 
 Never serve the app on both names. APP_URL is baked into the JS bundle at build time (ARG APP_URL in the Dockerfile, fed from APP_HOST in the server's compose .env), so a second hostname hands the browser a bundle whose URLs all point at the other origin and every form becomes a cross-origin post.
 
-To change the hostname again, the order is: edit APP_HOST in /opt/coresched/.env AND APP_URL in .env.docker (both, they must match), then certbot + nginx, then bin/deploy.sh to REBUILD. Editing the env files without a rebuild leaves the old host in the bundle.
+To change the hostname again, the order is: edit APP_HOST in /opt/tx-bookings/.env AND APP_URL in .env.docker (both, they must match), then certbot + nginx, then bin/deploy.sh to REBUILD. Editing the env files without a rebuild leaves the old host in the bundle.
 
 Side effects of any such change: everyone is signed out once (SESSION_DOMAIN=null means host-only cookies), and every registered passkey is invalidated because config/fortify.php derives the WebAuthn relying_party_id from APP_URL's host. There were 0 passkeys at the time of this migration; check again before the next one.

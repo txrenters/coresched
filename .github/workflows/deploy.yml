@@ -57,10 +57,10 @@ jobs:
           rsync -a --delete \
             --exclude '.env' \
             --exclude '.env.docker' \
-            ./ /opt/coresched/
+            ./ /opt/tx-bookings/
 
       - name: Deploy
-        working-directory: /opt/coresched
+        working-directory: /opt/tx-bookings
         run: SKIP_PULL=1 bash bin/deploy.sh
 
       - name: Verify the app is serving
