@@ -305,3 +305,47 @@ test('the key list says which keys may write', function () {
             ->where('keys', fn ($keys) => collect($keys)->firstWhere('id', $key->id)['canWrite'] === true
                 && collect($keys)->firstWhere('name', 'Reader')['canWrite'] === false));
 });
+
+test('switching organization can land straight on its API keys', function () {
+    $this->actingAs($this->superAdmin)
+        ->post(route('teams.switch', ['team' => $this->org->slug, 'to' => 'api-keys']))
+        ->assertRedirect(route('api-keys.index'));
+
+    expect($this->superAdmin->fresh()->current_team_id)->toBe($this->org->id);
+});
+
+test('switching organization goes back when the destination is not API keys', function () {
+    $this->actingAs($this->superAdmin)
+        ->from(route('teams.edit', $this->org->slug))
+        ->post(route('teams.switch', ['team' => $this->org->slug, 'to' => 'https://evil.example.com']))
+        ->assertRedirect(route('teams.edit', $this->org->slug));
+});
+
+test('asking for API keys does not let an outsider switch into an organization', function () {
+    $outsider = User::factory()->create();
+
+    $this->actingAs($outsider)
+        ->post(route('teams.switch', ['team' => $this->org->slug, 'to' => 'api-keys']))
+        ->assertForbidden();
+
+    expect($outsider->fresh()->current_team_id)->not->toBe($this->org->id);
+});
+
+test('the API keys tab follows the organization on screen, not the current one', function () {
+    $otherOrganization = Team::factory()->create();
+    $otherOrganization->members()->attach($this->admin, ['role' => TeamRole::Member->value]);
+
+    $this->actingAs($this->admin)
+        ->get(route('teams.edit', $otherOrganization->slug))
+        ->assertInertia(fn ($page) => $page
+            ->where('canManageApiKeys', true)
+            ->where('permissions.canManageApiKeys', false));
+
+    $this->actingAs($this->admin)
+        ->get(route('teams.edit', $this->org->slug))
+        ->assertInertia(fn ($page) => $page->where('permissions.canManageApiKeys', true));
+
+    $this->actingAs($this->superAdmin)
+        ->get(route('teams.edit', $otherOrganization->slug))
+        ->assertInertia(fn ($page) => $page->where('permissions.canManageApiKeys', true));
+});

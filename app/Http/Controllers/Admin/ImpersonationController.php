@@ -5,28 +5,29 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\User;
-use App\Services\Activity\ActivityLogger;
 use App\Support\Impersonation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 /**
  * Lets a super admin see the app exactly as one of an organization's members
  * does, and return to their own account afterwards.
  *
- * Both ends are written to the organization's activity log, under the super
- * admin's name. While it lasts, RestrictWhileImpersonating keeps the member's
- * own account security (password, email, 2FA, passkeys, API keys) out of reach.
+ * Both ends are written to the impersonation log, which only super admins can
+ * read, and never to the organization's activity log. While it lasts,
+ * RestrictWhileImpersonating keeps the member's own account security (password,
+ * email, 2FA, passkeys, changing API keys) out of reach.
  */
 class ImpersonationController extends Controller
 {
     /**
      * Sign in as a member of the organization.
      */
-    public function store(Request $request, Team $team, User $user, ActivityLogger $activity): RedirectResponse
+    public function store(Request $request, Team $team, User $user): RedirectResponse
     {
         Gate::authorize('accessAdminConsole');
 
@@ -45,13 +46,7 @@ class ImpersonationController extends Controller
 
         abort_if($user->isSuperAdmin() || $user->is($admin), 403);
 
-        $activity->record(
-            $team,
-            'impersonation.started',
-            __(':admin signed in as :member', ['admin' => $admin->name, 'member' => $user->name]),
-            $user,
-            actor: $admin,
-        );
+        $this->audit($request, 'A super admin signed in as a member.', $admin, $user, $team->id);
 
         Auth::guard('web')->login($user);
 
@@ -65,24 +60,19 @@ class ImpersonationController extends Controller
     /**
      * Return to the super admin's own account.
      */
-    public function destroy(Request $request, ActivityLogger $activity): RedirectResponse
+    public function destroy(Request $request): RedirectResponse
     {
         $admin = Impersonation::impersonator($request);
 
         abort_if($admin === null, 403);
 
-        $member = $request->user();
-        $team = Team::query()->whereKey($request->session()->get(Impersonation::TEAM_KEY))->first();
-
-        if ($team !== null) {
-            $activity->record(
-                $team,
-                'impersonation.ended',
-                __(':admin stopped signing in as :member', ['admin' => $admin->name, 'member' => $member->name]),
-                $member,
-                actor: $admin,
-            );
-        }
+        $this->audit(
+            $request,
+            'A super admin stopped signing in as a member.',
+            $admin,
+            $request->user(),
+            $request->session()->get(Impersonation::TEAM_KEY),
+        );
 
         Auth::guard('web')->login($admin);
 
@@ -92,5 +82,20 @@ class ImpersonationController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Back to your own account.')]);
 
         return redirect()->route('admin.organizations.index');
+    }
+
+    /**
+     * Write one end of an impersonation to the super admins' log.
+     */
+    private function audit(Request $request, string $message, User $admin, User $member, ?int $teamId): void
+    {
+        Log::channel('impersonation')->info($message, [
+            'admin_id' => $admin->id,
+            'admin_name' => $admin->name,
+            'member_id' => $member->id,
+            'member_name' => $member->name,
+            'team_id' => $teamId,
+            'ip_address' => $request->ip(),
+        ]);
     }
 }

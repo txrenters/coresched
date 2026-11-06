@@ -12,8 +12,9 @@ class RestrictWhileImpersonating
     /**
      * Routes that belong to the member's own account rather than to their
      * work, which a super admin signed in as them must never use: changing
-     * their password, email or 2FA, registering a passkey, minting an API key
-     * in their name, deleting their account or leaving the organization.
+     * their password, email or 2FA, registering a passkey, minting or changing
+     * an API key in their name, deleting their account or leaving the
+     * organization. Viewing the keys is fine: the list never holds a secret.
      *
      * Matched by route name, including Fortify's and the passkey package's.
      *
@@ -26,7 +27,10 @@ class RestrictWhileImpersonating
         'password.confirm.store',
         'two-factor.*',
         'passkey.*',
-        'api-keys.*',
+        'api-keys.store',
+        'api-keys.update',
+        'api-keys.destroy',
+        'api-keys.forget',
         'teams.leave',
     ];
 

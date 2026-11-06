@@ -11,9 +11,9 @@ import { index as apiKeys } from '@/routes/api-keys';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
-import { edit as editTeam } from '@/routes/teams';
+import { edit as editTeam, switchMethod } from '@/routes/teams';
 import { index as teamMembers } from '@/routes/teams/members';
-import type { NavItem } from '@/types';
+import type { NavItem, TeamPermissions } from '@/types';
 
 const page = usePage();
 
@@ -34,6 +34,16 @@ const organization = computed(
         page.props.currentTeam,
 );
 
+/**
+ * Whether the organization on screen lets this user manage its keys. Its pages
+ * say so themselves; the shared prop only speaks for the current organization.
+ */
+const canManageOrganizationApiKeys = computed(
+    () =>
+        (page.props.permissions as TeamPermissions | undefined)
+            ?.canManageApiKeys ?? page.props.canManageApiKeys,
+);
+
 const organizationTabs = computed<NavItem[]>(() => {
     if (!organization.value) {
         return [];
@@ -42,14 +52,29 @@ const organizationTabs = computed<NavItem[]>(() => {
     return [
         { title: 'Organization', href: editTeam(organization.value.slug) },
         { title: 'Members', href: teamMembers(organization.value.slug) },
-        // API keys belong to the current organization, so the tab is only
-        // offered while looking at that one.
-        ...(page.props.canManageApiKeys &&
-        organization.value.slug === page.props.currentTeam?.slug
-            ? [{ title: 'API keys', href: apiKeys() }]
+        // API keys belong to the current organization, so from any other one
+        // the tab switches to it on the way there.
+        ...(canManageOrganizationApiKeys.value
+            ? [
+                  {
+                      title: 'API keys',
+                      href:
+                          organization.value.slug ===
+                          page.props.currentTeam?.slug
+                              ? apiKeys()
+                              : switchMethod(organization.value.slug, {
+                                    query: { to: 'api-keys' },
+                                }),
+                  },
+              ]
             : []),
     ];
 });
+
+/** A tab that switches organization posts, which an anchor cannot do. */
+function isPostTab(item: NavItem): boolean {
+    return typeof item.href === 'object' && item.href.method === 'post';
+}
 
 const accountNavItems: NavItem[] = [
     {
@@ -95,6 +120,7 @@ const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
                     v-for="item in organizationTabs"
                     :key="toUrl(item.href)"
                     :href="item.href"
+                    :as="isPostTab(item) ? 'button' : 'a'"
                     :class="[
                         '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
                         isCurrentUrl(item.href)
