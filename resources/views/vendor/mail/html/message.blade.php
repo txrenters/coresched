@@ -1,15 +1,24 @@
 {{--
     $organization is set on booking emails (BookingMailPresenter::withSender)
-    so the header carries the organization's own name. Account emails have no
-    organization and are headed with the app's name. The footer is always the
-    app's own brand.
+    so the header carries the organization's own logo (when it has uploaded
+    one) beside its name. Account emails have no
+    organization and are headed with the app's icon and name. The icon is the
+    PNG touch icon on its own navy tile, so it reads on light and dark inboxes
+    alike (most clients do not render SVG). The footer is always the app's
+    own brand.
 --}}
 @props(['organization' => null])
 <x-mail::layout>
 {{-- Header --}}
 <x-slot:header>
 <x-mail::header :url="$organization['url'] ?? config('app.url')">
-{{ $organization['name'] ?? config('app.name') }}
+@if ($organization['logoUrl'] ?? null)
+<img src="{{ $organization['logoUrl'] }}" height="40" alt="" style="height: 40px; max-height: 40px; width: auto; max-width: 160px; border: 0; vertical-align: middle; margin-right: 10px;"><span style="vertical-align: middle;">{{ $organization['name'] }}</span>
+@elseif ($organization)
+{{ $organization['name'] }}
+@else
+<img src="{{ asset('apple-touch-icon.png') }}" width="32" height="32" alt="" style="width: 32px; height: 32px; border: 0; border-radius: 7px; vertical-align: middle; margin-right: 8px;"><span style="vertical-align: middle;">{{ config('app.name') }}</span>
+@endif
 </x-mail::header>
 </x-slot:header>
 

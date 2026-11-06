@@ -206,7 +206,7 @@ class BookingMailPresenter
     /**
      * Get the organization the email is sent on behalf of, for its header.
      *
-     * @return array{name: string, url: string}
+     * @return array{name: string, logoUrl: string|null, url: string}
      */
     public function organization(): array
     {
@@ -214,6 +214,7 @@ class BookingMailPresenter
 
         return [
             'name' => $team->name,
+            'logoUrl' => $team->logoUrl(),
             'url' => $team->slug === null ? config('app.url') : route('book.page', ['page' => $team->slug]),
         ];
     }

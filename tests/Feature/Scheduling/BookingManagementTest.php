@@ -175,7 +175,7 @@ test('a reply to a canceled or declined email reaches the other party too', func
     'declined' => BookingDeclined::class,
 ]);
 
-test('a booking email is headed with the organizations name, not its logo, and signed with the app brand', function () {
+test('a booking email is headed with the organizations logo beside its name, and signed with the app brand', function () {
     $this->team->forceFill(['name' => 'Acme Leasing', 'logo_path' => 'team-logos/acme.png'])->save();
     $booking = bookingFor($this->host, $this->eventType);
 
@@ -184,8 +184,7 @@ test('a booking email is headed with the organizations name, not its logo, and s
         ->render();
 
     expect($html)
-        ->toMatch('/<td class="header"[^>]*>\s*<a [^>]+>\s*Acme Leasing\s*<\/a>/')
-        ->not->toContain($this->team->fresh()->logoUrl())
+        ->toMatch('/<td class="header"[^>]*>\s*<a [^>]+>\s*<img src="'.preg_quote($this->team->fresh()->logoUrl(), '/').'"[^>]*><span[^>]*>Acme Leasing<\/span>/')
         ->toContain('href="'.route('book.page', ['page' => $this->team->fresh()->slug]).'"')
         ->toContain('© '.date('Y').' '.config('app.name').'.')
         ->not->toContain('© '.date('Y').' Acme Leasing.');
