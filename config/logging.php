@@ -65,6 +65,19 @@ return [
             'replace_placeholders' => true,
         ],
 
+        /*
+         * Who signed in as whom, for super admins only (the Logs page). It
+         * stays out of the organization's activity log, and has its own level
+         * and retention so production log settings cannot lose the trail.
+         */
+        'impersonation' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/impersonation.log'),
+            'level' => 'info',
+            'max_files' => 365,
+            'replace_placeholders' => true,
+        ],
+
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),

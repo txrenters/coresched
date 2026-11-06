@@ -29,6 +29,26 @@ test('a super admin signs in as a member and lands in that organization', functi
     $this->assertDatabaseMissing('activity_logs', ['team_id' => $this->team->id, 'event' => 'impersonation.started']);
 });
 
+test('both ends are logged for super admins and never for the organization', function () {
+    $logPath = tempnam(sys_get_temp_dir(), 'impersonation');
+    config(['logging.channels.impersonation' => ['driver' => 'single', 'path' => $logPath]]);
+
+    startImpersonating($this);
+    $this->delete(route('impersonation.destroy'));
+
+    $log = file_get_contents($logPath);
+    unlink($logPath);
+
+    expect($log)
+        ->toContain('A super admin signed in as a member.')
+        ->toContain('A super admin stopped signing in as a member.')
+        ->toContain('"admin_id":'.$this->operator->id)
+        ->toContain('"member_id":'.$this->member->id)
+        ->toContain('"team_id":'.$this->team->id);
+
+    $this->assertDatabaseMissing('activity_logs', ['team_id' => $this->team->id, 'user_id' => $this->operator->id]);
+});
+
 test('the banner knows who to return to', function () {
     startImpersonating($this);
 
