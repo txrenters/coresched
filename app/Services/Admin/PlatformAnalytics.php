@@ -5,6 +5,7 @@ namespace App\Services\Admin;
 use App\Enums\SalesInquiryStatus;
 use App\Enums\TeamPlan;
 use App\Models\Booking;
+use App\Models\PageVisit;
 use App\Models\SalesInquiry;
 use App\Models\Team;
 use App\Models\User;
@@ -25,6 +26,18 @@ use Illuminate\Support\Collection;
  */
 class PlatformAnalytics
 {
+    /**
+     * Readable names for the marketing pages RecordPageVisit counts.
+     *
+     * @var array<string, string>
+     */
+    protected const PAGE_LABELS = [
+        '/' => 'Home',
+        '/pricing' => 'Pricing',
+        '/termsofservice' => 'Terms of service',
+        '/privacy' => 'Privacy policy',
+    ];
+
     public function __construct(protected ?CarbonImmutable $now = null)
     {
         $this->now ??= CarbonImmutable::now();
@@ -43,6 +56,43 @@ class PlatformAnalytics
             'organizationsByMonth' => $this->organizationsByMonth(),
             'planMix' => $this->planMix(),
             'setupFunnel' => $this->setupFunnel(),
+            'traffic' => $this->traffic(),
+        ];
+    }
+
+    /**
+     * Visits to the public marketing pages, the last 30 days.
+     *
+     * A visitor is one visitor_hash, which changes every day: "visitors" over
+     * 30 days is the sum of each day's unique visitors, not unique people.
+     *
+     * @return array{visitorsLast30Days: int, visitorsPrevious30Days: int, pageViewsLast30Days: int, visitorsByDay: list<array{label: string, value: int}>, topPages: list<array{label: string, value: int}>, topReferrers: list<array{label: string, value: int}>, devices: list<array{label: string, value: int}>}
+     */
+    public function traffic(): array
+    {
+        $start = $this->now->startOfDay()->subDays(29);
+        $previousStart = $start->subDays(30);
+
+        $visitorsPerDay = PageVisit::query()
+            ->where('created_at', '>=', $previousStart)
+            ->selectRaw('DATE(created_at) as day, COUNT(DISTINCT visitor_hash) as aggregate')
+            ->groupBy('day')
+            ->pluck('aggregate', 'day')
+            ->map(fn ($count) => (int) $count);
+
+        $recent = fn () => PageVisit::query()->where('created_at', '>=', $start);
+
+        return [
+            'visitorsLast30Days' => $this->sumBetween($visitorsPerDay, $start, $this->now->addDay()),
+            'visitorsPrevious30Days' => $this->sumBetween($visitorsPerDay, $previousStart, $start),
+            'pageViewsLast30Days' => $recent()->count(),
+            'visitorsByDay' => array_map(fn (int $offset) => [
+                'label' => $start->addDays($offset)->format('M j'),
+                'value' => $visitorsPerDay[$start->addDays($offset)->toDateString()] ?? 0,
+            ], range(0, 29)),
+            'topPages' => $this->ranked($recent()->whereNotNull('path'), 'path', fn (string $path) => self::PAGE_LABELS[$path] ?? $path),
+            'topReferrers' => $this->ranked($recent()->whereNotNull('referrer_host'), 'referrer_host'),
+            'devices' => $this->ranked($recent(), 'device', fn (string $device) => ucfirst($device)),
         ];
     }
 
@@ -164,6 +214,36 @@ class PlatformAnalytics
         // Only the demo is taken out: bookings of a deleted real organization
         // still count, as they always have.
         return Booking::query()->whereNotIn('team_id', Team::withTrashed()->where('is_demo', true)->select('id'));
+    }
+
+    /**
+     * The five most common values of a column, most first.
+     *
+     * @param  Builder<PageVisit>  $query
+     * @param  (callable(string): string)|null  $label
+     * @return list<array{label: string, value: int}>
+     */
+    protected function ranked(Builder $query, string $column, ?callable $label = null): array
+    {
+        $counts = $query->toBase()
+            ->select($column)
+            ->selectRaw('COUNT(*) as aggregate')
+            ->groupBy($column)
+            ->orderByDesc('aggregate')
+            ->orderBy($column)
+            ->limit(5)
+            ->pluck('aggregate', $column);
+
+        $rows = [];
+
+        foreach ($counts as $name => $count) {
+            $rows[] = [
+                'label' => $label ? $label((string) $name) : (string) $name,
+                'value' => (int) $count,
+            ];
+        }
+
+        return $rows;
     }
 
     /**

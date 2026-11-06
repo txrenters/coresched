@@ -15,12 +15,16 @@ use App\Http\Controllers\Settings\OrganizationDirectoryController;
 use App\Http\Controllers\Settings\UserDirectoryController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Middleware\EnsureTeamMembership;
+use App\Http\Middleware\RecordPageVisit;
 use Illuminate\Support\Facades\Route;
 
-Route::inertia('/', 'Welcome')->name('home');
-Route::inertia('pricing', 'Pricing')->name('pricing');
-Route::inertia('termsofservice', 'Terms')->name('terms');
-Route::inertia('privacy', 'Privacy')->name('privacy');
+// The public marketing pages; visits are counted for the admin dashboard.
+Route::middleware(RecordPageVisit::class)->group(function () {
+    Route::inertia('/', 'Welcome')->name('home');
+    Route::inertia('pricing', 'Pricing')->name('pricing');
+    Route::inertia('termsofservice', 'Terms')->name('terms');
+    Route::inertia('privacy', 'Privacy')->name('privacy');
+});
 Route::post('contact-sales', [ContactSalesController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('contact-sales.store');
