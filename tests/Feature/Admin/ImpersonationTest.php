@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\TeamRole;
+use App\Models\ActivityLog;
 use App\Models\ApiKey;
 use App\Models\Team;
 use App\Models\User;
@@ -29,9 +30,37 @@ test('a super admin signs in as a member and lands in that organization', functi
     $this->assertDatabaseMissing('activity_logs', ['team_id' => $this->team->id, 'event' => 'impersonation.started']);
 });
 
-test('both ends are logged for super admins and never for the organization', function () {
+/** Send the impersonation log to a temporary file, and return its path. */
+function captureImpersonationLog(): string
+{
     $logPath = tempnam(sys_get_temp_dir(), 'impersonation');
     config(['logging.channels.impersonation' => ['driver' => 'single', 'path' => $logPath]]);
+
+    return $logPath;
+}
+
+/** Create an event type through the app, which the activity log records. */
+function createEventType(object $test): void
+{
+    $test->post(route('scheduling.store', ['current_team' => $test->team->slug]), [
+        'name' => 'Property Tour',
+        'slug' => 'property-tour',
+        'kind' => 'one_on_one',
+        'duration_minutes' => 30,
+        'buffer_before_minutes' => 0,
+        'buffer_after_minutes' => 0,
+        'seats_per_slot' => 1,
+        'date_range_type' => 'rolling_days',
+        'rolling_days' => 60,
+        'location_type' => 'custom_link',
+        'location_detail' => 'https://example.com/room',
+        'is_active' => true,
+        'is_hidden' => false,
+    ])->assertRedirect();
+}
+
+test('both ends are logged for super admins and never for the organization', function () {
+    $logPath = captureImpersonationLog();
 
     startImpersonating($this);
     $this->delete(route('impersonation.destroy'));
@@ -47,6 +76,41 @@ test('both ends are logged for super admins and never for the organization', fun
         ->toContain('"team_id":'.$this->team->id);
 
     $this->assertDatabaseMissing('activity_logs', ['team_id' => $this->team->id, 'user_id' => $this->operator->id]);
+});
+
+test('an action taken while signed in as a member names the super admin only in their log', function () {
+    $logPath = captureImpersonationLog();
+    $this->member->switchTeam($this->team);
+    startImpersonating($this);
+
+    createEventType($this);
+
+    $log = file_get_contents($logPath);
+    unlink($logPath);
+
+    $entry = ActivityLog::query()->where('event', 'event_type.created')->sole();
+
+    expect($entry->user_id)->toBe($this->member->id)
+        ->and($entry->actor_name)->toBe($this->member->name)
+        ->and(json_encode($entry->properties))->not->toContain($this->operator->name)
+        ->and($log)->toContain('A super admin acted while signed in as a member.')
+        ->and($log)->toContain('"admin_id":'.$this->operator->id)
+        ->and($log)->toContain('"member_id":'.$this->member->id)
+        ->and($log)->toContain('"activity_log_id":'.$entry->id);
+});
+
+test('a member acting for themselves is not written to the impersonation log', function () {
+    $logPath = captureImpersonationLog();
+    $this->member->switchTeam($this->team);
+    $this->actingAs($this->member);
+
+    createEventType($this);
+
+    $log = file_get_contents($logPath);
+    unlink($logPath);
+
+    expect(ActivityLog::query()->where('event', 'event_type.created')->exists())->toBeTrue()
+        ->and($log)->toBe('');
 });
 
 test('the banner knows who to return to', function () {
