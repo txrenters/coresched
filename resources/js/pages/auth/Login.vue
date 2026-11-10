@@ -26,6 +26,7 @@ defineProps<{
     status?: string;
     canResetPassword: boolean;
     teamInvitation?: TeamInvitationContext | null;
+    portalEnabled?: boolean;
 }>();
 </script>
 
@@ -44,6 +45,18 @@ defineProps<{
         :invitation="teamInvitation"
         action="Log in"
     />
+
+    <div
+        v-if="portalEnabled && !teamInvitation"
+        class="mb-6 flex flex-col gap-3"
+    >
+        <Button as="a" href="/auth/portal/redirect" class="w-full">
+            TexasRenters staff: sign in with TR Staff Portal
+        </Button>
+        <p class="text-center text-xs text-muted-foreground">
+            Everyone else: use your email and password below.
+        </p>
+    </div>
 
     <PasskeyVerify />
 

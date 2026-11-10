@@ -12,6 +12,8 @@ use App\Http\Responses\TwoFactorLoginResponse;
 use App\Http\Responses\VerifyEmailResponse;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\PortalSso\PortalLogoutResponse;
+use App\PortalSso\StaffAccounts;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,6 +23,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
+use Laravel\Fortify\Contracts\LogoutResponse as LogoutResponseContract;
 use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse as TwoFactorLoginResponseContract;
 use Laravel\Fortify\Contracts\VerifyEmailResponse as VerifyEmailResponseContract;
@@ -40,6 +43,7 @@ class FortifyServiceProvider extends ServiceProvider
         $this->app->singleton(RegisterResponseContract::class, RegisterResponse::class);
         $this->app->singleton(TwoFactorLoginResponseContract::class, TwoFactorLoginResponse::class);
         $this->app->singleton(VerifyEmailResponseContract::class, VerifyEmailResponse::class);
+        $this->app->singleton(LogoutResponseContract::class, PortalLogoutResponse::class);
     }
 
     /**
@@ -75,6 +79,13 @@ class FortifyServiceProvider extends ServiceProvider
                 return null;
             }
 
+            // While the TR Staff Portal is on, company-email staff sign in only through it
+            // (unless the emergency switch is on). Fortify's one generic message, so the answer
+            // never reveals which addresses are staff. Customer organizations are unaffected.
+            if (StaffAccounts::mustUsePortal($user)) {
+                return null;
+            }
+
             if ($user->hasOnlyDisabledOrganizations()) {
                 throw ValidationException::withMessages([Fortify::username() => EnsureActiveOrganization::MESSAGE]);
             }
@@ -92,6 +103,7 @@ class FortifyServiceProvider extends ServiceProvider
             'canResetPassword' => Features::enabled(Features::resetPasswords()),
             'status' => $request->session()->get('status'),
             'teamInvitation' => $this->teamInvitation($request),
+            'portalEnabled' => (bool) config('portal.enabled'),
         ]));
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/ResetPassword', [

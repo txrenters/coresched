@@ -143,3 +143,4 @@ Route::middleware(['auth'])->group(function () {
 require __DIR__.'/settings.php';
 require __DIR__.'/scheduling.php';
 require __DIR__.'/booking.php';
+require __DIR__.'/portal.php';
