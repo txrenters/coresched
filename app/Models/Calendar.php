@@ -50,6 +50,24 @@ class Calendar extends Model
     }
 
     /**
+     * Determine if this is a provider's public holiday calendar, such as
+     * Outlook's "United States holidays" or Google's "Holidays in United
+     * States".
+     *
+     * Holidays are the organization's call (its advanced settings), so these
+     * calendars never block time: otherwise a holiday the organization keeps
+     * open would still close the day for anyone who subscribed to one.
+     */
+    public function isHolidayCalendar(): bool
+    {
+        if (str_contains($this->external_id, '#holiday@group.v.calendar.google.com')) {
+            return true;
+        }
+
+        return ! $this->is_primary && preg_match('/\bholidays\b/i', $this->name) === 1;
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
