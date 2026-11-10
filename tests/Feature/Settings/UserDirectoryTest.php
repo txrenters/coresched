@@ -459,3 +459,98 @@ test('an admin still cannot delete an account outright', function () {
 
     $this->assertDatabaseHas('users', ['id' => $colleague->id]);
 });
+
+test('a super admin adds a mobile number to anyone, stored ready to dial', function () {
+    $user = User::factory()->create(['phone' => null]);
+
+    $this->actingAs(superAdminUser())
+        ->patch(route('users.phone', ['user' => $user->id]), ['phone' => '(512) 555-0100'])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect($user->fresh()->phone)->toBe('+15125550100');
+});
+
+test('an admin changes and clears the mobile number of somebody in their organization', function () {
+    $team = Team::factory()->create();
+    $admin = User::factory()->create();
+    $colleague = User::factory()->create(['phone' => '+15125550100']);
+
+    $admin->teams()->detach();
+    $colleague->teams()->detach();
+    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $team->members()->attach($colleague, ['role' => TeamRole::Member->value]);
+
+    $this->actingAs($admin)
+        ->get(route('users.index'))
+        ->assertInertia(fn ($page) => $page
+            ->where('users', fn ($users) => collect($users)->firstWhere('id', $colleague->id)['canEditPhone'] === true));
+
+    $this->actingAs($admin)
+        ->patch(route('users.phone', ['user' => $colleague->id]), ['phone' => '281-555-0100'])
+        ->assertSessionHasNoErrors();
+
+    expect($colleague->fresh()->phone)->toBe('+12815550100');
+
+    $this->actingAs($admin)
+        ->patch(route('users.phone', ['user' => $colleague->id]), ['phone' => ''])
+        ->assertSessionHasNoErrors();
+
+    expect($colleague->fresh()->phone)->toBeNull();
+});
+
+test('a mobile number nobody could dial is refused', function () {
+    $user = User::factory()->create(['phone' => null]);
+
+    $this->actingAs(superAdminUser())
+        ->patch(route('users.phone', ['user' => $user->id]), ['phone' => '861-239-0100'])
+        ->assertSessionHasErrors('phone');
+
+    expect($user->fresh()->phone)->toBeNull();
+});
+
+test('an admin cannot change the mobile number of a stranger, and a member cannot change anyones', function () {
+    $team = Team::factory()->create();
+    $admin = User::factory()->create();
+    $member = User::factory()->create();
+    $stranger = User::factory()->create(['phone' => null]);
+
+    $admin->teams()->detach();
+    $member->teams()->detach();
+    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $team->members()->attach($member, ['role' => TeamRole::Member->value]);
+
+    $this->actingAs($admin)
+        ->patch(route('users.phone', ['user' => $stranger->id]), ['phone' => '512-555-0100'])
+        ->assertForbidden();
+
+    $this->actingAs($member)
+        ->patch(route('users.phone', ['user' => $admin->id]), ['phone' => '512-555-0100'])
+        ->assertForbidden();
+
+    expect($stranger->fresh()->phone)->toBeNull();
+});
+
+test('an admin cannot change the mobile number of somebody who also belongs to an organization they do not run', function () {
+    $team = Team::factory()->create();
+    $otherTeam = Team::factory()->create();
+    $admin = User::factory()->create();
+    $shared = User::factory()->create(['phone' => '+15125550100']);
+
+    $admin->teams()->detach();
+    $shared->teams()->detach();
+    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $team->members()->attach($shared, ['role' => TeamRole::Member->value]);
+    $otherTeam->members()->attach($shared, ['role' => TeamRole::Member->value]);
+
+    $this->actingAs($admin)
+        ->get(route('users.index'))
+        ->assertInertia(fn ($page) => $page
+            ->where('users', fn ($users) => collect($users)->firstWhere('id', $shared->id)['canEditPhone'] === false));
+
+    $this->actingAs($admin)
+        ->patch(route('users.phone', ['user' => $shared->id]), ['phone' => '281-555-0100'])
+        ->assertForbidden();
+
+    expect($shared->fresh()->phone)->toBe('+15125550100');
+});

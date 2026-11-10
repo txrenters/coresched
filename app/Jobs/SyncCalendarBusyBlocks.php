@@ -56,7 +56,11 @@ class SyncCalendarBusyBlocks implements ShouldQueue
             $driver = $providers->for($account);
 
             foreach ($calendars as $calendar) {
-                $busy = $driver->busyPeriods($account, [$calendar->external_id], $window);
+                // A holiday calendar is still swept below, so blocks it cached
+                // before it was recognised are cleared rather than left behind.
+                $busy = $calendar->isHolidayCalendar()
+                    ? []
+                    : $driver->busyPeriods($account, [$calendar->external_id], $window);
 
                 DB::transaction(function () use ($calendar, $account, $busy, $window) {
                     // Replace the cached window wholesale: the provider is the

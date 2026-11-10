@@ -64,6 +64,67 @@ test('google busy times are pulled into busy blocks', function () {
         ->and($account->fresh()->last_synced_at)->not->toBeNull();
 });
 
+test('holidays outlook adds to a calendar do not block it, so the organization decides', function () {
+    $account = connectedAccount($this->host, CalendarProvider::Microsoft);
+
+    Http::fake([
+        'graph.microsoft.com/*' => Http::response([
+            'value' => [
+                [
+                    'start' => ['dateTime' => '2026-10-12T00:00:00.0000000', 'timeZone' => 'UTC'],
+                    'end' => ['dateTime' => '2026-10-13T00:00:00.0000000', 'timeZone' => 'UTC'],
+                    'showAs' => 'busy',
+                    'isCancelled' => false,
+                    'categories' => ['Holiday'],
+                ],
+                [
+                    'start' => ['dateTime' => '2026-10-12T15:00:00.0000000', 'timeZone' => 'UTC'],
+                    'end' => ['dateTime' => '2026-10-12T16:00:00.0000000', 'timeZone' => 'UTC'],
+                    'showAs' => 'busy',
+                    'isCancelled' => false,
+                    'categories' => ['Blue category'],
+                ],
+            ],
+        ]),
+    ]);
+
+    (new SyncCalendarBusyBlocks($account))->handle(app(CalendarProviderManager::class));
+
+    expect(BusyBlock::count())->toBe(1)
+        ->and(BusyBlock::first()->starts_at->toIso8601String())->toBe('2026-10-12T15:00:00+00:00');
+});
+
+test('a subscribed holiday calendar never blocks time and its old blocks are cleared', function (CalendarProvider $provider, string $externalId, string $name) {
+    $account = connectedAccount($this->host, $provider);
+    $account->calendars()->update(['checks_conflicts' => false]);
+
+    $holidays = $account->calendars()->create([
+        'external_id' => $externalId,
+        'name' => $name,
+        'is_primary' => false,
+        'checks_conflicts' => true,
+        'is_write_target' => false,
+    ]);
+
+    $stale = BusyBlock::create([
+        'calendar_id' => $holidays->id,
+        'user_id' => $this->host->id,
+        'starts_at' => CarbonImmutable::parse('2026-10-12 00:00:00', 'UTC'),
+        'ends_at' => CarbonImmutable::parse('2026-10-13 00:00:00', 'UTC'),
+    ]);
+
+    Http::fake();
+
+    (new SyncCalendarBusyBlocks($account->fresh('calendars')))->handle(app(CalendarProviderManager::class));
+
+    Http::assertNothingSent();
+
+    expect(BusyBlock::find($stale->id))->toBeNull();
+})->with([
+    'outlook' => [CalendarProvider::Microsoft, 'AAMkHoliday', 'United States holidays'],
+    'google' => [CalendarProvider::Google, 'en.usa#holiday@group.v.calendar.google.com', 'Holidays in United States'],
+]);
+
 test('microsoft busy times are pulled from the calendar view', function () {
     $account = connectedAccount($this->host, CalendarProvider::Microsoft);
 

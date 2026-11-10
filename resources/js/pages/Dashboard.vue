@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, setLayoutProps } from '@inertiajs/vue3';
+import { Head, Link, router, setLayoutProps, usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CalendarClock,
@@ -66,6 +66,7 @@ const props = defineProps<{
 }>();
 
 const { teamSlug } = useCurrentTeam();
+const page = usePage();
 
 setLayoutProps({
     breadcrumbs: [
@@ -229,12 +230,16 @@ const quickActions = computed(() =>
                   href: teamSettings(teamSlug.value),
                   icon: UserPlus,
               },
-              {
-                  key: 'activity',
-                  label: 'View activity',
-                  href: activityIndex(teamSlug.value),
-                  icon: History,
-              },
+              ...(page.props.canViewActivity
+                  ? [
+                        {
+                            key: 'activity',
+                            label: 'View activity',
+                            href: activityIndex(teamSlug.value),
+                            icon: History,
+                        },
+                    ]
+                  : []),
           ]
         : [],
 );

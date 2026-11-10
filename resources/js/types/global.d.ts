@@ -28,6 +28,9 @@ declare module '@inertiajs/core' {
             canViewOrganizations: boolean;
             canManageApiKeys: boolean;
             canManageOrganization: boolean;
+            canManageGroups: boolean;
+            canManageWorkflows: boolean;
+            canViewActivity: boolean;
             /** Set while a super admin is signed in as this user. */
             impersonator: { name: string } | null;
             /** Set while a visitor is exploring the shared public demo. */

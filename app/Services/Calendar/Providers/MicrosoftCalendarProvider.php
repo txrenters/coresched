@@ -157,7 +157,7 @@ class MicrosoftCalendarProvider implements CalendarProviderContract, DetectsLeav
                 ->get(self::GRAPH_URL."/me/calendars/{$calendarId}/calendarView", [
                     'startDateTime' => $window->start->toIso8601String(),
                     'endDateTime' => $window->end->toIso8601String(),
-                    '$select' => 'start,end,showAs,isCancelled',
+                    '$select' => 'start,end,showAs,isCancelled,categories',
                     '$top' => 250,
                 ])
                 ->throw()
@@ -165,6 +165,13 @@ class MicrosoftCalendarProvider implements CalendarProviderContract, DetectsLeav
 
             foreach ($events as $event) {
                 if (($event['isCancelled'] ?? false) || ($event['showAs'] ?? 'busy') === 'free') {
+                    continue;
+                }
+
+                // Outlook files the holidays it adds to a calendar under the
+                // Holiday category. Holidays are the organization's call, made
+                // in its advanced settings, so they never block time here.
+                if ($this->isHoliday($event)) {
                     continue;
                 }
 
@@ -176,6 +183,22 @@ class MicrosoftCalendarProvider implements CalendarProviderContract, DetectsLeav
         }
 
         return $busy->values();
+    }
+
+    /**
+     * Determine if an event is a holiday Outlook added to the calendar.
+     *
+     * @param  array<string, mixed>  $event
+     */
+    protected function isHoliday(array $event): bool
+    {
+        foreach ((array) ($event['categories'] ?? []) as $category) {
+            if (is_string($category) && in_array(strtolower(trim($category)), ['holiday', 'holidays'], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

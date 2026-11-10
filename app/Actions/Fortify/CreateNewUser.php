@@ -2,7 +2,6 @@
 
 namespace App\Actions\Fortify;
 
-use App\Actions\Scheduling\ApplyDefaultHolidays;
 use App\Actions\Scheduling\CreateDefaultAvailability;
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
@@ -19,7 +18,6 @@ class CreateNewUser implements CreatesNewUsers
 
     public function __construct(
         private CreateDefaultAvailability $createDefaultAvailability,
-        private ApplyDefaultHolidays $applyDefaultHolidays,
     ) {
         //
     }
@@ -92,7 +90,6 @@ class CreateNewUser implements CreatesNewUsers
             }
 
             $this->createDefaultAvailability->handle($user);
-            $this->applyDefaultHolidays->handle($user);
 
             return $user;
         });

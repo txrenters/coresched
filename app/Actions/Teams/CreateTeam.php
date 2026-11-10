@@ -2,6 +2,7 @@
 
 namespace App\Actions\Teams;
 
+use App\Actions\Scheduling\ApplyDefaultHolidays;
 use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
@@ -9,6 +10,11 @@ use Illuminate\Support\Facades\DB;
 
 class CreateTeam
 {
+    public function __construct(private ApplyDefaultHolidays $applyDefaultHolidays)
+    {
+        //
+    }
+
     /**
      * Create a new team and add the user as its admin.
      *
@@ -22,6 +28,8 @@ class CreateTeam
     {
         return DB::transaction(function () use ($user, $name) {
             $team = Team::create(['name' => $name]);
+
+            $this->applyDefaultHolidays->handle($team);
 
             if ($user->isSuperAdmin()) {
                 return $team;

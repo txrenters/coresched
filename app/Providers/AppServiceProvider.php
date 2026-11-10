@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Enums\TeamPermission;
 use App\Enums\TeamRole;
+use App\Models\Team;
 use App\Models\User;
 use App\Services\Mail\MicrosoftGraphTransport;
 use Carbon\CarbonImmutable;
@@ -41,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
         $this->restrictUserDirectoryToSuperAdmins();
         $this->letAdminsOpenTheirOrganizations();
         $this->letAdminsViewTheirPeople();
+        $this->keepActivityToAdmins();
         $this->restrictAdminConsoleToSuperAdmins();
     }
 
@@ -185,6 +187,16 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manageApiKeys', fn (User $user): bool => $user->isSuperAdmin()
             || ($user->currentTeam !== null
                 && $user->hasTeamPermission($user->currentTeam, TeamPermission::ManageApiKeys)));
+    }
+
+    /**
+     * Keep an organization's activity trail to its admins.
+     *
+     * Members do not see it at all, not even their own part of it.
+     */
+    protected function keepActivityToAdmins(): void
+    {
+        Gate::define('viewActivity', fn (User $user, Team $team): bool => $user->hasTeamPermission($team, TeamPermission::ViewActivity));
     }
 
     /**

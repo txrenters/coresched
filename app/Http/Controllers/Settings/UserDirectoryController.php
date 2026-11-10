@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Settings;
 
-use App\Actions\Scheduling\ApplyDefaultHolidays;
 use App\Actions\Scheduling\CreateDefaultAvailability;
 use App\Actions\Teams\CreateTeamUser;
 use App\Actions\Teams\SendAccountWelcome;
@@ -14,6 +13,8 @@ use App\Models\Membership;
 use App\Models\Team;
 use App\Models\User;
 use App\Policies\TeamPolicy;
+use App\Rules\DialableNumber;
+use App\Support\PhoneNumber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -29,7 +30,6 @@ class UserDirectoryController extends Controller
 {
     public function __construct(
         protected CreateDefaultAvailability $createDefaultAvailability,
-        protected ApplyDefaultHolidays $applyDefaultHolidays,
     ) {
         //
     }
@@ -129,7 +129,6 @@ class UserDirectoryController extends Controller
                 ])->save();
 
                 $this->createDefaultAvailability->handle($user);
-                $this->applyDefaultHolidays->handle($user);
 
                 return $user;
             });
@@ -168,6 +167,35 @@ class UserDirectoryController extends Controller
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => __('Password reset link sent to :email.', ['email' => $user->email]),
+        ]);
+
+        return back();
+    }
+
+    /**
+     * Add, change or clear a user's mobile number.
+     *
+     * A super admin may for anyone. An admin may only when they run every
+     * organization the person belongs to: the number is the account's, not the
+     * organization's, so changing it reroutes the texts of every organization
+     * the person hosts in.
+     */
+    public function updatePhone(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($this->mayEditPhone($request->user(), $user), 403);
+
+        $validated = $request->validate([
+            'phone' => ['nullable', 'string', 'max:20', new DialableNumber],
+        ]);
+
+        // Stored the way Twilio dials it, whatever punctuation was typed.
+        $user->forceFill(['phone' => PhoneNumber::toE164($validated['phone'] ?? null)])->save();
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => $user->phone === null
+                ? __('Mobile number removed for :name.', ['name' => $user->name])
+                : __('Mobile number saved for :name.', ['name' => $user->name]),
         ]);
 
         return back();
@@ -292,6 +320,25 @@ class UserDirectoryController extends Controller
     }
 
     /**
+     * Determine whether the viewer may change this account's mobile number.
+     */
+    protected function mayEditPhone(User $viewer, User $subject): bool
+    {
+        if ($viewer->can('manageUsers')) {
+            return true;
+        }
+
+        if ($subject->isSuperAdmin()) {
+            return false;
+        }
+
+        $memberOf = $subject->teams()->pluck('teams.id');
+
+        return $memberOf->isNotEmpty()
+            && $memberOf->diff($this->administeredTeamIds($viewer))->isEmpty();
+    }
+
+    /**
      * Get the ids of the organizations the viewer administers.
      *
      * @return Collection<int, int>
@@ -314,10 +361,13 @@ class UserDirectoryController extends Controller
             ? null
             : $this->administeredTeamIds($viewer);
 
+        $mayActOn = $this->mayActOn($viewer, $user);
+
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'phone' => $user->phone,
             'initials' => $this->initials($user->name),
             'isSuperAdmin' => $user->isSuperAdmin(),
             'isVerified' => $user->email_verified_at !== null,
@@ -329,7 +379,8 @@ class UserDirectoryController extends Controller
             'calendar' => $this->calendarStatus($user),
             // What this viewer may do to this row, so the menu offers only
             // the actions that would actually go through.
-            'canResetPassword' => $this->mayActOn($viewer, $user),
+            'canResetPassword' => $mayActOn,
+            'canEditPhone' => $this->mayEditPhone($viewer, $user),
             'removableFrom' => $viewer->is($user)
                 ? collect()
                 : $user->teams

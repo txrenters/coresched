@@ -9,6 +9,7 @@ import {
     KeyRound,
     Plus,
     MoreHorizontal,
+    Phone,
     Search,
     ShieldCheck,
     Trash2,
@@ -44,6 +45,7 @@ import {
     destroy as destroyUser,
     index as usersIndex,
     passwordReset,
+    phone as updatePhone,
     role as updateRole,
     store as storeUser,
 } from '@/routes/users';
@@ -62,6 +64,7 @@ type DirectoryUser = {
     id: number;
     name: string;
     email: string;
+    phone: string | null;
     initials: string;
     isSuperAdmin: boolean;
     isVerified: boolean;
@@ -70,6 +73,7 @@ type DirectoryUser = {
     groups: string[];
     calendar: { state: string; label: string; detail: string | null };
     canResetPassword: boolean;
+    canEditPhone: boolean;
     removableFrom: RemovableFrom[];
     organizations: Organization[];
 };
@@ -146,6 +150,28 @@ const sendPasswordReset = (user: DirectoryUser) => {
         {},
         { preserveScroll: true, preserveState: true },
     );
+};
+
+/** Adding, changing or clearing someone's mobile number. */
+const editingPhone = ref<DirectoryUser | null>(null);
+
+const phoneForm = useForm({ phone: '' });
+
+const openPhone = (user: DirectoryUser) => {
+    phoneForm.clearErrors();
+    phoneForm.phone = user.phone ?? '';
+    editingPhone.value = user;
+};
+
+const submitPhone = () => {
+    if (!editingPhone.value) {
+        return;
+    }
+
+    phoneForm.patch(updatePhone(editingPhone.value.id).url, {
+        preserveScroll: true,
+        onSuccess: () => (editingPhone.value = null),
+    });
 };
 
 const changeRole = (
@@ -309,6 +335,13 @@ defineOptions({
                                     <span class="text-muted-foreground">
                                         {{ user.email }}
                                     </span>
+                                    <span
+                                        v-if="user.phone"
+                                        class="block text-muted-foreground"
+                                        :data-test="`phone-${user.id}`"
+                                    >
+                                        {{ user.phone }}
+                                    </span>
                                 </div>
                             </div>
                         </td>
@@ -449,6 +482,18 @@ defineOptions({
                                     >
                                         <KeyRound class="size-3.5" />
                                         Send reset link
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        v-if="user.canEditPhone"
+                                        :data-test="`edit-phone-${user.id}`"
+                                        @click="openPhone(user)"
+                                    >
+                                        <Phone class="size-3.5" />
+                                        {{
+                                            user.phone
+                                                ? 'Edit mobile'
+                                                : 'Add mobile'
+                                        }}
                                     </DropdownMenuItem>
 
                                     <template v-if="user.removableFrom.length">
@@ -628,6 +673,53 @@ defineOptions({
                             data-test="submit-new-user"
                         >
                             Create user
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog
+            :open="editingPhone !== null"
+            @update:open="(open) => !open && (editingPhone = null)"
+        >
+            <DialogContent>
+                <form class="flex flex-col gap-4" @submit.prevent="submitPhone">
+                    <DialogHeader>
+                        <DialogTitle>Mobile number</DialogTitle>
+                        <DialogDescription>
+                            Used to text {{ editingPhone?.name }} about their
+                            meetings. Leave it empty to remove it.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div class="grid gap-1.5">
+                        <Label for="user-phone">Mobile</Label>
+                        <Input
+                            id="user-phone"
+                            v-model="phoneForm.phone"
+                            type="tel"
+                            autocomplete="tel"
+                            placeholder="(512) 555-0100"
+                            data-test="user-phone"
+                        />
+                        <InputError :message="phoneForm.errors.phone" />
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            @click="editingPhone = null"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            :disabled="phoneForm.processing"
+                            data-test="submit-user-phone"
+                        >
+                            Save
                         </Button>
                     </DialogFooter>
                 </form>

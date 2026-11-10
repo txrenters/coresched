@@ -24,7 +24,7 @@ class GroupController extends Controller
      */
     public function index(Request $request, Team $current_team): Response
     {
-        Gate::authorize('viewAny', Group::class);
+        Gate::authorize('viewAny', [Group::class, $current_team]);
 
         $groups = $current_team->groups()
             ->with(['members:id,name,email', 'team:id,slug', 'availabilitySchedule:id,name', 'pageEventTypes:id', 'eventTypes:id,group_id'])

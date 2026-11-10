@@ -30,7 +30,6 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property bool $is_super_admin
  * @property string|null $booking_slug
  * @property string $timezone
- * @property string|null $holiday_country
  * @property string|null $welcome_message
  * @property Carbon|null $email_verified_at
  * @property string $password
@@ -51,7 +50,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property-read Collection<int, CalendarAccount> $calendarAccounts
  * @property-read Pivot|null $pivot Present when fetched through a belongsToMany relation.
  */
-#[Fillable(['name', 'email', 'phone', 'password', 'is_super_admin', 'current_team_id', 'booking_slug', 'timezone', 'welcome_message', 'holiday_country'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'is_super_admin', 'current_team_id', 'booking_slug', 'timezone', 'welcome_message'])]
 #[Appends(['avatar'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser

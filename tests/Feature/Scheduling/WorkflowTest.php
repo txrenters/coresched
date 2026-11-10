@@ -4,6 +4,7 @@ use App\Enums\AutomationRecipient;
 use App\Enums\AutomationTrigger;
 use App\Enums\LocationType;
 use App\Enums\QuestionType;
+use App\Enums\TeamRole;
 use App\Models\Automation;
 use App\Models\AvailabilitySchedule;
 use App\Models\Booking;
@@ -545,4 +546,35 @@ test('a plain member of another organization cannot create a workflow in this on
             'body' => 'Hello',
         ])
         ->assertForbidden();
+});
+
+test('a plain member cannot see or change this organizations workflows', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member, ['role' => TeamRole::Member->value]);
+    $member->switchTeam($this->team);
+
+    $automation = Automation::factory()->create(['team_id' => $this->team->id]);
+
+    $this->actingAs($member)
+        ->get(route('automations.index', ['current_team' => $this->team->slug]))
+        ->assertForbidden();
+
+    $this->actingAs($member)
+        ->get(route('automations.edit', ['current_team' => $this->team->slug, 'automation' => $automation]))
+        ->assertForbidden();
+
+    $this->actingAs($member)
+        ->post(route('automations.store', ['current_team' => $this->team->slug]), [
+            'name' => 'Mine',
+            'trigger' => AutomationTrigger::Booked->value,
+            'channels' => ['email'],
+            'recipient' => AutomationRecipient::Host->value,
+            'subject' => 'Hello',
+            'body' => 'Hello',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($member)
+        ->get(route('dashboard', ['current_team' => $this->team->slug]))
+        ->assertInertia(fn ($page) => $page->where('canManageWorkflows', false));
 });

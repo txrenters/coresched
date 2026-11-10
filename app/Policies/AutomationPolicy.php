@@ -10,11 +10,13 @@ use App\Models\User;
 class AutomationPolicy
 {
     /**
-     * Determine whether the user can view any models.
+     * Determine whether the user can open the organization's Workflows page.
+     *
+     * Workflows are admin only: a member can neither see nor change them.
      */
-    public function viewAny(User $user): bool
+    public function viewAny(User $user, Team $team): bool
     {
-        return true;
+        return $user->hasTeamPermission($team, TeamPermission::ManageAutomations);
     }
 
     /**
@@ -22,18 +24,15 @@ class AutomationPolicy
      */
     public function view(User $user, Automation $automation): bool
     {
-        return $user->belongsToTeam($automation->team);
+        return $user->hasTeamPermission($automation->team, TeamPermission::ManageAutomations);
     }
 
     /**
      * Determine whether the user can create workflows in the given team.
-     *
-     * Gated on the permission that governs event types, since a workflow only
-     * exists to fire on them and both admins and members hold it.
      */
     public function create(User $user, Team $team): bool
     {
-        return $user->hasTeamPermission($team, TeamPermission::ManageEventTypes);
+        return $user->hasTeamPermission($team, TeamPermission::ManageAutomations);
     }
 
     /**
@@ -41,7 +40,7 @@ class AutomationPolicy
      */
     public function update(User $user, Automation $automation): bool
     {
-        return $user->hasTeamPermission($automation->team, TeamPermission::ManageEventTypes);
+        return $user->hasTeamPermission($automation->team, TeamPermission::ManageAutomations);
     }
 
     /**

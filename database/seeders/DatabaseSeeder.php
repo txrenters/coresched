@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Actions\Scheduling\ApplyDefaultHolidays;
 use App\Actions\Scheduling\CreateDefaultAvailability;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -45,7 +44,6 @@ class DatabaseSeeder extends Seeder
                 // No organization: a super admin belongs to none and creates
                 // the first one from the organizations screen.
                 app(CreateDefaultAvailability::class)->handle($user);
-                app(ApplyDefaultHolidays::class)->handle($user);
             });
         }
     }

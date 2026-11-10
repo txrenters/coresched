@@ -166,7 +166,7 @@ class AvailabilityEngine
             }
 
             $windows = $this->workingHours->windowsFor($schedule, $window);
-            $windows = $this->withoutHolidays($windows, $host, $eventType->team, $window, $schedule->timezone ?: 'UTC');
+            $windows = $this->withoutClosedDays($windows, $eventType->team, $window, $schedule->timezone ?: 'UTC');
             $busy = $busyByHost->get($host->id) ?? new Collection;
 
             $ranges = $windows
@@ -180,15 +180,15 @@ class AvailabilityEngine
     }
 
     /**
-     * Drop any working window falling on a holiday the host takes off, or one
-     * the event type's organization requires every member to take off.
+     * Drop any working window falling on a day the event type's organization
+     * is closed: one of its holidays or a date it blocked.
      *
      * @param  Collection<int, TimeRange>  $windows
      * @return Collection<int, TimeRange>
      */
-    protected function withoutHolidays(Collection $windows, User $host, ?Team $organization, TimeRange $window, string $timezone): Collection
+    protected function withoutClosedDays(Collection $windows, ?Team $organization, TimeRange $window, string $timezone): Collection
     {
-        $dates = $this->restrictions->holidayDates($host, $window, $organization);
+        $dates = $organization === null ? [] : $this->restrictions->closedDates($organization, $window);
 
         if ($dates === []) {
             return $windows;
