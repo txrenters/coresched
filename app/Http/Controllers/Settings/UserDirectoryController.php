@@ -13,6 +13,8 @@ use App\Models\Membership;
 use App\Models\Team;
 use App\Models\User;
 use App\Policies\TeamPolicy;
+use App\Rules\DialableNumber;
+use App\Support\PhoneNumber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -171,6 +173,33 @@ class UserDirectoryController extends Controller
     }
 
     /**
+     * Add, change or clear a user's mobile number.
+     *
+     * Open to the same people as the reset link: a super admin for anyone, an
+     * admin for the people in the organizations they run.
+     */
+    public function updatePhone(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($this->mayActOn($request->user(), $user), 403);
+
+        $validated = $request->validate([
+            'phone' => ['nullable', 'string', 'max:20', new DialableNumber],
+        ]);
+
+        // Stored the way Twilio dials it, whatever punctuation was typed.
+        $user->forceFill(['phone' => PhoneNumber::toE164($validated['phone'] ?? null)])->save();
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => $user->phone === null
+                ? __('Mobile number removed for :name.', ['name' => $user->name])
+                : __('Mobile number saved for :name.', ['name' => $user->name]),
+        ]);
+
+        return back();
+    }
+
+    /**
      * Change the role a user holds in one of their organizations.
      */
     public function updateRole(Request $request, User $user): RedirectResponse
@@ -311,10 +340,13 @@ class UserDirectoryController extends Controller
             ? null
             : $this->administeredTeamIds($viewer);
 
+        $mayActOn = $this->mayActOn($viewer, $user);
+
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'phone' => $user->phone,
             'initials' => $this->initials($user->name),
             'isSuperAdmin' => $user->isSuperAdmin(),
             'isVerified' => $user->email_verified_at !== null,
@@ -326,7 +358,8 @@ class UserDirectoryController extends Controller
             'calendar' => $this->calendarStatus($user),
             // What this viewer may do to this row, so the menu offers only
             // the actions that would actually go through.
-            'canResetPassword' => $this->mayActOn($viewer, $user),
+            'canResetPassword' => $mayActOn,
+            'canEditPhone' => $mayActOn,
             'removableFrom' => $viewer->is($user)
                 ? collect()
                 : $user->teams

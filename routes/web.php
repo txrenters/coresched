@@ -93,6 +93,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('users/{user}/password-reset', [UserDirectoryController::class, 'sendPasswordReset'])
         ->name('users.password-reset');
     Route::patch('users/{user}/role', [UserDirectoryController::class, 'updateRole'])->name('users.role');
+    Route::patch('users/{user}/phone', [UserDirectoryController::class, 'updatePhone'])->name('users.phone');
 
     Route::get('organizations', [OrganizationDirectoryController::class, 'index'])->name('organizations.index');
     Route::post('organizations/{team}/members', [OrganizationDirectoryController::class, 'storeMember'])
