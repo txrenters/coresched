@@ -7,6 +7,7 @@ use App\Http\Middleware\NoIndexExceptMarketing;
 use App\Http\Middleware\RestrictInDemo;
 use App\Http\Middleware\RestrictWhileImpersonating;
 use App\Http\Middleware\SetTeamUrlDefaults;
+use App\PortalSso\EnsurePortalSession;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -44,7 +45,12 @@ return Application::configure(basePath: dirname(__DIR__))
             RestrictWhileImpersonating::class,
             RestrictInDemo::class,
             EnsureActiveOrganization::class,
+            // Staff sessions re-check with the TR Staff Portal every few minutes.
+            EnsurePortalSession::class,
         ]);
+
+        // The portal posts signed logout tokens server-to-server; the signature replaces CSRF.
+        $middleware->validateCsrfTokens(except: ['auth/portal/backchannel-logout']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
