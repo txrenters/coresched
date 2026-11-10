@@ -16,9 +16,9 @@ PORTAL_ALLOW_PASSWORD_LOGIN=true                # keep on: staff can still use t
 
 In the portal, register CoreSched with:
 
-- **App address:** `https://scheduling.texasrenters.com`
-- **Callback:** `https://scheduling.texasrenters.com/auth/portal/callback`
-- **Logout address:** `https://scheduling.texasrenters.com/auth/portal/backchannel-logout`
+- **App address:** `https://coresched.com`
+- **Callback:** `https://coresched.com/auth/portal/callback`
+- **Logout address:** `https://coresched.com/auth/portal/backchannel-logout`
 
 ## What happens
 

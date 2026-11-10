@@ -20,7 +20,7 @@ class PortalClientTest extends TestCase
             'portal.client_id' => 'client-123',
             'portal.client_secret' => 'secret-xyz',
             'portal.app_slug' => 'coresched',
-            'app.url' => 'https://scheduling.texasrenters.com',
+            'app.url' => 'https://coresched.com',
         ]);
     }
 
@@ -33,7 +33,7 @@ class PortalClientTest extends TestCase
         $this->assertSame([
             'client_id' => 'client-123',
             'response_type' => 'code',
-            'redirect_uri' => 'https://scheduling.texasrenters.com/auth/portal/callback',
+            'redirect_uri' => 'https://coresched.com/auth/portal/callback',
             'scope' => 'openid profile email apps',
             'state' => 'state-1',
             'code_challenge' => 'challenge-1',
