@@ -31,7 +31,7 @@ class StoreBookingRequest extends FormRequest
             'timezone' => ['required', 'string', Rule::in(timezone_identifiers_list())],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255'],
-            'notes' => ['nullable', 'string', 'max:2000'],
+            'notes' => ['required', 'string', 'max:2000'],
             'location_detail' => ['nullable', 'string', 'max:500'],
             'guests' => ['array', 'max:10'],
             'guests.*' => ['email', 'max:255'],
@@ -162,6 +162,7 @@ class StoreBookingRequest extends FormRequest
     {
         return [
             'location_detail' => 'phone number',
+            'notes' => 'anything we should know beforehand',
         ];
     }
 }

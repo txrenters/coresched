@@ -31,6 +31,7 @@ beforeEach(function () {
         'timezone' => 'UTC',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ];
 });
 

@@ -47,6 +47,7 @@ function bookASlot(array $overrides = []): Booking
         'timezone' => 'UTC',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ], $overrides));
 
     return Booking::latest('id')->first();
@@ -433,6 +434,7 @@ test('the message variables are filled in from the booking', function () {
         'ends_at' => CarbonImmutable::parse('2026-09-02 16:00:00', 'UTC'),
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'location_type' => LocationType::InPerson,
         'location_detail' => '12 Main St',
         'notes' => 'Bringing my co-signer.',
@@ -511,6 +513,7 @@ test('a reply to a workflow email reaches a person, not the shared mailbox', fun
         'user_id' => $this->host->id,
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ]);
 
     $booking->hosts()->attach($this->host);
