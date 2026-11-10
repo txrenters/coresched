@@ -12,6 +12,7 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import { edit as editTeam, switchMethod } from '@/routes/teams';
+import { edit as teamAdvanced } from '@/routes/teams/advanced';
 import { index as teamMembers } from '@/routes/teams/members';
 import type { NavItem, TeamPermissions } from '@/types';
 
@@ -52,6 +53,10 @@ const organizationTabs = computed<NavItem[]>(() => {
     return [
         { title: 'Organization', href: editTeam(organization.value.slug) },
         { title: 'Members', href: teamMembers(organization.value.slug) },
+        {
+            title: 'Advanced settings',
+            href: teamAdvanced(organization.value.slug),
+        },
         // API keys belong to the current organization, so from any other one
         // the tab switches to it on the way there.
         ...(canManageOrganizationApiKeys.value
@@ -109,7 +114,7 @@ const { isCurrentUrl, isCurrentOrParentUrl } = useCurrentUrl();
         >
             <PageHeader
                 :title="organization?.name ?? 'Organization'"
-                description="Its settings, members and API keys."
+                description="Its settings, members, holidays and API keys."
             />
 
             <nav

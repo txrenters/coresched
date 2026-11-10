@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string $slug
  * @property string|null $logo_path
  * @property string $timezone
+ * @property string|null $holiday_country
  * @property string|null $sms_from_number
  * @property string|null $twilio_account_sid
  * @property string|null $twilio_auth_token
@@ -48,8 +50,9 @@ use Illuminate\Support\Facades\Storage;
  * @property-read Collection<int, Group> $groups
  * @property-read Collection<int, Automation> $automations
  * @property-read Collection<int, Booking> $bookings
+ * @property-read Collection<int, TeamClosure> $closures
  */
-#[Fillable(['name', 'slug', 'logo_path', 'timezone', 'sms_from_number', 'twilio_account_sid', 'twilio_auth_token', 'welcome_message', 'website_url', 'plan', 'plan_note', 'mail_from_address', 'disabled_at', 'disabled_reason'])]
+#[Fillable(['name', 'slug', 'logo_path', 'timezone', 'holiday_country', 'sms_from_number', 'twilio_account_sid', 'twilio_auth_token', 'welcome_message', 'website_url', 'plan', 'plan_note', 'mail_from_address', 'disabled_at', 'disabled_reason'])]
 /*
  * Hidden because the signed-in user is shared with every page and carries
  * their current organization along with it: Twilio credentials and the super
@@ -286,5 +289,29 @@ class Team extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /**
+     * Get the holidays every member is unavailable on for this organization's
+     * event types, whatever they chose for themselves.
+     *
+     * @return array<int, string>
+     */
+    public function requiredHolidays(): array
+    {
+        return DB::table('team_holidays')
+            ->where('team_id', $this->id)
+            ->pluck('holiday_key')
+            ->all();
+    }
+
+    /**
+     * Get the dates the organization blocks for everyone.
+     *
+     * @return HasMany<TeamClosure, $this>
+     */
+    public function closures(): HasMany
+    {
+        return $this->hasMany(TeamClosure::class);
     }
 }

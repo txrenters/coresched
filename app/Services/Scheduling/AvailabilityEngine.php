@@ -7,6 +7,7 @@ use App\Data\HostAvailability;
 use App\Enums\DateRangeType;
 use App\Models\Booking;
 use App\Models\EventType;
+use App\Models\Team;
 use App\Models\User;
 use App\Support\TimeRange;
 use Carbon\CarbonImmutable;
@@ -68,8 +69,6 @@ class AvailabilityEngine
         $slots = $eventType->kind->requiresEveryHost()
             ? $this->collectiveSlots($eventType, $freeByHost, $window, $anchors, $hosts->count())
             : $this->pooledSlots($eventType, $freeByHost, $window, $anchors);
-
-        $slots = $this->applyHostLimits($eventType, $slots, $expanded, $ignoringBookingId);
 
         if ($eventType->kind->allowsMultipleInvitees()) {
             $slots = $this->withoutOverlappingSessions($eventType, $slots, $ignoringBookingId);
@@ -167,7 +166,7 @@ class AvailabilityEngine
             }
 
             $windows = $this->workingHours->windowsFor($schedule, $window);
-            $windows = $this->withoutHolidays($windows, $host, $window, $schedule->timezone ?: 'UTC');
+            $windows = $this->withoutHolidays($windows, $host, $eventType->team, $window, $schedule->timezone ?: 'UTC');
             $busy = $busyByHost->get($host->id) ?? new Collection;
 
             $ranges = $windows
@@ -181,14 +180,15 @@ class AvailabilityEngine
     }
 
     /**
-     * Drop any working window falling on a holiday the host takes off.
+     * Drop any working window falling on a holiday the host takes off, or one
+     * the event type's organization requires every member to take off.
      *
      * @param  Collection<int, TimeRange>  $windows
      * @return Collection<int, TimeRange>
      */
-    protected function withoutHolidays(Collection $windows, User $host, TimeRange $window, string $timezone): Collection
+    protected function withoutHolidays(Collection $windows, User $host, ?Team $organization, TimeRange $window, string $timezone): Collection
     {
-        $dates = $this->restrictions->holidayDates($host, $window);
+        $dates = $this->restrictions->holidayDates($host, $window, $organization);
 
         if ($dates === []) {
             return $windows;
@@ -312,61 +312,6 @@ class AvailabilityEngine
         $steps = (int) ceil($anchor->diffInMinutes($range->start) / $interval);
 
         return $anchor->addMinutes($steps * $interval);
-    }
-
-    /**
-     * Drop slots where a host has hit their own cap on meetings.
-     *
-     * A slot survives if any of its hosts still has room; a collective event
-     * needs every host to have room, since all of them attend.
-     *
-     * @param  Collection<int, AvailabilitySlot>  $slots
-     * @return Collection<int, AvailabilitySlot>
-     */
-    protected function applyHostLimits(EventType $eventType, Collection $slots, TimeRange $window, ?int $ignoringBookingId): Collection
-    {
-        if ($slots->isEmpty()) {
-            return $slots;
-        }
-
-        $timezone = $this->limitTimezone($eventType);
-        $userIds = $slots->flatMap(fn (AvailabilitySlot $slot) => $slot->hostIds)->unique()->values()->all();
-
-        $filledByHost = $this->restrictions->filledPeriods($userIds, $window, $timezone, $ignoringBookingId);
-
-        if ($filledByHost->isEmpty()) {
-            return $slots;
-        }
-
-        $needsEveryHost = $eventType->kind->requiresEveryHost();
-
-        return $slots
-            ->map(function (AvailabilitySlot $slot) use ($filledByHost, $timezone, $needsEveryHost) {
-                $localStart = $slot->startsAt->setTimezone($timezone);
-
-                $withRoom = array_values(array_filter(
-                    $slot->hostIds,
-                    fn (int $hostId) => $this->restrictions->hasRoom(
-                        $filledByHost->get($hostId, []),
-                        $localStart,
-                    ),
-                ));
-
-                if ($needsEveryHost && count($withRoom) !== count($slot->hostIds)) {
-                    return null;
-                }
-
-                return $withRoom === []
-                    ? null
-                    : new AvailabilitySlot(
-                        startsAt: $slot->startsAt,
-                        endsAt: $slot->endsAt,
-                        hostIds: $withRoom,
-                        seatsRemaining: $slot->seatsRemaining,
-                    );
-            })
-            ->filter()
-            ->values();
     }
 
     /**
