@@ -60,6 +60,7 @@ class RestrictInDemo
         'users.organizations.destroy',
         'users.password-reset',
         'users.role',
+        'users.phone',
     ];
 
     /**
