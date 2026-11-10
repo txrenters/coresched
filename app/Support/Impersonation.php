@@ -20,10 +20,17 @@ class Impersonation
 
     /**
      * Determine whether the current session is an impersonation.
+     *
+     * A marker naming the signed-in user themselves is a leftover, not an
+     * impersonation: nobody is signed in as someone else.
      */
     public static function active(Request $request): bool
     {
-        return $request->hasSession() && $request->session()->has(self::IMPERSONATOR_KEY);
+        if (! $request->hasSession() || ! $request->session()->has(self::IMPERSONATOR_KEY)) {
+            return false;
+        }
+
+        return (int) $request->session()->get(self::IMPERSONATOR_KEY) !== $request->user()?->id;
     }
 
     /**

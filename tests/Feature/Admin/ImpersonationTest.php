@@ -6,6 +6,7 @@ use App\Models\ApiKey;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\Impersonation;
+use Illuminate\Support\Facades\Auth;
 
 beforeEach(function () {
     $this->operator = User::factory()->create(['is_super_admin' => true]);
@@ -237,4 +238,37 @@ test('their password is untouched when a change is attempted', function () {
     ])->assertForbidden();
 
     expect($this->member->fresh()->password)->toBe($hash);
+});
+
+test('signing in again ends a leftover impersonation, so the super admin can save their own profile', function () {
+    startImpersonating($this);
+
+    // A fresh sign-in that never went through "Return to your account",
+    // the way the staff portal callback logs in.
+    Auth::guard('web')->login($this->operator);
+
+    expect(session()->has(Impersonation::IMPERSONATOR_KEY))->toBeFalse();
+
+    $this->actingAs($this->operator)
+        ->patch(route('profile.update'), [
+            'name' => $this->operator->name,
+            'email' => $this->operator->email,
+            'phone' => '512-555-0100',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect($this->operator->fresh()->phone)->toBe('+15125550100');
+});
+
+test('a marker naming the signed-in user is not an impersonation', function () {
+    $this->actingAs($this->operator)
+        ->withSession([Impersonation::IMPERSONATOR_KEY => $this->operator->id])
+        ->patch(route('profile.update'), [
+            'name' => $this->operator->name,
+            'email' => $this->operator->email,
+            'phone' => '512-555-0100',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
 });
