@@ -45,8 +45,6 @@ const props = defineProps<{
     entries: Paginated;
     kinds: Array<{ value: string; label: string }>;
     kind: string;
-    /** Admins read the organization's trail; members read their own part. */
-    seesEveryone: boolean;
 }>();
 
 defineOptions({
@@ -110,11 +108,7 @@ const range = computed(() => {
     <div class="flex h-full flex-1 flex-col gap-6 p-4 sm:p-6">
         <PageHeader
             title="Activity"
-            :description="
-                seesEveryone
-                    ? 'Everything that has happened in this organization.'
-                    : 'What you have done here, and what has happened to your meetings.'
-            "
+            description="Everything that has happened in this organization."
         >
             <template #actions>
                 <Select

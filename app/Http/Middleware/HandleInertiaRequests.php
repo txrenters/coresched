@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Models\Announcement;
+use App\Models\Automation;
+use App\Models\Group;
 use App\Models\Team;
 use App\Support\Demo;
 use App\Support\Impersonation;
@@ -77,6 +79,10 @@ class HandleInertiaRequests extends Middleware
             'canManageApiKeys' => (bool) $user?->can('manageApiKeys'),
             // Gates the Settings nav entry, which opens the current organization's settings.
             'canManageOrganization' => (bool) ($user?->currentTeam && $user->can('update', $user->currentTeam)),
+            // Gate the Teams, Workflows and Activity nav entries, which are admin only; the controllers enforce them as well.
+            'canManageGroups' => (bool) ($user?->currentTeam && $user->can('viewAny', [Group::class, $user->currentTeam])),
+            'canManageWorkflows' => (bool) ($user?->currentTeam && $user->can('viewAny', [Automation::class, $user->currentTeam])),
+            'canViewActivity' => (bool) ($user?->currentTeam && $user->can('viewActivity', $user->currentTeam)),
             // Gates the Organizations nav entry; the controller enforces it as well.
             'canViewOrganizations' => (bool) $user?->can('viewOrganizations'),
         ];

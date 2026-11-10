@@ -10,11 +10,13 @@ use App\Models\User;
 class GroupPolicy
 {
     /**
-     * Determine whether the user can view any models.
+     * Determine whether the user can open the organization's Teams page.
+     *
+     * Admin only: a member never sees how the organization is split into teams.
      */
-    public function viewAny(User $user): bool
+    public function viewAny(User $user, Team $team): bool
     {
-        return true;
+        return $user->hasTeamPermission($team, TeamPermission::ManageGroups);
     }
 
     /**

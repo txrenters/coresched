@@ -73,6 +73,18 @@ test('someone outside the team cannot be added to a group', function () {
         ->assertSessionHasErrors('member_ids.0');
 });
 
+test('a plain member cannot open the teams page', function () {
+    $this->member->switchTeam($this->team);
+
+    $this->actingAs($this->member)
+        ->get(route('groups.index', ['current_team' => $this->team->slug]))
+        ->assertForbidden();
+
+    $this->actingAs($this->member)
+        ->get(route('dashboard', ['current_team' => $this->team->slug]))
+        ->assertInertia(fn ($page) => $page->where('canManageGroups', false));
+});
+
 test('a plain member cannot create a group', function () {
     $this->member->switchTeam($this->team);
 

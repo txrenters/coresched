@@ -97,7 +97,7 @@ const teamWorkspaceItems = computed<NavItem[]>(() => [
 ]);
 
 const teamNavItems = computed<NavItem[]>(() =>
-    hasTeam.value
+    hasTeam.value && page.props.canManageGroups
         ? [
               {
                   title: 'Teams',
@@ -109,13 +109,17 @@ const teamNavItems = computed<NavItem[]>(() =>
 );
 
 const otherNavItems = computed<NavItem[]>(() => [
-    ...(hasTeam.value
+    ...(hasTeam.value && page.props.canManageWorkflows
         ? [
               {
                   title: 'Workflows',
                   href: automationsIndex(teamSlug.value),
                   icon: Workflow,
               },
+          ]
+        : []),
+    ...(hasTeam.value && page.props.canViewActivity
+        ? [
               {
                   title: 'Activity',
                   href: activityIndex(teamSlug.value),

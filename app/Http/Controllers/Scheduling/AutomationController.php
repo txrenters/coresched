@@ -30,7 +30,7 @@ class AutomationController extends Controller
      */
     public function index(Request $request, Team $current_team): Response
     {
-        Gate::authorize('viewAny', Automation::class);
+        Gate::authorize('viewAny', [Automation::class, $current_team]);
 
         $automations = $current_team->automations()
             ->with('eventTypes:id,name')

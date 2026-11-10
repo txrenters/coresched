@@ -2,7 +2,6 @@
 
 use App\Enums\TeamRole;
 use App\Models\ActivityLog;
-use App\Models\Booking;
 use App\Models\EventType;
 use App\Models\Team;
 use App\Models\User;
@@ -148,48 +147,20 @@ test('activity from another organization is never shown', function () {
         ->assertInertia(fn ($page) => $page->has('entries.data', 0));
 });
 
-test('a member reads only their own part of the trail', function () {
+test('a member cannot open the activity trail', function () {
     $team = Team::factory()->create();
-    $admin = User::factory()->create();
     $member = User::factory()->create();
 
-    $member->teams()->detach();
-    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
     $team->members()->attach($member, ['role' => TeamRole::Member->value]);
     $member->switchTeam($team);
 
-    // Something they did.
-    ActivityLog::create([
-        'team_id' => $team->id,
-        'user_id' => $member->id,
-        'event' => 'event_type.created',
-        'description' => 'Created an event type',
-    ]);
-
-    // Something done to them.
-    ActivityLog::create([
-        'team_id' => $team->id,
-        'user_id' => $admin->id,
-        'event' => 'member.role_changed',
-        'description' => "Changed the member's role",
-        'subject_type' => User::class,
-        'subject_id' => $member->id,
-    ]);
-
-    // Somebody else's business entirely.
-    ActivityLog::create([
-        'team_id' => $team->id,
-        'user_id' => $admin->id,
-        'event' => 'event_type.created',
-        'description' => 'Created something of their own',
-    ]);
-
     $this->actingAs($member)
         ->get(route('activity.index', ['current_team' => $team->slug]))
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->where('seesEveryone', false)
-            ->has('entries.data', 2));
+        ->assertForbidden();
+
+    $this->actingAs($member)
+        ->get(route('dashboard', ['current_team' => $team->slug]))
+        ->assertInertia(fn ($page) => $page->where('canViewActivity', false));
 });
 
 test('an admin reads the whole organizations trail', function () {
@@ -214,38 +185,6 @@ test('an admin reads the whole organizations trail', function () {
         ->get(route('activity.index', ['current_team' => $team->slug]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('seesEveryone', true)
+            ->where('canViewActivity', true)
             ->has('entries.data', 2));
-});
-
-test('a member sees activity about the meetings they host', function () {
-    $team = Team::factory()->create();
-    $admin = User::factory()->create();
-    $member = User::factory()->create();
-
-    $member->teams()->detach();
-    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
-    $team->members()->attach($member, ['role' => TeamRole::Member->value]);
-    $member->switchTeam($team);
-
-    $eventType = EventType::factory()->ownedBy($member)->create(['team_id' => $team->id]);
-    $booking = Booking::factory()->for($eventType)->create([
-        'team_id' => $team->id,
-        'user_id' => $member->id,
-    ]);
-
-    // Cancelled by the admin, but it is the member's meeting.
-    ActivityLog::create([
-        'team_id' => $team->id,
-        'user_id' => $admin->id,
-        'event' => 'booking.canceled',
-        'description' => 'Canceled a meeting',
-        'subject_type' => Booking::class,
-        'subject_id' => $booking->id,
-    ]);
-
-    $this->actingAs($member)
-        ->get(route('activity.index', ['current_team' => $team->slug]))
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('entries.data', 1));
 });

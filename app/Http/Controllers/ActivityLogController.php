@@ -2,13 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\TeamPermission;
 use App\Models\ActivityLog;
-use App\Models\Booking;
 use App\Models\Team;
-use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -38,6 +35,8 @@ class ActivityLogController extends Controller
      */
     public function index(Request $request, Team $current_team): Response
     {
+        Gate::authorize('viewActivity', $current_team);
+
         $user = $request->user();
         $timezone = $user->timezone ?: config('scheduling.default_timezone');
 
@@ -47,27 +46,8 @@ class ActivityLogController extends Controller
             $kind = 'all';
         }
 
-        // An admin reads the organization's trail; a member reads their own
-        // part of it -- what they did, what was done to them, and the meetings
-        // they host.
-        $seesEveryone = $user->hasTeamPermission($current_team, TeamPermission::ManageTeamBookings);
-
         $entries = ActivityLog::query()
             ->where('team_id', $current_team->id)
-            ->when(! $seesEveryone, fn ($query) => $query->where(
-                fn (Builder $mine) => $mine
-                    ->where('user_id', $user->id)
-                    ->orWhere(fn (Builder $about) => $about
-                        ->where('subject_type', User::class)
-                        ->where('subject_id', $user->id))
-                    ->orWhereHasMorph(
-                        'subject',
-                        Booking::class,
-                        fn (Builder $booking) => $booking
-                            ->where('user_id', $user->id)
-                            ->orWhereHas('hosts', fn (Builder $hosts) => $hosts->whereKey($user->id)),
-                    ),
-            ))
             ->when($kind !== 'all', fn ($query) => $query->ofKind($kind))
             ->with('user:id,name')
             ->latest()
@@ -90,7 +70,6 @@ class ActivityLogController extends Controller
             'entries' => $entries,
             'kinds' => $this->kinds,
             'kind' => $kind,
-            'seesEveryone' => $seesEveryone,
         ]);
     }
 }
