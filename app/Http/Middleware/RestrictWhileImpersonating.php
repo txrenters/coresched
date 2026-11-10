@@ -64,6 +64,6 @@ class RestrictWhileImpersonating
             return false;
         }
 
-        return mb_strtolower(trim((string) $request->input('email'))) !== mb_strtolower((string) $request->user()?->email);
+        return (string) $request->input('email') !== (string) $request->user()?->email;
     }
 }

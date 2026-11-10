@@ -303,3 +303,18 @@ test('the members email cannot be changed while signed in as them', function () 
         ->email->toBe($email)
         ->phone->toBeNull();
 });
+
+test('not even the capitalisation of the members email changes while signed in as them', function () {
+    $this->member->forceFill(['email' => 'it.support@example.com'])->save();
+
+    startImpersonating($this);
+
+    $this->patch(route('profile.update'), [
+        'name' => $this->member->name,
+        'email' => 'IT.Support@example.com',
+    ])->assertForbidden();
+
+    expect($this->member->fresh())
+        ->email->toBe('it.support@example.com')
+        ->email_verified_at->not->toBeNull();
+});

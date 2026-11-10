@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileDeleteRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
 use App\Models\User;
+use App\Support\Impersonation;
 use App\Support\PhoneNumber;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,7 +41,11 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
-        $user->fill($request->safe()->except(['photo', 'remove_photo']));
+        // A super admin signed in as this user never changes where their
+        // password resets go; RestrictWhileImpersonating refuses it as well.
+        $user->fill($request->safe()->except(Impersonation::active($request)
+            ? ['photo', 'remove_photo', 'email']
+            : ['photo', 'remove_photo']));
         $user->forceFill($this->resolvePhoto($request, $user));
 
         // Stored the way Twilio dials it, whatever punctuation was typed.
