@@ -166,6 +166,7 @@ test('booking a slot schedules reminders', function () {
         'timezone' => 'UTC',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ]);
 
     expect(Booking::first()->reminders()->count())->toBe(2);
@@ -179,6 +180,7 @@ test('the same slot cannot be booked twice', function () {
         'timezone' => 'UTC',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ];
 
     $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), $payload);
@@ -189,6 +191,20 @@ test('the same slot cannot be booked twice', function () {
     expect(Booking::count())->toBe(1);
 });
 
+test('an invitee must say what we should know beforehand', function (?string $notes) {
+    Notification::fake();
+
+    $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), [
+        'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC')->toIso8601String(),
+        'timezone' => 'UTC',
+        'name' => 'Sam Rivera',
+        'email' => 'sam@example.com',
+        'notes' => $notes,
+    ])->assertSessionHasErrors('notes');
+
+    expect(Booking::count())->toBe(0);
+})->with(['missing' => null, 'blank' => '   ']);
+
 test('a slot outside the working hours is rejected', function () {
     Notification::fake();
 
@@ -197,6 +213,7 @@ test('a slot outside the working hours is rejected', function () {
         'timezone' => 'UTC',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ])->assertSessionHasErrors('starts_at');
 
     expect(Booking::count())->toBe(0);
@@ -217,6 +234,7 @@ test('a booking captures guests and answers to custom questions', function () {
         'timezone' => 'UTC',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'guests' => ['colleague@example.com'],
         'answers' => [$question->id => 'Pricing'],
     ]);
@@ -243,6 +261,7 @@ test('a required question must be answered', function () {
         'timezone' => 'UTC',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ])->assertSessionHasErrors("answers.{$question->id}");
 });
 
@@ -281,6 +300,7 @@ test('an invitee can reschedule to a free slot', function () {
         'ends_at' => CarbonImmutable::parse('2026-09-02 11:00:00', 'UTC'),
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ]);
 
     $this->post(route('booking.reschedule.store', ['booking' => $booking->uid]), [
@@ -309,6 +329,7 @@ test('rescheduling announces the move once, without a second confirmation', func
         'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC'),
         'ends_at' => CarbonImmutable::parse('2026-09-02 11:00:00', 'UTC'),
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ]);
 
     $this->post(route('booking.reschedule.store', ['booking' => $booking->uid]), [
@@ -413,6 +434,7 @@ test('booking a requires-confirmation event creates a pending request', function
         'timezone' => 'UTC',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ]);
 
     $booking = Booking::first();
@@ -444,6 +466,7 @@ test('a pending booking blocks the slot for other invitees', function () {
         'timezone' => 'UTC',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ];
 
     $this->post(route('book.store', ['page' => 'dana', 'eventType' => 'intro']), $payload);
@@ -501,6 +524,7 @@ test('rescheduling into a requires-confirmation event yields a new pending reque
         'starts_at' => CarbonImmutable::parse('2026-09-02 10:00:00', 'UTC'),
         'ends_at' => CarbonImmutable::parse('2026-09-02 11:00:00', 'UTC'),
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ]);
 
     $this->post(route('booking.reschedule.store', ['booking' => $booking->uid]), [
@@ -526,6 +550,7 @@ test('an invitee who picks no timezone is recorded in the configured default', f
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
     ]);
 
     expect(Booking::first()->invitee_timezone)->toBe('America/Chicago');
@@ -590,6 +615,7 @@ test('a yes or no question is answered from its two options', function () {
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'answers' => [$question->id => 'Yes'],
     ])->assertSessionHasNoErrors();
 
@@ -612,6 +638,7 @@ test('a pick multiple question keeps every answer', function () {
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'answers' => [$question->id => ['Billing', 'Maintenance']],
     ])->assertSessionHasNoErrors();
 
@@ -634,6 +661,7 @@ test('an answer outside the offered options is refused', function () {
         'starts_at' => $startsAt->toIso8601String(),
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'timezone' => 'America/Chicago',
         'answers' => [$question->id => 'Somewhere else'],
     ])->assertSessionHasErrors("answers.{$question->id}");
@@ -682,6 +710,7 @@ test('a phone question refuses an answer that is not a number', function () {
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'answers' => [$question->id => 'call me whenever'],
     ])->assertSessionHasErrors("answers.{$question->id}");
 
@@ -703,6 +732,7 @@ test('a phone question accepts the ways people write numbers', function () {
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'answers' => [$question->id => '(346) 239-9213'],
     ])->assertSessionHasNoErrors();
 
@@ -724,6 +754,7 @@ test('a phone question refuses a number too short to be a us number', function (
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'answers' => [$question->id => '555-0100'],
     ])->assertSessionHasErrors(["answers.{$question->id}" => 'Enter a 10 digit phone number.']);
 });
@@ -738,6 +769,7 @@ test('the number an invitee gives to be called on is stored with its +1', functi
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'location_detail' => '346.239.9213',
     ])->assertSessionHasNoErrors();
 
@@ -748,6 +780,7 @@ test('the number an invitee gives to be called on is stored with its +1', functi
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'location_detail' => '239-9213',
     ])->assertSessionHasErrors(['location_detail' => 'Enter a 10 digit phone number.']);
 });
@@ -765,6 +798,7 @@ test('an invitee cannot replace the hosts own location', function () {
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'location_detail' => 'https://evil.example.com',
     ])->assertSessionHasNoErrors();
 
@@ -866,6 +900,7 @@ test('a phone question refuses a list of answers', function () {
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'answers' => [$question->id => ['+1 (346) 239-9213']],
     ])->assertSessionHasErrors(["answers.{$question->id}" => 'Enter a phone number.']);
 
@@ -886,6 +921,7 @@ test('an answer nested deeper than a list is refused', function () {
         'timezone' => 'America/Chicago',
         'name' => 'Sam Rivera',
         'email' => 'sam@example.com',
+        'notes' => 'Nothing to add.',
         'answers' => [$question->id => [['Pricing']]],
     ])->assertSessionHasErrors(["answers.{$question->id}.0" => 'The answers.'.$question->id.'.0 field must be a string.']);
 

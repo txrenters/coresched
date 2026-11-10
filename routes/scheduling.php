@@ -57,8 +57,6 @@ Route::prefix('{current_team}')
 
         Route::get('availability', [AvailabilityScheduleController::class, 'index'])->name('availability.index');
         Route::get('availability/calendars', [AvailabilityScheduleController::class, 'calendars'])->name('availability.calendars');
-        Route::get('availability/advanced', [AvailabilityScheduleController::class, 'advanced'])->name('availability.advanced');
-        Route::patch('availability/advanced', [AvailabilityScheduleController::class, 'updateAdvanced'])->name('availability.advanced.update');
         Route::post('availability', [AvailabilityScheduleController::class, 'store'])->name('availability.store');
         Route::patch('availability/{availability}', [AvailabilityScheduleController::class, 'update'])->name('availability.update');
         Route::delete('availability/{availability}', [AvailabilityScheduleController::class, 'destroy'])->name('availability.destroy');

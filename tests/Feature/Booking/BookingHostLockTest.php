@@ -55,6 +55,7 @@ function pinnedBooking(array $overrides = []): array
         'timezone' => 'UTC',
         'name' => 'Rae Renter',
         'email' => 'rae@example.com',
+        'notes' => 'Nothing to add.',
         'reference' => 'lead-token-123',
         'host' => 'dana@example.com',
         ...$overrides,

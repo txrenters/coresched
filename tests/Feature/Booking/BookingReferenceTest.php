@@ -50,6 +50,7 @@ function referencedBooking(array $overrides = []): array
         'timezone' => 'UTC',
         'name' => 'Rae Renter',
         'email' => 'rae@example.com',
+        'notes' => 'Nothing to add.',
         'reference' => 'lead-token-123',
         ...$overrides,
     ];
@@ -61,6 +62,7 @@ test('the booking page prefills the invitee from the link and keeps the referenc
         'eventType' => 'intro',
         'name' => ' Rae Renter ',
         'email' => 'rae@example.com',
+        'notes' => 'Nothing to add.',
         'phone' => '2815550100',
         'ref' => 'lead-token-123',
     ]))

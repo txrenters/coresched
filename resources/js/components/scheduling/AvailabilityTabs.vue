@@ -2,7 +2,7 @@
 import { Link } from '@inertiajs/vue3';
 import { useCurrentTeam } from '@/composables/useCurrentTeam';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
-import { advanced, calendars, index } from '@/routes/availability';
+import { calendars, index } from '@/routes/availability';
 
 const { teamSlug } = useCurrentTeam();
 const { isCurrentUrl } = useCurrentUrl();
@@ -10,7 +10,6 @@ const { isCurrentUrl } = useCurrentUrl();
 const tabs = [
     { label: 'Schedules', href: () => index(teamSlug.value) },
     { label: 'Calendar settings', href: () => calendars(teamSlug.value) },
-    { label: 'Advanced settings', href: () => advanced(teamSlug.value) },
 ];
 </script>
 

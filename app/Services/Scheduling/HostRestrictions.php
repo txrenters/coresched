@@ -2,17 +2,16 @@
 
 namespace App\Services\Scheduling;
 
-use App\Enums\LimitPeriod;
-use App\Models\Booking;
-use App\Models\MeetingLimit;
+use App\Models\Team;
+use App\Models\TeamClosure;
 use App\Models\User;
 use App\Support\TimeRange;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
 
 /**
  * Restrictions that apply to a host across every event type they run: the
- * holidays they take off, and the caps on how many meetings they will accept.
+ * holidays they take off, and the holidays and blocked dates their
+ * organization requires of everyone.
  */
 class HostRestrictions
 {
@@ -22,119 +21,63 @@ class HostRestrictions
     }
 
     /**
-     * Get the local dates a host is unavailable on for holidays.
+     * Get the local dates a host is unavailable on: the holidays they take off,
+     * plus the holidays and blocked dates the organization requires.
      *
      * @return array<int, string> Y-m-d dates.
      */
-    public function holidayDates(User $host, TimeRange $window): array
+    public function holidayDates(User $host, TimeRange $window, ?Team $organization = null): array
     {
-        $country = $host->holiday_country;
+        $fromYear = (int) $window->start->format('Y');
+        $toYear = (int) $window->end->format('Y');
 
-        if (blank($country)) {
-            return [];
+        $dates = blank($host->holiday_country)
+            ? []
+            : $this->holidays->datesFor($host->holiday_country, $host->enabledHolidays(), $fromYear, $toYear);
+
+        if ($organization !== null) {
+            if (filled($organization->holiday_country)) {
+                $dates = [
+                    ...$dates,
+                    ...$this->holidays->datesFor($organization->holiday_country, $organization->requiredHolidays(), $fromYear, $toYear),
+                ];
+            }
+
+            $dates = [...$dates, ...$this->closureDates($organization, $window)];
         }
 
-        $keys = $host->enabledHolidays();
-
-        if ($keys === []) {
-            return [];
-        }
-
-        return $this->holidays->datesFor(
-            $country,
-            $keys,
-            (int) $window->start->format('Y'),
-            (int) $window->end->format('Y'),
-        );
+        return array_values(array_unique($dates));
     }
 
     /**
-     * Get the period keys a host has already filled, so slots falling in them
-     * can be dropped.
+     * Get every day the organization has blocked near the window.
      *
-     * @param  array<int, int>  $userIds
-     * @return Collection<int, array<string, array<string, bool>>> Keyed by user id, then period.
+     * Padded by a day either side so a window that starts late in UTC still
+     * sees the local date it lands on.
+     *
+     * @return array<int, string> Y-m-d dates.
      */
-    public function filledPeriods(array $userIds, TimeRange $window, string $timezone, ?int $ignoringBookingId = null): Collection
+    protected function closureDates(Team $organization, TimeRange $window): array
     {
-        $limits = MeetingLimit::query()
-            ->whereIn('user_id', $userIds)
-            ->get()
-            ->groupBy('user_id');
+        $from = $window->start->subDay()->toDateString();
+        $to = $window->end->addDay()->toDateString();
 
-        if ($limits->isEmpty()) {
-            return new Collection;
-        }
+        $dates = [];
 
-        // Count across whole periods, not just the requested window, or a
-        // booking earlier in the week would not count towards a weekly cap.
-        $bookings = Booking::query()
-            ->active()
-            ->whereBetween('starts_at', [
-                $window->start->startOfMonth()->subWeek(),
-                $window->end->endOfMonth()->addWeek(),
-            ])
-            ->when($ignoringBookingId !== null, fn ($query) => $query->whereKeyNot($ignoringBookingId))
-            ->where(function ($query) use ($userIds) {
-                $query->whereIn('user_id', $userIds)
-                    ->orWhereHas('hosts', fn ($hosts) => $hosts->whereIn('users.id', $userIds));
-            })
-            ->with('hosts:id')
-            ->get(['id', 'user_id', 'starts_at']);
+        $organization->closures()
+            ->whereDate('starts_on', '<=', $to)
+            ->whereDate('ends_on', '>=', $from)
+            ->get(['starts_on', 'ends_on'])
+            ->each(function (TeamClosure $closure) use (&$dates, $from, $to) {
+                $day = CarbonImmutable::parse(max($closure->starts_on->toDateString(), $from));
+                $last = min($closure->ends_on->toDateString(), $to);
 
-        return (new Collection($userIds))->mapWithKeys(function (int $userId) use ($limits, $bookings, $timezone) {
-            /** @var Collection<int, MeetingLimit> $userLimits */
-            $userLimits = $limits->get($userId, new Collection);
-
-            if ($userLimits->isEmpty()) {
-                return [$userId => []];
-            }
-
-            $theirs = $bookings->filter(
-                fn (Booking $booking) => $booking->user_id === $userId
-                    || $booking->hosts->contains('id', $userId),
-            );
-
-            /** @var array<string, array<string, bool>> $filled */
-            $filled = [];
-
-            foreach ($userLimits as $limit) {
-                $counts = $theirs
-                    ->groupBy(fn (Booking $booking) => $limit->period->keyFor(
-                        CarbonImmutable::parse($booking->starts_at)->setTimezone($timezone),
-                    ))
-                    ->map->count();
-
-                $full = [];
-
-                foreach ($counts as $key => $count) {
-                    if ($count >= $limit->max_bookings) {
-                        $full[(string) $key] = true;
-                    }
+                while ($day->toDateString() <= $last) {
+                    $dates[] = $day->toDateString();
+                    $day = $day->addDay();
                 }
+            });
 
-                $filled[$limit->period->value] = $full;
-            }
-
-            return [$userId => $filled];
-        });
-    }
-
-    /**
-     * Determine if a host has room for a meeting starting at the given time.
-     *
-     * @param  array<string, array<string, bool>>  $filled
-     */
-    public function hasRoom(array $filled, CarbonImmutable $localStart): bool
-    {
-        foreach ($filled as $period => $keys) {
-            $periodEnum = LimitPeriod::from($period);
-
-            if ($keys[$periodEnum->keyFor($localStart)] ?? false) {
-                return false;
-            }
-        }
-
-        return true;
+        return $dates;
     }
 }

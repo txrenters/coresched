@@ -4,23 +4,18 @@ namespace App\Http\Controllers\Scheduling;
 
 use App\Actions\Scheduling\SaveAvailabilitySchedule;
 use App\Enums\CalendarProvider;
-use App\Enums\LimitPeriod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Scheduling\SaveAvailabilityScheduleRequest;
-use App\Http\Requests\Scheduling\UpdateAdvancedAvailabilityRequest;
 use App\Models\AvailabilityOverride;
 use App\Models\AvailabilityRule;
 use App\Models\AvailabilitySchedule;
 use App\Models\Calendar;
 use App\Models\CalendarAccount;
-use App\Models\MeetingLimit;
 use App\Models\Team;
 use App\Services\Calendar\CalendarProviderManager;
 use App\Services\Calendar\DetectsLeaveContract;
-use App\Services\Scheduling\HolidayCalendar;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -97,64 +92,6 @@ class AvailabilityScheduleController extends Controller
                 ])->values(),
             ]),
         ]);
-    }
-
-    /**
-     * Show the settings that govern the user's public booking page.
-     */
-    public function advanced(Request $request, Team $current_team, HolidayCalendar $holidays): Response
-    {
-        $user = $request->user();
-        $country = $user->holiday_country;
-
-        return Inertia::render('scheduling/availability/Advanced', [
-            'limits' => $user->meetingLimits()->get()
-                ->map(fn (MeetingLimit $limit) => [
-                    'period' => $limit->period->value,
-                    'max_bookings' => $limit->max_bookings,
-                ])->values(),
-            'periods' => LimitPeriod::options(),
-            'holidayCountry' => $country,
-            'countries' => $holidays->countries(),
-            'holidays' => blank($country) ? [] : $holidays->forCountry($country),
-            'enabledHolidays' => $user->enabledHolidays(),
-        ]);
-    }
-
-    /**
-     * Save the advanced settings.
-     */
-    public function updateAdvanced(UpdateAdvancedAvailabilityRequest $request, Team $current_team): RedirectResponse
-    {
-        $user = $request->user();
-
-        DB::transaction(function () use ($request, $user) {
-            $user->update(['holiday_country' => $request->validated('holiday_country')]);
-
-            $user->meetingLimits()->delete();
-
-            foreach ($request->validated('limits', []) as $limit) {
-                $user->meetingLimits()->create([
-                    'period' => $limit['period'],
-                    'max_bookings' => $limit['max_bookings'],
-                ]);
-            }
-
-            DB::table('user_holidays')->where('user_id', $user->id)->delete();
-
-            foreach (array_unique($request->validated('holidays', [])) as $key) {
-                DB::table('user_holidays')->insert([
-                    'user_id' => $user->id,
-                    'holiday_key' => $key,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-        });
-
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Settings saved.')]);
-
-        return to_route('availability.advanced', ['current_team' => $current_team->slug]);
     }
 
     /**

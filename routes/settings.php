@@ -4,6 +4,7 @@ use App\Http\Controllers\Settings\ApiKeyController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Controllers\Teams\TeamController;
+use App\Http\Controllers\Teams\TeamHolidayController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Controllers\Teams\TeamMemberController;
 use App\Http\Middleware\EnsureTeamMembership;
@@ -48,6 +49,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('settings/teams/{team}', [TeamController::class, 'destroy'])->name('teams.destroy');
         Route::post('settings/teams/{team}/switch', [TeamController::class, 'switch'])->name('teams.switch');
         Route::delete('settings/teams/{team}/leave', [TeamController::class, 'leave'])->name('teams.leave');
+
+        Route::get('settings/teams/{team}/advanced', [TeamHolidayController::class, 'edit'])->name('teams.advanced.edit');
+        Route::patch('settings/teams/{team}/advanced', [TeamHolidayController::class, 'update'])->name('teams.advanced.update');
+        Route::post('settings/teams/{team}/closures', [TeamHolidayController::class, 'storeClosure'])->name('teams.closures.store');
+        Route::delete('settings/teams/{team}/closures/{closure}', [TeamHolidayController::class, 'destroyClosure'])->name('teams.closures.destroy');
 
         Route::get('settings/teams/{team}/members', [TeamMemberController::class, 'index'])->name('teams.members.index');
         Route::post('settings/teams/{team}/members', [TeamMemberController::class, 'store'])->name('teams.members.store');

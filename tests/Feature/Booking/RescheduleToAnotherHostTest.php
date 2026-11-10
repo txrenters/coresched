@@ -37,6 +37,7 @@ beforeEach(function () {
         'starts_at' => CarbonImmutable::parse('2026-09-02 12:00:00', 'UTC'),
         'ends_at' => CarbonImmutable::parse('2026-09-02 12:30:00', 'UTC'),
         'email' => 'dominic@example.com',
+        'notes' => 'Nothing to add.',
     ]);
     $this->booking->hosts()->attach($this->host);
 });

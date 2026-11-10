@@ -966,12 +966,19 @@ const submit = () => {
                             <div class="grid gap-2">
                                 <Label for="notes">
                                     Anything we should know beforehand?
+                                    <span
+                                        class="text-destructive"
+                                        aria-hidden="true"
+                                        >*</span
+                                    >
                                 </Label>
                                 <Textarea
                                     id="notes"
                                     v-model="form.notes"
                                     rows="3"
                                     data-test="booking-notes"
+                                    required
+                                    :aria-invalid="Boolean(form.errors.notes)"
                                 />
                                 <InputError :message="form.errors.notes" />
                             </div>
