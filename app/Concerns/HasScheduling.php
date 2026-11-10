@@ -14,7 +14,6 @@ use App\Models\Team;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 trait HasScheduling
@@ -121,19 +120,6 @@ trait HasScheduling
     public function hostZones(): HasMany
     {
         return $this->hasMany(HostZone::class);
-    }
-
-    /**
-     * Get the holidays the user is marked unavailable on.
-     *
-     * @return array<int, string>
-     */
-    public function enabledHolidays(): array
-    {
-        return DB::table('user_holidays')
-            ->where('user_id', $this->id)
-            ->pluck('holiday_key')
-            ->all();
     }
 
     /**

@@ -60,7 +60,7 @@ test('members can see the advanced settings but not change them', function () {
         ->and($this->team->closures()->count())->toBe(0);
 });
 
-test('an admin can require holidays of every member', function () {
+test('an admin can choose the organization holidays', function () {
     $this->actingAs($this->admin)
         ->patch(route('teams.advanced.update', $this->team), ['holiday_country' => 'US', 'holidays' => ['thanksgiving']])
         ->assertRedirect(route('teams.advanced.edit', $this->team));
@@ -75,9 +75,8 @@ test('a holiday the country does not have is refused', function () {
         ->assertSessionHasErrors('holidays.0');
 });
 
-test('a required holiday blocks the member even though they never took it off', function () {
-    expect($this->member->enabledHolidays())->toBeEmpty()
-        ->and(openSlotsOn($this->eventType, '2026-11-26'))->not->toBeEmpty();
+test('an organization holiday blocks every member', function () {
+    expect(openSlotsOn($this->eventType, '2026-11-26'))->not->toBeEmpty();
 
     $this->team->update(['holiday_country' => 'US']);
     DB::table('team_holidays')->insert(['team_id' => $this->team->id, 'holiday_key' => 'thanksgiving']);

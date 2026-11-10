@@ -4,14 +4,13 @@ namespace App\Services\Scheduling;
 
 use App\Models\Team;
 use App\Models\TeamClosure;
-use App\Models\User;
 use App\Support\TimeRange;
 use Carbon\CarbonImmutable;
 
 /**
- * Restrictions that apply to a host across every event type they run: the
- * holidays they take off, and the holidays and blocked dates their
- * organization requires of everyone.
+ * Days an organization is closed: the holidays it takes off and the dates it
+ * blocks (a company outing, say). Nobody in it can be booked on them for its
+ * event types; they are the organization's call, not each host's.
  */
 class HostRestrictions
 {
@@ -21,32 +20,20 @@ class HostRestrictions
     }
 
     /**
-     * Get the local dates a host is unavailable on: the holidays they take off,
-     * plus the holidays and blocked dates the organization requires.
+     * Get the local dates the organization is closed on near the window.
      *
      * @return array<int, string> Y-m-d dates.
      */
-    public function holidayDates(User $host, TimeRange $window, ?Team $organization = null): array
+    public function closedDates(Team $organization, TimeRange $window): array
     {
         $fromYear = (int) $window->start->format('Y');
         $toYear = (int) $window->end->format('Y');
 
-        $dates = blank($host->holiday_country)
+        $dates = blank($organization->holiday_country)
             ? []
-            : $this->holidays->datesFor($host->holiday_country, $host->enabledHolidays(), $fromYear, $toYear);
+            : $this->holidays->datesFor($organization->holiday_country, $organization->requiredHolidays(), $fromYear, $toYear);
 
-        if ($organization !== null) {
-            if (filled($organization->holiday_country)) {
-                $dates = [
-                    ...$dates,
-                    ...$this->holidays->datesFor($organization->holiday_country, $organization->requiredHolidays(), $fromYear, $toYear),
-                ];
-            }
-
-            $dates = [...$dates, ...$this->closureDates($organization, $window)];
-        }
-
-        return array_values(array_unique($dates));
+        return array_values(array_unique([...$dates, ...$this->closureDates($organization, $window)]));
     }
 
     /**

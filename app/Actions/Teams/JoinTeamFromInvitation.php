@@ -2,7 +2,6 @@
 
 namespace App\Actions\Teams;
 
-use App\Actions\Scheduling\ApplyDefaultHolidays;
 use App\Actions\Scheduling\CreateDefaultAvailability;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -13,7 +12,6 @@ class JoinTeamFromInvitation
 {
     public function __construct(
         private CreateDefaultAvailability $createDefaultAvailability,
-        private ApplyDefaultHolidays $applyDefaultHolidays,
     ) {
         //
     }
@@ -66,7 +64,6 @@ class JoinTeamFromInvitation
             $invitation->update(['accepted_at' => now()]);
 
             $this->createDefaultAvailability->handle($user);
-            $this->applyDefaultHolidays->handle($user);
 
             return $user;
         });

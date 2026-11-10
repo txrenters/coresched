@@ -1,33 +1,19 @@
 <?php
 
-use App\Actions\Scheduling\ApplyDefaultHolidays;
-use App\Models\User;
 use Illuminate\Database\Migrations\Migration;
 
 return new class extends Migration
 {
     /**
      * Run the migrations.
+     *
+     * This once opted every user in to the default holidays. Holidays are now
+     * the organization's (see move_holidays_from_users_to_organizations), so
+     * a fresh database has nothing to do here.
      */
     public function up(): void
     {
-        $country = config('scheduling.default_holiday_country');
-
-        if (blank($country)) {
-            return;
-        }
-
-        $apply = app(ApplyDefaultHolidays::class);
-
-        // Only people who have never chosen a country, so anyone who has
-        // deliberately opted out is left alone.
-        User::query()
-            ->whereNull('holiday_country')
-            ->chunkById(100, function ($users) use ($apply, $country) {
-                foreach ($users as $user) {
-                    $apply->handle($user, $country);
-                }
-            });
+        //
     }
 
     /**
@@ -35,6 +21,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Opting people back out would discard choices they have since made.
+        //
     }
 };

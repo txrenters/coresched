@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Settings;
 
-use App\Actions\Scheduling\ApplyDefaultHolidays;
 use App\Actions\Scheduling\CreateDefaultAvailability;
 use App\Actions\Teams\CreateTeamUser;
 use App\Actions\Teams\SendAccountWelcome;
@@ -29,7 +28,6 @@ class UserDirectoryController extends Controller
 {
     public function __construct(
         protected CreateDefaultAvailability $createDefaultAvailability,
-        protected ApplyDefaultHolidays $applyDefaultHolidays,
     ) {
         //
     }
@@ -129,7 +127,6 @@ class UserDirectoryController extends Controller
                 ])->save();
 
                 $this->createDefaultAvailability->handle($user);
-                $this->applyDefaultHolidays->handle($user);
 
                 return $user;
             });

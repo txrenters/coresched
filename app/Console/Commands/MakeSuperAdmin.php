@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Actions\Scheduling\ApplyDefaultHolidays;
 use App\Actions\Scheduling\CreateDefaultAvailability;
 use App\Models\Team;
 use App\Models\User;
@@ -32,7 +31,6 @@ class MakeSuperAdmin extends Command
 
     public function __construct(
         protected CreateDefaultAvailability $createDefaultAvailability,
-        protected ApplyDefaultHolidays $applyDefaultHolidays,
     ) {
         parent::__construct();
     }
@@ -98,7 +96,6 @@ class MakeSuperAdmin extends Command
          */
         if ($user->availabilitySchedules()->doesntExist()) {
             $this->createDefaultAvailability->handle($user);
-            $this->applyDefaultHolidays->handle($user);
         }
 
         $this->components->info("{$user->email} is now a super admin.");

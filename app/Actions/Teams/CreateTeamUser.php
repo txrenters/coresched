@@ -2,7 +2,6 @@
 
 namespace App\Actions\Teams;
 
-use App\Actions\Scheduling\ApplyDefaultHolidays;
 use App\Actions\Scheduling\CreateDefaultAvailability;
 use App\Enums\TeamRole;
 use App\Models\Team;
@@ -14,7 +13,6 @@ class CreateTeamUser
 {
     public function __construct(
         private CreateDefaultAvailability $createDefaultAvailability,
-        private ApplyDefaultHolidays $applyDefaultHolidays,
         private SendAccountWelcome $sendAccountWelcome,
     ) {
         //
@@ -50,7 +48,6 @@ class CreateTeamUser
             $user->forceFill(['current_team_id' => $team->id])->save();
 
             $this->createDefaultAvailability->handle($user);
-            $this->applyDefaultHolidays->handle($user);
 
             return $user;
         });
