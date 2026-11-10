@@ -175,12 +175,14 @@ class UserDirectoryController extends Controller
     /**
      * Add, change or clear a user's mobile number.
      *
-     * Open to the same people as the reset link: a super admin for anyone, an
-     * admin for the people in the organizations they run.
+     * A super admin may for anyone. An admin may only when they run every
+     * organization the person belongs to: the number is the account's, not the
+     * organization's, so changing it reroutes the texts of every organization
+     * the person hosts in.
      */
     public function updatePhone(Request $request, User $user): RedirectResponse
     {
-        abort_unless($this->mayActOn($request->user(), $user), 403);
+        abort_unless($this->mayEditPhone($request->user(), $user), 403);
 
         $validated = $request->validate([
             'phone' => ['nullable', 'string', 'max:20', new DialableNumber],
@@ -318,6 +320,25 @@ class UserDirectoryController extends Controller
     }
 
     /**
+     * Determine whether the viewer may change this account's mobile number.
+     */
+    protected function mayEditPhone(User $viewer, User $subject): bool
+    {
+        if ($viewer->can('manageUsers')) {
+            return true;
+        }
+
+        if ($subject->isSuperAdmin()) {
+            return false;
+        }
+
+        $memberOf = $subject->teams()->pluck('teams.id');
+
+        return $memberOf->isNotEmpty()
+            && $memberOf->diff($this->administeredTeamIds($viewer))->isEmpty();
+    }
+
+    /**
      * Get the ids of the organizations the viewer administers.
      *
      * @return Collection<int, int>
@@ -359,7 +380,7 @@ class UserDirectoryController extends Controller
             // What this viewer may do to this row, so the menu offers only
             // the actions that would actually go through.
             'canResetPassword' => $mayActOn,
-            'canEditPhone' => $mayActOn,
+            'canEditPhone' => $this->mayEditPhone($viewer, $user),
             'removableFrom' => $viewer->is($user)
                 ? collect()
                 : $user->teams

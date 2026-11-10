@@ -530,3 +530,27 @@ test('an admin cannot change the mobile number of a stranger, and a member canno
 
     expect($stranger->fresh()->phone)->toBeNull();
 });
+
+test('an admin cannot change the mobile number of somebody who also belongs to an organization they do not run', function () {
+    $team = Team::factory()->create();
+    $otherTeam = Team::factory()->create();
+    $admin = User::factory()->create();
+    $shared = User::factory()->create(['phone' => '+15125550100']);
+
+    $admin->teams()->detach();
+    $shared->teams()->detach();
+    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $team->members()->attach($shared, ['role' => TeamRole::Member->value]);
+    $otherTeam->members()->attach($shared, ['role' => TeamRole::Member->value]);
+
+    $this->actingAs($admin)
+        ->get(route('users.index'))
+        ->assertInertia(fn ($page) => $page
+            ->where('users', fn ($users) => collect($users)->firstWhere('id', $shared->id)['canEditPhone'] === false));
+
+    $this->actingAs($admin)
+        ->patch(route('users.phone', ['user' => $shared->id]), ['phone' => '281-555-0100'])
+        ->assertForbidden();
+
+    expect($shared->fresh()->phone)->toBe('+15125550100');
+});
