@@ -3,14 +3,12 @@ import { StackedBar } from '@unovis/ts';
 import { VisAxis, VisStackedBar, VisXYContainer } from '@unovis/vue';
 import { computed } from 'vue';
 import type { ChartConfig } from '@/components/ui/chart';
-import {
-    ChartContainer,
-    ChartTooltip,
-    ChartTooltipContent,
-    componentToString,
-} from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart';
 
 type Point = { label: string; value: number };
+
+/** What Unovis 1.7 binds to each stacked-bar element: the row is wrapped. */
+type BarRecord = { datum: Point; index: number };
 
 const props = defineProps<{
     data: Point[];
@@ -30,11 +28,51 @@ const config = computed<ChartConfig>(() => ({
 const x = (_: Point, index: number) => index;
 const y = (point: Point) => point.value;
 
-/** Label every other bar when there are many, so ticks never collide. */
-const tickFormat = (index: number) => {
-    const step = props.data.length > 8 ? 2 : 1;
+/**
+ * At most six x labels, always on whole bars, so a 30-day series doesn't
+ * crowd its ticks into wrapped two-line labels.
+ */
+const tickValues = computed(() => {
+    const step = Math.max(1, Math.ceil(props.data.length / 6));
 
-    return index % step === 0 ? (props.data[index]?.label ?? '') : '';
+    return props.data
+        .map((_, index) => index)
+        .filter((index) => index % step === 0);
+});
+
+const tickFormat = (index: number) => props.data[index]?.label ?? '';
+
+const escapeHtml = (text: string) =>
+    text.replace(
+        /[&<>"']/g,
+        (character) =>
+            ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+            })[character] ?? character,
+    );
+
+/**
+ * Tooltip markup for one bar. Built here rather than with the shadcn
+ * componentToString helper: that helper reads label/value off the top level
+ * (Unovis 1.7 wraps the row in `datum`, so it rendered empty) and calls useId()
+ * on the client only, which shifted every chart id after hydration and left
+ * the bars without their --color-value.
+ */
+const tooltipTemplate = (record: BarRecord | Point) => {
+    const point = 'datum' in record ? record.datum : record;
+
+    return `<div class="grid min-w-32 gap-1.5 rounded-lg border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-overlay">
+        <div class="font-medium">${escapeHtml(point.label)}</div>
+        <div class="flex items-center gap-2">
+            <span class="size-2.5 shrink-0 rounded-xs bg-(--color-value)"></span>
+            <span class="flex-1 text-muted-foreground">${escapeHtml(props.seriesLabel)}</span>
+            <span class="font-mono font-medium tabular-nums">${point.value.toLocaleString()}</span>
+        </div>
+    </div>`;
 };
 
 /** Whole-number y ticks: these are counts. */
@@ -68,7 +106,7 @@ const max = computed(() =>
                     :tick-line="false"
                     :domain-line="false"
                     :grid-line="false"
-                    :num-ticks="data.length"
+                    :tick-values="tickValues"
                     :tick-format="tickFormat"
                 />
                 <VisAxis
@@ -79,13 +117,7 @@ const max = computed(() =>
                     :tick-format="yTickFormat"
                 />
                 <ChartTooltip
-                    :triggers="{
-                        [StackedBar.selectors.bar]: componentToString(
-                            config,
-                            ChartTooltipContent,
-                            { labelKey: 'label' },
-                        ),
-                    }"
+                    :triggers="{ [StackedBar.selectors.bar]: tooltipTemplate }"
                 />
             </VisXYContainer>
         </ChartContainer>

@@ -5,6 +5,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/Scheduling/** | .ai/rules/actions-scheduling.md |
+| resources/js/components/admin/** | .ai/rules/admin.md |
 | app/Actions/Bookings/AssignHosts.php, app/Actions/Bookings/ScheduleAutomations.php, app/Actions/Bookings/** | .ai/rules/bookings.md |
 | app/Services/Calendar/** | .ai/rules/calendar.md |
 | app/Services/Calendly/**, app/Services/Calendly/CalendlyClient.php | .ai/rules/calendly.md |
