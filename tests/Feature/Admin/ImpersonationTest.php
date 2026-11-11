@@ -195,7 +195,6 @@ test('the members account security is locked while signed in as them', function 
     $this->{$method}(route($routeName))->assertForbidden();
 })->with([
     'password' => ['put', 'user-password.update'],
-    'profile and email' => ['patch', 'profile.update'],
     'account deletion' => ['delete', 'profile.destroy'],
     'two-factor' => ['post', 'two-factor.enable'],
     'api keys' => ['post', 'api-keys.store'],
@@ -271,4 +270,51 @@ test('a marker naming the signed-in user is not an impersonation', function () {
         ])
         ->assertSessionHasNoErrors()
         ->assertRedirect();
+});
+
+test('the members phone and name can be changed while signed in as them', function () {
+    startImpersonating($this);
+
+    $this->patch(route('profile.update'), [
+        'name' => 'IT Support',
+        'email' => $this->member->email,
+        'phone' => '(512) 555-0100',
+    ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('profile.edit'));
+
+    expect($this->member->fresh())
+        ->name->toBe('IT Support')
+        ->phone->toBe('+15125550100');
+});
+
+test('the members email cannot be changed while signed in as them', function () {
+    startImpersonating($this);
+
+    $email = $this->member->email;
+
+    $this->patch(route('profile.update'), [
+        'name' => $this->member->name,
+        'email' => 'someone-else@example.com',
+        'phone' => '(512) 555-0100',
+    ])->assertForbidden();
+
+    expect($this->member->fresh())
+        ->email->toBe($email)
+        ->phone->toBeNull();
+});
+
+test('not even the capitalisation of the members email changes while signed in as them', function () {
+    $this->member->forceFill(['email' => 'it.support@example.com'])->save();
+
+    startImpersonating($this);
+
+    $this->patch(route('profile.update'), [
+        'name' => $this->member->name,
+        'email' => 'IT.Support@example.com',
+    ])->assertForbidden();
+
+    expect($this->member->fresh())
+        ->email->toBe('it.support@example.com')
+        ->email_verified_at->not->toBeNull();
 });
